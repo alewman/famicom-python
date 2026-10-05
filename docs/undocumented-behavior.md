@@ -1,0 +1,255 @@
+# Undocumented behaviour, revision differences, contradictions, open items
+
+Nintendo published no hardware manual for the 2A03 or 2C02; what is known comes
+from test programs run on consoles, die analysis (Visual 2A03/2C02, Breaks) and
+the NESdev community's write-ups of both. This page holds what a board needs
+beyond [start-here.md](start-here.md): the quirks, how the chip revisions
+differ, where the sources disagree, and what is still open. Paths as in
+start-here.md; tiers in [validation.md](validation.md).
+
+## The CPU (2A03 against the NMOS 6502)
+
+1. **Decimal mode is disconnected.** D is set and cleared by SED/CLD, pushed and
+   pulled normally; the decimal-adjust signals are cut ("cutting 5 pieces of
+   polysilicon"), so ADC and SBC are binary with binary flags (Breaks
+   `APU/core.md` "Embedded 6502 Core", die-derived; AccuracyCoin "The Decimal
+   Flag", hardware-corrected). The undocumented opcodes that use the adder or
+   the decimal fix-up are binary too: **RRA, ISC, USBC ($EB) and ARR**. Checked
+   on SingleStepTests `nes6502/v1`: with D set, all 4,948 `ADC #imm` and 4,992
+   `ARR` cases give the binary result. Unmodified 6502-python fails 4,732 cases
+   of `69.json` and 2,790 of `6b.json`, every one with D set; opcodes 00, 8B, 9E,
+   AB fail none. Affected opcodes: ADC 61 65 69 6D 71 75 79 7D; SBC E1 E5 E9 ED
+   F1 F5 F9 FD; EB; ARR 6B; RRA 63 67 6F 73 77 7B 7F; ISC E3 E7 EF F3 F7 FB FF.
+2. **The instruction decoder is otherwise identical** (Breaks: "No differences
+   were found in the instruction decoder"). A few commercial games use
+   unofficial opcodes ($80/$89/$04/$DA/$FA NOPs, SLO $07, LAX $B3;
+   `CPU_unofficial_opcodes.wiki`).
+3. **ANE ($8B) / LXA ($AB) magic constant varies from chip to chip.** AccuracyCoin
+   tests only the cases it cannot affect. SingleStepTests `nes6502` uses $EE (the
+   one constant that fits all 10,000 cases of each file), as 6502-python does.
+   Keep $EE and say so.
+4. **SHA/SHX/SHY/TAS**: with a DMA halt on the cycle before the write the
+   "AND (H+1)" drops out (AccuracyCoin codes 7–C); the high-byte corruption on a
+   page cross varies by manufacturer (AND with A&X, X only, A & magic, A | X;
+   AccuracyCoin `TEST_SHA_93`). 6502-python implements the No More Secrets model.
+   Which one an RP2A03G shows is open; no commercial game depends on it.
+5. **Reset suppresses the three stack writes** (reads instead), as 6502-python
+   already does.
+
+## The PPU
+
+### Power-up and reset
+
+- Writes to **$2000, $2001, $2005, $2006** are ignored (and w does not flip)
+  until the reset flag clears at the first pre-render line; $2002, $2003, $2004,
+  $2007 and $4014 work at once (`PPU_power_up_state.wiki`, blargg 2008). The
+  internal reset clears PPUCTRL, PPUMASK, t, x, w and the read buffer, **not v**.
+- PPUSTATUS at power `+0+x xxxx` (VBL often set). Palette RAM: undefined at
+  power, unchanged at reset; blargg's console:
+  `09 01 00 01 00 02 02 0D 08 10 08 24 00 00 04 2C 09 01 34 03 00 04 00 14 08 3A 00 02 00 20 2C 08`
+  ("probably unique to my NES"); AccuracyCoin: "every console tested appears to
+  have a unique and consistent power on state". Mesen2 boots with blargg's table.
+- OAM is DRAM: undefined at power; it decays when not refreshed (holds at least
+  one vblank, "not much longer"; `PPU_OAM.wiki`).
+
+### The I/O latch ("PPU open bus")
+
+Any write to $2000–$2007 loads it; $2004/$2007 reads load it; a $2002 read
+loads bits 7–5 only; write-only registers read it back. **Decay is a
+contradiction** (below, item C1). Proposal: per-bit decay with a configurable
+timeout, default between 10 ms and 1 s so blargg's test passes, noting that
+hardware is faster.
+
+### OAM and OAMADDR
+
+- 2C02G: a write to $2003 corrupts OAM by copying the old 8-byte row over the
+  new (`PPU_registers.wiki`; `nesdev-forum/10189.html`). At render start, an
+  OAMADDR ≥ 8 copies the 8 bytes at OAMADDR & $F8 to OAM[0–7] on revisions C,
+  E, G, H (`Errata.wiki`). 2C03/04/05/07 don't.
+- $2004 writes during rendering don't write OAM but bump OAMADDR's high bits
+  ("probably best to completely ignore").
+
+### Bus-level glitches
+
+- **Early writes**: the CPU data bus holds open bus at the start of a write
+  cycle, so for PPUCTRL bits 0–1, the first $2005 write and the second $2006
+  write the PPU briefly sees the open-bus value for about one dot. A PPUCTRL
+  write on dots 257–258 draws the next line from the left nametable (the Super
+  Mario Bros. glitch, `nesdev-forum/10104.html`). Reproducible only if the board
+  knows the open-bus value at the start of each write cycle; optional.
+- **Internal bus conflict**: if the t→v copy of a second $2006 write lands on
+  the same dot as a coarse-X or Y increment, the incremented part of v and t
+  becomes old v AND t (`PPU_glitches.wiki`; `nesdev-forum/18092.html`).
+- $2007 accesses during rendering increment coarse X and Y together.
+- Y scroll 240–255 reads attribute bytes as tiles; coarse Y 31 wraps to 0
+  without switching nametable.
+
+## The APU
+
+- Pulse 1's sweep negate adds the ones' complement (−c−1), pulse 2's the two's
+  complement (−c). **Sweep muting applies whether or not the sweep is enabled**:
+  period < 8 or target > $7FF mutes (`APU_Sweep.wiki`).
+- The triangle is never silenced by the hardware: silencing halts it at its
+  current step (DC hold, pops), and periods 0 and 1 give ultrasonic output that
+  averages to 7.5 ("half way between 7 and 8", blargg `apu_ref.txt` l.476–478).
+  Many emulators silence it; the reference board does not.
+- A $4011 write can be lost when it coincides with a DMC output clock.
+- $4015 reads are internal: the external data bus is not driven and open bus is
+  not updated; bit 5 is the last open-bus value.
+- **Mixing**: the DMC level attenuates triangle and noise (SMB and StarTropics
+  use it as a volume control).
+
+### Measured expansion-audio mix levels
+
+dB of a full-volume tone against the APU square, 440 Hz RMS (hardware-captured):
+
+| Chip | rainwarrior 2018 (AV Famicom) | James-F 2018 (HVC-CPU-07) | NSFe `mixe` default (mB) |
+| --- | --- | --- | --- |
+| APU triangle | −0.3 (Famicom), +0.1 (NES) | −0.03 | −20 |
+| VRC6 | +0.2 | −1.11 | 0 |
+| VRC7 (square-like patch) | +11.3 | +10.88 | 1100 |
+| FDS | +6.6 | | 700 |
+| MMC5 | +1.0 | +0.05 | 0 |
+| N163, 1 channel | +17.2 to +19.2 | +11.58 to +18.16 | 1100 or 1900 by submapper |
+| 5B (volume 12) | −1.3 | | −130 |
+
+`nesdev-forum/17741.html`, `NSFe.wiki` l.207–242, `Namco_163_audio.wiki`
+l.229–262. Levels vary by cartridge (N163 boards use different resistors) and
+by console revision.
+
+## Revisions as data
+
+### CPU (`CPU_variants.wiki`, `CPU_Test_Mode.wiki`)
+
+| Rev | Dates | Differences |
+| --- | --- | --- |
+| RP2A03 (letterless) | 1983–84 | M2 duty 17/24 (or 75 % measured, C3); frame counter and DPCM LFSR not reset by /RES; no short noise mode, noise table one LFSR stage shorter ($F = 2046) |
+| RP2A03E | 1984–86 | pin 30 = external /RDY (PlayChoice uses it); no APU difference recorded |
+| **RP2A03G** | 1987–93 | reference; pin 30 = test mode ($4018–$401A); late runs have the DMC unexpected-reload bug |
+| RP2A03H | 1993– | no known differences from late G |
+| RP2A07 (PAL) | | ÷16, M2 19/32, PAL noise/DMC/frame tables, DMA register-read glitches fixed |
+| UMC clones (Dendy) | | ÷15, NTSC tables, DMC status cleared one APU cycle later |
+
+### PPU (`PPU_variants.wiki`, `Errata.wiki`)
+
+| Part | Differences |
+| --- | --- |
+| RP2C02 letterless, A, B | $2004 and palette not readable; A: PPUCTRL/PPUMASK asynchronous; A/B: sprite garbage at x = 255; no render-start OAM copy |
+| C, D, E | not readable; C/E copy the OAM row at render start; "various OAM evaluation bugs" on E and earlier (UNVERIFIED detail) |
+| **G** | $2004 and palette readable (palette read corrupt on one alignment); $2003 corruption; render-start copy. Visual 2C02 and PPUSim model it |
+| H | as G; "thought to have fixed some glitches (which?)" |
+| 2C07 (PAL) | 312 lines, no odd-frame skip, R/G emphasis swapped, forced OAM refresh lines 265–310, black border |
+| 2C03/2C04/2C05 (RGB) | no odd-frame skip (except 2C05-99), emphasis = channel full scale; 2C04 scrambled palettes; 2C05 swaps $2000/$2001 and returns a constant in $2002's low bits |
+
+### Region table (later phases)
+
+| | 2C02 NTSC | 2C07 PAL | Dendy | RGB PPUs |
+| --- | --- | --- | --- | --- |
+| Lines | 262 | 312 | 312 | 262 |
+| Post-render lines before VBL | 1 | 1 | **51** | 1 |
+| VBL set line | 241 | 241 | 291 | 241 |
+| VBL length | 20 lines | 70 or 71 (C7) | 20 | 20 |
+| Odd-frame skip | yes | no | no | no |
+| Emphasis bits 7/6/5 | B/G/R | B/R/G | B/R/G | full-scale |
+
+## Contradictions found while gathering
+
+Numbered so other documents can point at them. Each needs its judge named
+before the board takes a side.
+
+- **C1. PPU open-bus decay.** blargg `ppu_open_bus` readme: about 600 ms (its
+  test #3 needs zero after 1 s, #5/#7 assume bits survive 10 ms). lidnariq's
+  2023 hardware test: the fastest bit decays in 4–21 ms, faster when warm
+  (`nesdev-forum/24639.html`). The wiki: "3 ms to 30 ms" and elsewhere "at least
+  1 ms". Mesen2: 3 frames.
+- **C2. NMI suppression window.** The wiki says suppression "may" extend to
+  "the following dot or two"; blargg's tests give exactly −1, 0, +1 (other
+  alignments shift it by ±1 dot).
+- **C3. Letterless 2A03 M2 duty.** Wiki 17/24; Jarhmander's scope capture 75 %
+  (18/24, `nesdev-forum/13993-p166761.html`); Breaks `old_2a03.md` states it the
+  other way round (15/24 vs 17/24 for G). Matters only to M2-clocked cartridge
+  hardware.
+- **C4. CPU registers at power.** Wiki and blargg: A = X = Y = 0, P = $34.
+  AccuracyCoin: "many consoles were found to have noise in these registers …
+  the zero flag has been seen to be set". MAME powers on with X = $80, Z set.
+- **C5. $4017 at reset.** Brad Taylor: both bits cleared. blargg (hardware
+  tests) and the wiki: the last value is rewritten; IRQ inhibit "sometimes
+  cleared".
+- **C6. $4017 write delay.** `APU.wiki`: "2 or 3 cycles after the write";
+  `APU_Frame_Counter.wiki`: "3 or 4 CPU clock cycles after the write cycle".
+  Probably counted from different origins.
+- **C7. Frame IRQ flag while inhibited.** The wiki table: set only if inhibit is
+  clear. AccuracyCoin J/K: set for two cycles even when inhibited.
+- **C8. Noise LFSR at power.** Wiki and blargg: 1. `CPU_power_up_state.wiki`:
+  $0000, the first clock shifts in a 1.
+- **C9. Which 2A03 revisions lack short noise.** Brad Taylor: "revisions before
+  F". Wiki and Breaks: only the letterless one.
+- **C10. Analogue filter corners.** `APU_Mixer.wiki`: NES high-pass 90 Hz and
+  440 Hz, low-pass 14 kHz. Those came from blargg's 2009 fits
+  (`nesdev-forum/4946.html`), but his coefficients at 44.1 kHz work out to about
+  28 Hz, 1.2 Hz and 11.9 kHz (our arithmetic, UNVERIFIED). rainwarrior's 2018
+  sweeps fit a single high-pass of ~16 Hz (NES) and ~32 Hz (Famicom); lidnariq
+  gives 37 Hz from the Famicom schematic. The board's analogue presets are
+  "fitted" assumptions, cited, not facts.
+- **C11. DMC DMA cost.** blargg 2010: "4 normally, 3 on a write"; the wiki:
+  "load 3, reload 4". The wiki's get/put model reproduces blargg's table:
+  a difference of framing, document the wiki's model.
+- **C12. Rendering-enable latency.** Wiki: 3–4 dots. Mesen2: 1 dot.
+- **C13. Odd-frame skip condition.** Diagram and blargg's tests: BG enabled.
+  Wiki text: rendering enabled (BG or sprites).
+- **C14. Sprite evaluation end.** `PPU_sprite_priority.wiki`: dot 240;
+  `PPU_sprite_evaluation.wiki`: 256.
+- **C15. The second garbage fetch of each sprite slot.** Diagram: an AT fetch;
+  text: an NT fetch.
+- **C16. 2C07 vblank length.** 70 lines (cycle chart) vs 71 (variants page).
+- **C17. MMC3 revision names.** The wiki says the IRQ behaviour splits Sharp vs
+  NEC, not by letter; blargg's `mmc3_irq_tests` call the old behaviour "rev A",
+  `mmc3_test_2` calls it "MMC3_alt" and notes a chip marked MMC3B behaving that
+  way. **Name behaviours (new/Sharp = submapper 4.0, old/NEC = 4.4), never
+  letters.**
+- **C18. MMC6's IRQ.** blargg's `mmc3_test/6-MMC6` tests the *old* behaviour;
+  the NES 2.0 submapper page says MMC6 "uses Sharp MMC3 IRQ behavior".
+- **C19. MMC1 power-on bank.** "Reliably … the last bank" vs "fragile"
+  (`MMC1.wiki`).
+- **C20. Superseded documents.** loopy's 1999 scrolling document (needs both
+  layers enabled; v = t at line 0) and Brad Taylor's 2004 2C02 reference (MMC3
+  counts A13; both scroll copies at dot 256; 4 dots per evaluation step) are
+  wrong where the wiki has since been corrected. Cite them for history only.
+- **C21. $2006 t→v delay.** "1 to 1.5 dots after the write completes" vs "about
+  3 dots after the register write begins": probably the same instant; pin on
+  PPUSim.
+
+## Open items
+
+1. **Settle on PPUSim (die-derived)**: the garbage-fetch addresses (C15), the
+   row of the empty-slot tile-$FF fetch (Mesen2 uses row 0; the evaluation page
+   implies line − OAM[63].Y), the odd-frame skip's sampled signal and dot (C13),
+   the PPUMASK latency (C12), the $2006 delay (C21). But first check PPUSim
+   reproduces blargg's alignment-dependent results: Breaknes as a whole scores
+   70/140 on AccuracyCoin, so a gate-level model is evidence, not a verdict,
+   until the circuit in question is checked.
+2. **Check APUSim (die-derived) against `apu_test`, `apu_reset`, the 2005 suite
+   and AccuracyCoin pages 13–14** before using it as a per-cycle APU judge. It
+   stores a revision but branches on none: effectively 2A03G only. Its DAC is
+   fitted to one voltage, so it cannot judge the mixer.
+3. AV Famicom and NES-101 reset wiring (does the button reset the PPU?).
+4. The $4016 output latch after reset; exactly when OUT0–2 update.
+5. Which SHA/SHS behaviour and which ANE/LXA magic an RP2A03G shows.
+6. Reset is asynchronous on hardware; 6502-python takes it at a boundary.
+   Harmless for a button; `apu_reset/4017_timing` measures 9–12 clocks and may
+   care.
+7. The palette-read corruption alignment, and whether 2C02G's "two variants"
+   (PCLK distribution, `PPUSim ppu.h` l.149) change anything modelled.
+8. What a $2007 *write* during rendering writes, and where.
+9. 2C02H differences from G; the E-and-earlier OAM evaluation bugs.
+10. PAL/Dendy VBL clear timing; PAL APU beyond the frame sequencer (only
+    `pal_apu_tests` exist).
+11. Per-console analogue presets need recordings (rainwarrior's raw data was
+    never published; no NES MDFourier set was found).
+12. FirebrandX's "Composite Direct" palette: the site answered HTTP 465 to our
+    fetcher; download by hand if wanted, and its licence is unstated. The
+    licence of the Visual 2C02/2A03 netlist data is also unstated.
+13. The letterless 2A03's noise period table in text (Breaks has it as an image).
+14. MMC6 IRQ behaviour (C18), MMC3 Sharp vs NEC per licensed game (nes20db
+    assigns 4.0 to all), MMC2 latch timing (no test ROM), MMC5's in-frame exit
+    on $2001 and its $4014 snooping ("believed but not tested").

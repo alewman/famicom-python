@@ -1,0 +1,355 @@
+[
+ {
+  "path": "reference/src/240p-test-mini",
+  "url": "https://github.com/pinobatch/240p-test-mini",
+  "rev": "12c20f8c07f2736bb6f91b5590b9ef8bdf8cb38b",
+  "date": "2026-07-09T04:09:04Z",
+  "sparse": [
+   "/nes/"
+  ],
+  "note": "GPL-2.0 per GitHub (zlib per source headers?)"
+ },
+ {
+  "path": "reference/src/65x02",
+  "url": "https://github.com/SingleStepTests/65x02",
+  "rev": "2f6980a2d95757486c7bee24355c360e40e2a224",
+  "date": "2025-05-10T10:49:00-04:00",
+  "sparse": [
+   "/nes6502/README.md",
+   "/nes6502/v1/00.json",
+   "/nes6502/v1/69.json",
+   "/nes6502/v1/6b.json",
+   "/nes6502/v1/8b.json",
+   "/nes6502/v1/9e.json",
+   "/nes6502/v1/ab.json"
+  ],
+  "license": "MIT",
+  "note": "nes6502/v1: 256 files x 10,000 cases, bus cycles included, 1,081,529,097 bytes total; same rev 6502-python pins for its 6502 set. Full set should be fetched by the oracle runner, not pinned file by file."
+ },
+ {
+  "path": "reference/src/AccuracyCoin",
+  "url": "https://github.com/100thCoin/AccuracyCoin",
+  "rev": "4151899fd39bacd0b51bf3321127eb89ff762bb0",
+  "date": "2026-10-04T14:46:02-04:00",
+  "sparse": [
+   "/README.md",
+   "/AccuracyCoin.asm",
+   "/LICENSE"
+  ],
+  "license": "MIT",
+  "note": "hardware-corrected (designed on RP2A03G + RP2C02G); 144 tests; cited for decimal, interrupt polling, branch polls, SHx+RDY, DMA register conflicts, controller clocking variants"
+ },
+ {
+  "path": "reference/src/AprVisual",
+  "url": "https://github.com/erspicu/AprVisual",
+  "rev": "ced0e1d53357b85ab1dbbc047c0bfd0fcc70130e",
+  "date": "2026-07-24T16:58:29Z",
+  "sparse": [],
+  "note": "switch-level 2A03+2C02 sim (not cloned)"
+ },
+ {
+  "path": "reference/src/FlawlessChips",
+  "url": "https://github.com/tgjones/FlawlessChips",
+  "rev": "7647a7731d18162cc18ecb4d516928e021b25c07",
+  "date": "2026-03-15T23:22:33Z",
+  "sparse": [],
+  "note": "C# netlist sims incl. 2C02 (not cloned)"
+ },
+ {
+  "path": "reference/src/Mesen2",
+  "url": "https://github.com/SourMesen/Mesen2",
+  "rev": "b9fa69ddc6d0a331fb103fdb5eef6904305703c2",
+  "date": "2026-06-04T18:31:24+09:00",
+  "sparse": [
+   "/COMPILING.md",
+   "/Core/Debugger/LuaApi.cpp",
+   "/Core/NES/",
+   "/Core/NES/APU/",
+   "/Core/NES/BaseNesPpu.cpp",
+   "/Core/NES/BaseNesPpu.h",
+   "/Core/NES/Mappers/Audio/",
+   "/Core/NES/NesConstants.h",
+   "/Core/NES/NesPpu.cpp",
+   "/Core/NES/NesPpu.h",
+   "/InteropDLL/",
+   "/LICENSE",
+   "/README.md",
+   "/UI/Utilities/TestRunner.cs",
+   "/makefile"
+  ],
+  "license": "GPL-3.0 (read and cite only; never copy)",
+  "note": "Emulator-derived reference for odd-frame skip sampling, open-bus decay model, empty-slot sprite fetch address."
+ },
+ {
+  "path": "reference/src/MesenCE",
+  "url": "https://github.com/nesdev-org/MesenCE",
+  "rev": "a60e79feb4d6dcced5922d636f9211837d01e381",
+  "date": "2026-09-26T02:52:50Z",
+  "sparse": [
+   "/Core/NES/"
+  ],
+  "note": "GPL-3.0; live successor of Mesen2 (not cloned)"
+ },
+ {
+  "path": "reference/src/NES_MiSTer",
+  "url": "https://github.com/MiSTer-devel/NES_MiSTer",
+  "rev": "49a0a662e244469ca77b2155746a066df704ffae",
+  "date": "2026-09-30T13:29:05Z",
+  "sparse": [
+   "/rtl/"
+  ],
+  "note": "GPL-3.0 FPGA core, emulator-tier (not cloned)"
+ },
+ {
+  "path": "reference/src/Nuked-OPLL",
+  "url": "https://github.com/nukeykt/Nuked-OPLL",
+  "rev": "1269cf5a783b65583b50fa2464d08be75830aaa0",
+  "date": "2023-01-19T15:37:25+09:00",
+  "sparse": [],
+  "license": "GPL-2.0-or-later (read, run as referee, cite; never copy)",
+  "note": "Die-derived YM2413 family incl. opll_type_ds1001 = Konami VRC VII (opll.h:29-35; opll.c:114 patch_ds1001, 280-282 rhythm forced, 297-305 reset, 832-841 single multiplexed output, 955-956 no rhythm output). Same rev sms-python pins."
+ },
+ {
+  "path": "reference/src/TriCNES",
+  "url": "https://github.com/100thCoin/TriCNES",
+  "rev": "94f1b1178057e84c56e4c2410c8391eee4d78975",
+  "date": "2026-09-16T21:12:25Z",
+  "sparse": [],
+  "note": "AccuracyCoin author's emulator, 140/140 (not cloned; check licence)"
+ },
+ {
+  "path": "reference/src/VRC7dump",
+  "url": "https://github.com/nukeykt/VRC7dump",
+  "rev": "404294ad94e0d74aff901ab17e6de9495c9257f7",
+  "date": "2019-12-29T03:06:38+09:00",
+  "sparse": [],
+  "license": "GPL-2.0",
+  "note": "VRC7 internal patch ROM dump (die-read)."
+ },
+ {
+  "path": "reference/src/VisualNes",
+  "url": "https://github.com/SourMesen/VisualNes",
+  "rev": "f7dbdf2b2fb199e59d8ef583c6781aea9b2c8874",
+  "date": "2020-05-02T20:31:08Z",
+  "sparse": [],
+  "note": "C++/C# port of Visual 2A03+2C02 netlists (not cloned)"
+ },
+ {
+  "path": "reference/src/YM2203-LLE",
+  "url": "https://github.com/nukeykt/YM2203-LLE",
+  "rev": "817387fd89affd0db5331034d6ae04d919e25a5e",
+  "date": "2025-04-13T06:54:45+09:00",
+  "sparse": [],
+  "license": "GPL-2.0-or-later (read, run as referee, cite; never copy)",
+  "note": "Die-derived YM2203 incl. its SSG (AY/YM2149-compatible PSG), fmopn.c ~1550-1830 (17-bit noise LFSR taps 16/13 at 1819). Candidate judge for a shared YM2149 core / Sunsoft 5B: equivalence of YM2203 SSG to YM2149F (SEL low, 32-step envelope) UNVERIFIED."
+ },
+ {
+  "path": "reference/src/breaknes",
+  "url": "https://github.com/emu-russia/breaknes",
+  "rev": "fb7de61b62aeb1dbf710db5edfa1caaa4a4aad20",
+  "date": "2026-09-04T11:32:28+03:00",
+  "sparse": [
+   "/Chips/APUSim/",
+   "/Chips/PPUSim/",
+   "/Chips/Readme.md",
+   "/Common/BaseLogicLib/",
+   "/LICENSE",
+   "/Readme.md",
+   "/Tools/PPUPlayer/Build/Readme.md"
+  ],
+  "license": "CC0-1.0",
+  "note": "PPUSim: gate-level C++ 2C02/2C03/2C04/2C05/2C07 simulator; compiles with g++ -std=c++20 on Linux (24/24 TUs)."
+ },
+ {
+  "path": "reference/src/breaks",
+  "url": "https://github.com/emu-russia/breaks",
+  "rev": "5a55bacc2672474bc024aec68e59c226fceb0c27",
+  "date": "2026-09-07T18:35:54+03:00",
+  "sparse": [
+   "/BreakingNESWiki/*.md",
+   "/BreakingNESWiki/6502/",
+   "/BreakingNESWiki/APU/",
+   "/BreakingNESWiki/PPU/",
+   "/BreakingNESWiki_DeepL/*.md",
+   "/BreakingNESWiki_DeepL/6502/",
+   "/BreakingNESWiki_DeepL/APU/",
+   "/BreakingNESWiki_DeepL/PPU/",
+   "/Docs/6502/",
+   "/Docs/APU/",
+   "/Docs/Famicom/",
+   "/Docs/NES/",
+   "/Docs/PPU/",
+   "/HDL/APU/",
+   "/HDL/Common/*.v",
+   "/HDL/Design/apu/apu_test_coverage.xlsx",
+   "/HDL/Framework/Icarus/apu/",
+   "/HDL/Framework/Readme.md",
+   "/HDL/PPU/",
+   "/HDL/Readme.md",
+   "/LICENSE",
+   "/Logisim/Readme.md",
+   "/README.md"
+  ],
+  "license": "CC0-1.0",
+  "note": "clone created by another researcher; I ADDED the two DeepL 6502 paths with git sparse-checkout add. Cited: APU/core.md (decimal cut), APU/dma.md, Ricoh.md"
+ },
+ {
+  "path": "reference/src/fceux",
+  "url": "https://github.com/TASEmulators/fceux",
+  "rev": "a62b868e9247c4aafd66f597cdfa8d2609704087",
+  "date": "2026-05-30T00:35:55Z",
+  "sparse": [
+   "/src/"
+  ],
+  "note": "GPL-2.0 (not cloned)"
+ },
+ {
+  "path": "reference/src/holy-mapperel",
+  "url": "https://github.com/pinobatch/holy-mapperel",
+  "rev": "4e48b59432b5f1d3c011ac830e40ddf7ed5bbc61",
+  "date": "2022-12-06",
+  "sparse": [],
+  "note": "zlib; Damian Yerrick's mapper PCB test (source). Binary release v0.02 pinned separately in mapper-pins.json"
+ },
+ {
+  "path": "reference/src/mame",
+  "url": "https://github.com/mamedev/mame",
+  "rev": "f379cd060ac3b2bd567ebbd0957aed059d6895ff",
+  "date": "2026-01-29T15:02:37Z",
+  "sparse": [
+   "/src/mame/nintendo/nes*",
+   "/src/devices/video/ppu2c0x*",
+   "/src/devices/sound/nes_apu*",
+   "/src/devices/bus/nes/",
+   "/src/devices/bus/nes_ctrl/",
+   "/src/devices/cpu/m6502/",
+   "/hash/nes.xml",
+   "/hash/famicom_*.xml",
+   "/hash/nes_*.xml"
+  ],
+  "note": "tag mame0285 (= installed 0.285); BSD-3 except nes_apu.cpp GPL-2.0+"
+ },
+ {
+  "path": "reference/src/mame_nes",
+  "url": "https://github.com/theklap/mame_nes",
+  "rev": "f8b7c1d454d20978da4688ab4f06ba821e26d159",
+  "date": "2026-10-05T05:43:53Z",
+  "sparse": [
+   "/src/devices/video/ppu2c0x*",
+   "/src/mame/nintendo/nes*"
+  ],
+  "note": "MAME fork scoring 140/140 on AccuracyCoin (not cloned)"
+ },
+ {
+  "path": "reference/src/metalnes",
+  "url": "https://github.com/iaddis/metalnes",
+  "rev": "6acddfb97f49c54fc68349ae76ea2da3dfd2d715",
+  "date": "2022-04-13T22:45:52-07:00",
+  "sparse": [
+   "/LICENSE",
+   "/LICENSE*",
+   "/README.md",
+   "/data/2C02/",
+   "/data/nes/*.json"
+  ],
+  "license": "MIT",
+  "note": "Transistor-level NES-001 sim built on Visual 2A03/2C02 netlists; OSX-only build per README. Cited only."
+ },
+ {
+  "path": "reference/src/nes-audio-tests",
+  "url": "https://github.com/bbbradsmith/nes-audio-tests",
+  "rev": "99ef107f3f3ffe19f72937507ca0820a4f5c34cd",
+  "date": "2023-06-09T23:42:26-04:00",
+  "sparse": [],
+  "license": "permissive (readme: freely redistributed and modified for any purpose)",
+  "note": "rainwarrior's measurement ROMs: db_* expansion-volume survey, dac_square/dac_tnd0-3 DAC linearity (misc/dac.py analysis), sweep_5b filter sweep, tri_silence, clip_vrc7/clip_5b, test_vrc7, vrc7_patches/. Recordings themselves NOT in the repo."
+ },
+ {
+  "path": "reference/src/nes-test-roms",
+  "url": "https://github.com/christopherpow/nes-test-roms",
+  "rev": "95d8f621ae55cee0d09b91519a8989ae0e64753b",
+  "date": "2022-03-02T13:47:57-06:00",
+  "sparse": [
+   "/cpu_interrupts_v2/",
+   "/dmc_dma_during_read4/",
+   "/sprdma_and_dmc_dma/",
+   "/cpu_reset/",
+   "/cpu_dummy_reads/",
+   "/cpu_exec_space/",
+   "/branch_timing_tests/",
+   "/instr_misc/",
+   "/read_joy3/",
+   "/apu_reset/",
+   "/instr_test-v5/readme.txt",
+   "/cpu_timing_test6/",
+   "/ppu_open_bus/",
+   "/nmi_sync/"
+  ],
+  "license": "per-ROM (blargg ROMs: no explicit license; redistributed widely)",
+  "note": "CPU-side subset only; the test-ROM researcher may pin a wider sparse set at the same rev"
+ },
+ {
+  "path": "reference/src/nestopia",
+  "url": "https://github.com/0ldsk00l/nestopia",
+  "rev": "7b5c87d8dc3c817211545449683d1fcd897324ca",
+  "date": "2026-09-13T21:53:05Z",
+  "sparse": [
+   "/source/core/"
+  ],
+  "note": "GPL-2.0 (not cloned)"
+ },
+ {
+  "path": "reference/src/nintendulator",
+  "url": "https://github.com/quietust/nintendulator",
+  "rev": "1409c6af5ceea0cac7dec15c8348cb01024c84ed",
+  "date": "2025-12-27T20:20:45Z",
+  "sparse": [
+   "/src/"
+  ],
+  "note": "no licence file in repo root (not cloned)"
+ },
+ {
+  "path": "reference/src/perfect6502",
+  "url": "https://github.com/mist64/perfect6502",
+  "rev": "09fc542877a84318291aa42dab143a3e2c3db974",
+  "date": "2026-04-06T10:52:08Z",
+  "sparse": [],
+  "note": "C netlist 6502 (not cloned)"
+ },
+ {
+  "path": "reference/src/puNES",
+  "url": "https://github.com/punesemu/puNES",
+  "rev": "b1758ec26a3d6da10abf50dc184fa837236c5f61",
+  "date": "2026-09-01T07:20:20Z",
+  "sparse": [
+   "/src/core/"
+  ],
+  "note": "GPL-2.0 (not cloned)"
+ },
+ {
+  "path": "reference/src/tetanes",
+  "url": "https://github.com/lukexor/tetanes",
+  "rev": "a0a6b17f8ba9c5ee451453fb2409753fd06e5a31",
+  "date": "2026-09-07T04:29:35Z",
+  "sparse": [
+   "/tetanes-core/"
+  ],
+  "note": "Apache-2.0 / MIT (not cloned)"
+ },
+ {
+  "path": "tests/test_roms/AccuracyCoin",
+  "url": "https://github.com/100thCoin/AccuracyCoin",
+  "rev": "4151899fd39bacd0b51bf3321127eb89ff762bb0",
+  "date": "2026-10-04T18:46:02Z",
+  "sparse": [],
+  "note": "MIT"
+ },
+ {
+  "path": "tests/test_roms/nes-test-roms",
+  "url": "https://github.com/christopherpow/nes-test-roms",
+  "rev": "95d8f621ae55cee0d09b91519a8989ae0e64753b",
+  "date": "2022-03-02T19:47:57Z",
+  "sparse": [],
+  "note": "collection; no top-level licence"
+ }
+]
