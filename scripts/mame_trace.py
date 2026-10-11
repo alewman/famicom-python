@@ -6,8 +6,10 @@ Runs the recipe in docs/mame-oracle.md in a fresh directory (default
 there. The NES drivers need no BIOS; nothing is read from a romset.
 
     python scripts/mame_trace.py nes tests/test_roms/nes-test-roms/other/nestest.nes --nestest
-    python scripts/mame_trace.py nes tests/test_roms/nes-test-roms/ppu_vbl_nmi/ppu_vbl_nmi.nes --seconds 4
-    python scripts/mame_trace.py nes path/to/rom.nes --no-trace --seconds 60      # result only, fast
+    python scripts/mame_trace.py nes \
+        tests/test_roms/nes-test-roms/ppu_vbl_nmi/ppu_vbl_nmi.nes --seconds 4
+    # result only, fast:
+    python scripts/mame_trace.py nes path/to/rom.nes --no-trace --seconds 60
     python scripts/mame_trace.py nes AccuracyCoin.nes --no-trace --seconds 120 --press 120:Start:6
 
 ``error.log`` then holds, in execution order:
@@ -178,7 +180,8 @@ def main() -> int:
                 instructions += 1
     status = (out / "status.txt").read_text(encoding="utf-8").splitlines()
     print(
-        f"MAME {version}, {args.driver}, {args.seconds} s emulated in {wall:.1f} s: {out / 'error.log'}"
+        f"MAME {version}, {args.driver}, {args.seconds} s emulated in {wall:.1f} s: "
+        f"{out / 'error.log'}"
     )
     if not args.no_trace:
         print(

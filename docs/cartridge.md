@@ -62,18 +62,25 @@ Facts the protocol must honour:
 class CartridgeConnector(Protocol):
     # CPU side: one call per CPU bus cycle
     def cpu_read(self, address: int, t: int) -> int | None: ...
-    def cpu_write(self, address: int, value: int, t: int) -> None: ...  # bus conflicts are the mapper's
-    def m2(self, t: int) -> None: ...                  # optional per-cycle tick for cycle-counting IRQs
+    def cpu_write(
+        self, address: int, value: int, t: int
+    ) -> None: ...  # bus conflicts are the mapper's
+    def m2(self, t: int) -> None: ...  # optional per-cycle tick for cycle-counting IRQs
 
     # PPU side
-    def ppu_address(self, address: int, t: int) -> None: ...  # every address-bus change, rendering or not
-    def nametable(self, address: int) -> tuple[bool, int]: ... # (CIRAM /CE active, CIRAM A10)
+    def ppu_address(
+        self, address: int, t: int
+    ) -> None: ...  # every address-bus change, rendering or not
+    def nametable(self, address: int) -> tuple[bool, int]: ...  # (CIRAM /CE active, CIRAM A10)
     def ppu_read(self, address: int, t: int) -> int | None: ...
     def ppu_write(self, address: int, value: int, t: int) -> None: ...
 
     # outputs the board samples
     irq: bool
-    def audio(self, apu_in: float, t: int) -> float: ...  # Famicom pins 45 -> 46; default returns apu_in
+
+    def audio(
+        self, apu_in: float, t: int
+    ) -> float: ...  # Famicom pins 45 -> 46; default returns apu_in
     def battery_ram(self) -> bytes | None: ...
 ```
 
