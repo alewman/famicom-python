@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Drive a locally built MesenCore.so (Mesen2 2.1.1 archive) headless via ctypes.
 
-Feasibility probe for docs/validation.md ("Mesen2 as a second detector"): mirrors UI/Utilities/TestRunner.cs
+Feasibility probe for docs/validation.md ("Mesen2 as a second detector"): mirrors
+UI/Utilities/TestRunner.cs
 (no .NET needed) and adds the built-in trace logger, which prints the PPU
 scanline/dot and the CPU cycle count before every instruction.
 

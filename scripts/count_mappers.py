@@ -144,7 +144,10 @@ def main():
         timing = collections.Counter(r.get("timing") for r in good)
         print(f"NES2.0 timing (0 NTSC,1 PAL,2 multi,3 Dendy): {dict(timing)}", file=out)
         print(
-            f"battery: {sum(r['battery'] for r in good)}; trainer: {sum(r['trainer'] for r in good)}; four-screen bit: {sum(r['fourscreen'] for r in good)}; CHR-RAM (chr8==0): {sum(r['chr8'] == 0 for r in good)}",
+            f"battery: {sum(r['battery'] for r in good)}; "
+            f"trainer: {sum(r['trainer'] for r in good)}; "
+            f"four-screen bit: {sum(r['fourscreen'] for r in good)}; "
+            f"CHR-RAM (chr8==0): {sum(r['chr8'] == 0 for r in good)}",
             file=out,
         )
         exp = collections.Counter(r.get("exp") for r in good)
@@ -195,12 +198,14 @@ def main():
                 summary[setname]["licensed-sub"] = dict(sctr.most_common())
                 six = sum(1 for r in g if r["mapper"] in (0, 1, 2, 3, 4, 7))
                 print(
-                    f"\nmappers 0,1,2,3,4,7 cover {six}/{len(g)} = {100 * six / len(g):.2f}% of licensed dumps",
+                    f"\nmappers 0,1,2,3,4,7 cover {six}/{len(g)} = "
+                    f"{100 * six / len(g):.2f}% of licensed dumps",
                     file=out,
                 )
                 sixt = sum(v for k, v in tctr.items() if k in (0, 1, 2, 3, 4, 7))
                 print(
-                    f"mappers 0,1,2,3,4,7 cover {sixt}/{len(titles)} = {100 * sixt / len(titles):.2f}% of licensed base titles",
+                    f"mappers 0,1,2,3,4,7 cover {sixt}/{len(titles)} = "
+                    f"{100 * sixt / len(titles):.2f}% of licensed base titles",
                     file=out,
                 )
                 # PRG-RAM / CHR-RAM / battery by mapper for top mappers
@@ -209,8 +214,10 @@ def main():
                     rs = [r for r in g if r["mapper"] == m]
                     subs = collections.Counter(r["sub"] for r in rs)
                     print(
-                        f"  mapper {m}: n={n} battery={sum(r['battery'] for r in rs)} chrram={sum(r['chr8'] == 0 for r in rs)} "
-                        f"4scr={sum(r['fourscreen'] for r in rs)} vmirror={sum(r['vmirror'] for r in rs)} subs={dict(subs)} "
+                        f"  mapper {m}: n={n} battery={sum(r['battery'] for r in rs)} "
+                        f"chrram={sum(r['chr8'] == 0 for r in rs)} "
+                        f"4scr={sum(r['fourscreen'] for r in rs)} "
+                        f"vmirror={sum(r['vmirror'] for r in rs)} subs={dict(subs)} "
                         f"prg16={sorted(collections.Counter(r['prg16'] for r in rs).items())[:8]}",
                         file=out,
                     )

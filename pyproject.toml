@@ -1,4 +1,54 @@
-# Tooling only for now: there is no package yet (see docs/handoff-brief.md).
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "famicom-python"
+version = "0.1.0.dev0"
+description = "Readable, pure-Python Famicom and NES emulator built on 6502-python"
+readme = "README.md"
+# The floor is the newest Python PyPy supports (3.11 as of PyPy 7.3.23); raise it when PyPy does.
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "alewman" }]
+# A git revision, never a local path, until 6502-python is released: 038aa5d
+# (PR #6) has RP2A03 (#2), polling at the second-to-last cycle (#3) and the
+# per-CPU ANE/LXA constant (#6). Branch poll points (#4, re-landed as #5) are on
+# another branch until both merge; milestone 1 does not need them, milestone 3
+# does, so the pin moves to main when #5 and #6 are merged.
+dependencies = [
+    "6502-python @ git+https://github.com/alewman/6502-python@038aa5d7fe683c4ddee6ba06bac60ff770162bf8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    # Pinned: `ruff format --check` in CI must see the formatter the tree was formatted with.
+    "ruff==0.16.8",
+]
+
+[project.scripts]
+famicom-python = "famicom_python.__main__:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/famicom_python"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = ["reference", "tests/test_roms", "tests/mame_traces"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM", "PERF", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["famicom_python"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers -ra -m 'not slow'"
+pythonpath = ["src", "tests"]
+markers = ["slow: test ROMs that run for many emulated seconds (pytest -m slow)"]
