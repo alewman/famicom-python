@@ -1,0 +1,35 @@
+name: CI
+
+# Private repository: Actions minutes cost money, so PyPy only (the interpreter
+# the board is certified on), main and pull requests only, superseded runs
+# cancelled. The slow test ROMs run by hand (scripts/run_test_roms.py).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "pypy3.11"
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m ruff check .
+      - run: python -m ruff format --check .
+      # nestest only, from the pinned nes-test-roms (scripts/pinned_repos.json);
+      # nothing fetched is committed.
+      - name: Fetch nestest
+        run: |
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/christopherpow/nes-test-roms tests/test_roms/nes-test-roms
+          git -C tests/test_roms/nes-test-roms sparse-checkout set other
+          git -C tests/test_roms/nes-test-roms checkout --quiet 95d8f621ae55cee0d09b91519a8989ae0e64753b
+      - run: python -m pytest -q

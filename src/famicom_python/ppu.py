@@ -71,6 +71,16 @@ class PPU:
 
     def run_to(self, time: int) -> None:
         """Run every dot that begins before master tick ``time``."""
+        ticks = self.dot_ticks
+        dots = (time - self.time + ticks - 1) // ticks
+        if dots <= 0:
+            return
+        dot = self.dot
+        if dot >= 1 and dot + dots < DOTS - 1:
+            # Nothing happens on dots 2-339 in milestone 1: advance in one step.
+            self.dot = dot + dots
+            self.time += dots * ticks
+            return
         while self.time < time:
             self.time += self.dot_ticks
             dot = self.dot + 1

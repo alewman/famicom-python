@@ -240,5 +240,70 @@ The No-Intro sets are under `/data/emu/source/myrient.erista.me/files/No-Intro/`
 
 ## Certification record
 
-Empty: there is no emulator yet. The milestones in
-[handoff-brief.md](handoff-brief.md) say what each rung's record must contain.
+### Milestone 1: the CPU on the board (2026-10-11)
+
+**Pins.** famicom-python at the commit that adds this record; 6502-python
+`038aa5d7fe683c4ddee6ba06bac60ff770162bf8` (PR #6: RP2A03, polling at the
+second-to-last cycle, the per-CPU ANE/LXA constant); `nes-test-roms`
+`95d8f621ae55cee0d09b91519a8989ae0e64753b`. Machine NES-001 (RP2A03G +
+RP2C02G), `PowerOn()` defaults: alignment 0, first cycle an APU get, RAM $00,
+A = X = Y = 0; LXA's constant $FF, ANE's $EE. PyPy 7.3.20 (Python 3.11.13) and
+CPython 3.14.4 on a shared 32-core machine.
+
+**nestest** (`other/nestest.nes`, SHA-256 `f67d55fd…0004`) in automation mode
+against `nestest.log` (`442c4dd5…6f8f`, emulator-derived: Nintendulator, and
+MAME 0.285 agrees): **8,991 of 8,991 lines** match in PC, A, X, Y, P (masked
+$CF), SP and CYC, and the PPU line and dot columns match too. Power-on for
+lines 1-2: A = X = Y = 0, S = 0 and I set before the 7-cycle reset sequence,
+which leaves S = $FD, P = $24, CYC = 7; then PC = $C000. Result codes $02 and
+$03 are both 0. `tests/test_nestest.py`, in the quick loop.
+
+**The CPU test ROMs** (hardware-corrected), `pytest -m slow` and
+`scripts/run_test_roms.py --suite cpu`, all passing under PyPy and under
+CPython, with identical cycle and instruction counts (wall time includes loading
+nes20db, about 2 s; 10 ran at a time):
+
+| ROM | SHA-256 | Reports | CPU cycles | Instructions | Wall s, PyPy | Wall s, CPython |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| `instr_test-v5/all_instrs.nes` | `353870c1…c785` | $6000: "All 16 tests passed" | 70,936,630 | 23,018,000 | 10.9 | 34.8 |
+| `instr_timing/instr_timing.nes` | `3d1bca14…0fb0` | $6000: both passed | 38,653,018 | 11,060,000 | 8.2 | 18.5 |
+| `instr_misc/instr_misc.nes` | `b6762e20…1243` | $6000: all 4 passed | 6,641,245 | 2,478,000 | 4.4 | 4.4 |
+| `cpu_timing_test6/cpu_timing_test.nes`, B held (official + all unofficial) | `6ab4fe8a…5b85` | screen: PASSED | 29,482,697 | 8,748,978 | 8.5 | 14.3 |
+| `branch_timing_tests/1.Branch_Basics.nes` | `7b69e304…86cd` | screen: PASSED ($F8 = 1) | 893,417 | 327,328 | 2.7 | 1.5 |
+| `branch_timing_tests/2.Backward_Branch.nes` | `f7966e9b…29a4` | screen: PASSED | 893,419 | 335,742 | 2.6 | 1.6 |
+| `branch_timing_tests/3.Forward_Branch.nes` | `d0fbc6b1…9c9b` | screen: PASSED | 893,417 | 335,534 | 2.4 | 1.1 |
+| `cpu_dummy_reads/cpu_dummy_reads.nes` | `db4f91b8…17c9` | screen: Passed | 1,786,832 | 629,668 | 2.8 | 1.6 |
+| `cpu_dummy_writes/cpu_dummy_writes_ppumem.nes` | `f59ac329…a6b3` | $6000: Passed | 6,494,373 | 1,866,000 | 4.4 | 3.9 |
+| `cpu_exec_space/test_cpu_exec_space_ppuio.nes` | `9f7f24d4…9251` | $6000: Passed | 1,192,027 | 344,000 | 2.7 | 1.2 |
+
+**One finding against a lower tier.** With 6502-python's default LXA constant
+($EE, SingleStepTests') `all_instrs` fails `03-immediate` on `AB ATX #n`; with
+$FF it passes, and blargg's CRCs were taken on an NES. The board sets $FF
+([undocumented-behavior.md](undocumented-behavior.md) CPU item 3); 6502-python
+PR #6 made the constant a per-CPU setting rather than a board workaround.
+
+**The gates can fail.** Each seeded fault below, in a copy of `src/`, makes its
+gate fail (11 of 11):
+
+| Fault | Gate that fails |
+| --- | --- |
+| undriven reads return 0, not open bus | `test_board` |
+| a $4015 read updates open bus | `test_board` |
+| the NES-001 clocks its pad on every read cycle | `test_board` |
+| OAM DMA without its alignment cycle | `test_board` (513/514) |
+| RAM mirrored every 4 KiB | `test_board` |
+| LXA's constant $EE | `all_instrs` (test 3 of 16) |
+| no half-frame clock at 14913 | `instr_timing` (test 1) |
+| a frame one line longer | `1.Branch_Basics` (#3, NMI period) |
+| $2007 reads unbuffered | `cpu_dummy_writes_ppumem` (#2) |
+| /NMI's edge never latched | `1.Branch_Basics` (no verdict) |
+| write-only PPU registers read 0, not the I/O latch | `cpu_exec_space_ppuio` (#3) |
+
+Not gated yet: MMC1's consecutive-write ignore and CNROM's bus conflicts
+(milestone 5's judges), the alignment and APU parity (milestones 2 and 3).
+
+**Speed** (`cpu_timing_test6`, 300 frames after 60 of warm-up, rendering off):
+PyPy 180 frames/s (5.4 M CPU cycles/s, 3.0x real time); CPython 79 frames/s
+(2.4 M CPU cycles/s, 1.3x real time). The PPU advances dots 2-339 in one step
+while nothing happens on them; dot by dot, PyPy managed 1.8x real time,
+because its JIT handles a three-iteration loop per CPU cycle badly.

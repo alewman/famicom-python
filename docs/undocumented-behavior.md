@@ -26,8 +26,14 @@ start-here.md; tiers in [validation.md](validation.md).
    `CPU_unofficial_opcodes.wiki`).
 3. **ANE ($8B) / LXA ($AB) magic constant varies from chip to chip.** AccuracyCoin
    tests only the cases it cannot affect. SingleStepTests `nes6502` uses $EE (the
-   one constant that fits all 10,000 cases of each file), as 6502-python does.
-   Keep $EE and say so.
+   one constant that fits all 10,000 cases of each file), as 6502-python does by
+   default. **Settled for LXA in milestone 1**: blargg's `instr_test-v5`
+   `03-immediate`, whose CRCs were taken on an NES (hardware-corrected), fails
+   with $EE and $00 and passes with **$FF**, so the board sets LXA's constant
+   to $FF (`Machine.lxa_constant`; 6502-python PR #6 made it a per-CPU
+   setting). The emulator-derived $EE loses to the hardware-corrected test.
+   ANE ($8B) is excluded from `instr_test-v5` as unstable; no test fixes its
+   constant, so it stays $EE.
 4. **SHA/SHX/SHY/TAS**: with a DMA halt on the cycle before the write the
    "AND (H+1)" drops out (AccuracyCoin codes 7–C); the high-byte corruption on a
    page cross varies by manufacturer (AND with A&X, X only, A & magic, A | X;

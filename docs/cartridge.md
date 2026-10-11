@@ -46,49 +46,65 @@ Facts the protocol must honour:
   undriven PPU read returns the **low byte of the address** (mapper 185's copy
   protection depends on it).
 
-### The protocol (proposed; the first milestone settles it)
+### The protocol (settled in milestone 1)
 
-1. **One timeline**: every call carries `t` in master ticks (CPU cycle = 12, dot
-   = 4); the board delivers CPU and PPU events in `t` order. With that a mapper
-   counts M2 edges between PPU events itself (the MMC3 filter) knowing nothing
-   of the board.
-2. **The cartridge sees every CPU bus cycle**, with the full 16-bit address.
+`src/famicom_python/cartridge/connector.py` is the protocol; `Cartridge` there
+is its do-nothing default, which every mapper extends. What was proposed, and
+what milestone 1 decided:
+
+1. **One timeline.** Every call carries `t` in master ticks (NTSC CPU cycle = 12,
+   dot = 4); the board delivers CPU and PPU events in `t` order. *Decided*: for
+   a CPU access `t` is the **end** of its cycle (M2's fall, when read data are
+   latched and a write completes); for a PPU access, the dot of its /RD or /WR.
+   A mapper that needs M2's rise (MMC5) places it inside the cycle itself:
+   M2 on an RP2A03G is high for 15/24 of the cycle (`CPU_pinout.wiki`).
+2. **What the cartridge sees of the CPU.** Proposed: every cycle. *Decided*:
+   every **write**, whatever its address (MMC1's consecutive-write ignore
+   counts any write; MMC5 snoops $2000-$2006 and $4014); every **read of
+   $4020-$FFFF**; reads of $0000-$401F only for a mapper that sets
+   `snoops_cpu_reads`. Those reads are most of the CPU's cycles and no
+   licensed mapper decodes them; a cycle count is `Δt / 12`, so nothing is
+   lost. A mapper whose counter must raise /IRQ on an exact cycle (VRC4, FME-7,
+   N163, Bandai) sets `counts_m2` and gets `m2(t)` every cycle.
 3. **"Not driven" is a value**: a read returns `None` and the board supplies
-   open bus (the CPU data latch, or the PPU address low byte).
-4. No reset method: the reset button never reaches the cartridge; MMC5 detects
+   open bus (the CPU data latch, or the PPU address's low byte).
+4. **Nametables.** Proposed: `nametable(address) -> (CIRAM /CE, CIRAM A10)`.
+   *Decided*: `ciram_a10(address) -> int | None`, `None` meaning CIRAM is
+   disabled and the cartridge answers through `ppu_read`/`ppu_write` (four-screen
+   RAM, MMC5 ExRAM, ROM nametables). One call, no tuple per access.
+5. No reset method: the reset button never reaches the cartridge; MMC5 detects
    reset from a gap in M2, which the timestamps make visible.
 
 ```python
-class CartridgeConnector(Protocol):
-    # CPU side: one call per CPU bus cycle
-    def cpu_read(self, address: int, t: int) -> int | None: ...
-    def cpu_write(
-        self, address: int, value: int, t: int
-    ) -> None: ...  # bus conflicts are the mapper's
-    def m2(self, t: int) -> None: ...  # optional per-cycle tick for cycle-counting IRQs
+class Cartridge:
+    snoops_cpu_reads = False  # also receive reads of $0000-$401F
+    counts_m2 = False  # receive m2(t) every CPU cycle
+    irq: bool  # /IRQ, wired-OR on the board
 
-    # PPU side
-    def ppu_address(
-        self, address: int, t: int
-    ) -> None: ...  # every address-bus change, rendering or not
-    def nametable(self, address: int) -> tuple[bool, int]: ...  # (CIRAM /CE active, CIRAM A10)
+    # the CPU side
+    def cpu_read(self, address: int, t: int) -> int | None: ...
+    def cpu_write(self, address: int, value: int, t: int) -> None: ...
+    def m2(self, t: int) -> None: ...
+
+    # the PPU side
+    def ppu_address(self, address: int, t: int) -> None: ...
+    def ciram_a10(self, address: int) -> int | None: ...
     def ppu_read(self, address: int, t: int) -> int | None: ...
     def ppu_write(self, address: int, value: int, t: int) -> None: ...
 
     # outputs the board samples
-    irq: bool
-
-    def audio(
-        self, apu_in: float, t: int
-    ) -> float: ...  # Famicom pins 45 -> 46; default returns apu_in
+    def audio(self, apu_in: float, t: int) -> float: ...  # Famicom pins 45 -> 46
     def battery_ram(self) -> bytes | None: ...
 ```
 
-Open protocol questions: where inside a CPU cycle `t` falls, since MMC3 counts
-*falling* M2 edges and MMC5 *rising* ones (M2 on RP2A03G is high for 15/24 of
-the cycle, `CPU_pinout.wiki`); whether `ppu_address` and `ppu_read` should be one
-call (MMC2/MMC4 latch *after* the read, which argues for two); the cost (about
-5.4 M PPU-side calls a second, acceptable for a reference board).
+Still open, for milestone 2: whether `ppu_address` and `ppu_read` stay two
+calls (MMC2/MMC4 latch *after* the read, which argues for two), and their cost
+(about 5.4 M PPU-side calls a second). Milestone 1's PPU does not render, so
+only $2007 accesses reach the connector so far.
+
+Milestone 1 implements mappers 0 (NROM), 1 (MMC1) and 3 (CNROM), because the
+CPU test ROMs need them (`all_instrs`, `instr_timing` and `instr_misc` are MMC1
+boards; `cpu_dummy_reads` is CNROM). Their judges are milestone 5's.
 
 ### Which mappers stress which part
 
