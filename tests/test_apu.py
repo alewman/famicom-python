@@ -116,7 +116,12 @@ def test_noise_lfsr_sequence_lengths() -> None:
     noise = apu.noise
     noise.period = 0
     start = noise.shift
-    period = next(n for n in range(1, 40000) if noise.clock_timer() and noise.shift == start)
+    period = 0
+    while True:
+        noise.clock_timer()
+        period += 1
+        if noise.shift == start or period > 40000:
+            break
     assert period == 32767
     noise.mode_bit = 6
     seen = []

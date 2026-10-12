@@ -206,13 +206,13 @@ class Pulse:
         self.update_output()
 
     def clock_timer(self) -> bool:
-        """One APU cycle; True when the sequencer stepped."""
+        """One APU cycle; True when the sequencer stepped while it can be heard."""
         if self.timer:
             self.timer -= 1
             return False
         self.timer = self.period
         self.step = (self.step - 1) & 7
-        return True
+        return self.period >= 8 and self.length.value > 0  # else muted throughout
 
     def half(self) -> None:
         if (
@@ -312,7 +312,7 @@ class Noise:
         self.update_output()
 
     def clock_timer(self) -> bool:
-        """One APU cycle; True when the shift register moved."""
+        """One APU cycle; True when the shift register moved while it can be heard."""
         if self.timer:
             self.timer -= 1
             return False
@@ -320,7 +320,7 @@ class Noise:
         shift = self.shift
         feedback = (shift ^ (shift >> self.mode_bit)) & 1
         self.shift = (shift >> 1) | (feedback << 14)
-        return True
+        return self.length.value > 0  # else silent throughout
 
     def update_output(self) -> None:
         if self.shift & 1 or not self.length.value:
@@ -476,7 +476,7 @@ class APU:
             if self.pulse1.clock_timer() | self.pulse2.clock_timer() | self.noise.clock_timer():
                 self._level_dirty = True
             dmc = self.dmc
-            if not dmc.timer:
+            if not dmc.timer and not dmc.silence:
                 self._level_dirty = True
             if dmc.clock_timer() and dmc.remaining:
                 # A reload DMA: it halts on this APU cycle's put (DMA.wiki).
