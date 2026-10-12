@@ -2,7 +2,7 @@
 
 Prints how the cartridge was identified, runs it, and reports what a test ROM
 says: blargg's $6000 text if present, else the first nametable as text.
-``--png``/``--wav`` arrive with the PPU and APU milestones (docs/handoff-brief.md).
+``--png`` saves the last frame; ``--wav`` arrives with the APU (milestone 3).
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import time
 from .machine import MACHINES
 from .system import System
 from .testrom import SIGNATURE, blargg_text, peek, run_blargg, screen_text
+from .video import DEFAULT_PALETTE, load_palette, to_rgb, write_png
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -23,6 +24,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--frames", type=int, default=600, help="frames to run (default 600)")
     parser.add_argument(
         "--blargg", action="store_true", help="run to blargg's $6000 result instead of --frames"
+    )
+    parser.add_argument("--png", help="save the last frame as a PNG")
+    parser.add_argument(
+        "--palette", default=str(DEFAULT_PALETTE), help="a 64- or 512-colour .pal file"
     )
     args = parser.parse_args(argv)
 
@@ -53,6 +58,9 @@ def main(argv: list[str] | None = None) -> int:
             print(screen_text(system))
     wall = time.perf_counter() - start
     print(f"{system.cycles:,} CPU cycles, {system.instructions:,} instructions, {wall:.1f} s")
+    if args.png:
+        write_png(args.png, to_rgb(system.board.ppu.picture, load_palette(args.palette)))
+        print(f"frame {system.board.ppu.frame} written to {args.png}")
     return 0
 
 
