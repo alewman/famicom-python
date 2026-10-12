@@ -7,8 +7,9 @@ around it: the 2A03's sound unit, DMA and joypad ports, the 2C02 picture
 processor dot by dot, the cartridge connector and the mappers behind it, and
 the clock that ties them together.
 
-**Status (2026-10-12): milestones 1, 2 and 3 of 8 pass**: the CPU on the
-board, the PPU dot by dot, and the APU, DMA and interrupts. One master-clock
+**Status (2026-10-12): milestones 1-4 of 8 done**: the CPU on the board, the
+PPU dot by dot, the APU, DMA and interrupts, and AccuracyCoin run in full
+(136 of 146, every failure with its cause). One master-clock
 timeline with the PPU and APU advanced inside each CPU bus cycle, the memory
 map and open bus, both controller clocking models, OAM and DMC DMA inside the
 stalled read (get/put cycles, DMC precedence), the cartridge connector
@@ -52,7 +53,15 @@ analogue stage per console (`--wav`).
   detector), `apu_mixer`'s tones agree in timing, pitch and level.
 - **APUSim, the gate-level 2A03**, runs here but is not yet a judge: 3 of 8
   `apu_test`, for a cause found in its simulation order.
-- Pins: 6502-python `1ae3610` (main after its PRs #5 and #6), `nes-test-roms` `95d8f62`.
+- **AccuracyCoin** (`6bee919`, 146 tests): 136 pass, from 116 on the first
+  run, fixed against its hardware answer keys: the frame IRQ's clear and
+  inhibit, the controller strobe, the 2A03's internal data bus, its register
+  decode during DMA, the DMC's reload timing, enable hold and abort bug, SHx
+  after a DMA (6502-python PR #7), OAM evaluation, corruption and `$2004`,
+  sprites from the pre-render line. Of the ten left, PPUSim passes eight (mid-line
+  rendering toggles, mostly): open, with a judge.
+- Pins: 6502-python `fdef250` (its PR #7 on main `1ae3610`; repin once merged),
+  `nes-test-roms` `95d8f62`, AccuracyCoin `6bee919`.
   The record, with SHA-256s, cycle and instruction counts, wall times and
   the seeded faults each gate catches, is in
   [docs/validation.md](docs/validation.md#certification-record).
@@ -69,6 +78,7 @@ python -m pytest -m slow                      # the CPU, PPU and APU test ROMs
 python scripts/run_test_roms.py --suite cpu   # the same, as a certification table
 python scripts/run_test_roms.py --suite ppu
 python scripts/run_test_roms.py --suite apu
+python scripts/accuracycoin.py --failures     # all of AccuracyCoin (--test NAME for one)
 python -m famicom_python ROM --frames 600 --png out.png --wav out.wav
 ```
 
@@ -113,6 +123,8 @@ reported and kept; everything else must match its hash.
 | `scripts/build_ppusim.py`, `scripts/ppusim/` | Breaknes PPUSim (gate-level 2C02G) built with our shim, which records its pins |
 | `scripts/ppusim_board.py` | a test ROM on the board with PPUSim in place of the PPU |
 | `scripts/ppusim_compare.py` | the board's PPU and PPUSim fed the same register accesses, compared pin for pin, or a whole frame (`frame ROM N`) |
+| `scripts/accuracycoin.py` | AccuracyCoin run in full or test by test, each result with its error code |
+| `scripts/ppusim_lockstep.py` | an AccuracyCoin test on the board and the PPUSim board in lockstep, to the first divergence |
 | `scripts/mesen_audio.py` | the board's sound against Mesen2's recording, window by window (aligned, gain-fitted, residual) |
 | `scripts/volume_levels.py` | the channels' relative levels in `volume_tests` against its NES-001 recording |
 | `scripts/build_apusim.py`, `scripts/apusim/` | Breaknes APUSim (gate-level 2A03) built with our shim: a stub board around the whole chip |

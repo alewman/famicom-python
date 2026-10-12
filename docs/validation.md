@@ -736,3 +736,92 @@ channel step can be heard. The board stays a reference, not a player
 
 **Frames against Mesen2**, frames 200 and 600 of milestone 2's twelve ROMs: the
 same counts as milestone 2, ROM for ROM.
+
+### Milestone 4: AccuracyCoin (2026-10-12)
+
+**Pins.** famicom-python at the commit that adds this record; AccuracyCoin
+`6bee919529289c555803b612b8c9e4f7eaaeeabb` (2026-10-10, re-pinned from
+`4151899` as this document asks: 146 tests and 5 DRAW pages); 6502-python
+`fdef250` (its PR #7, `dma_stalled`, on main `1ae3610`; to repin once merged);
+Breaknes PPUSim `fb7de61` at skew 3. Machine NES-001, `PowerOn()` defaults.
+PyPy 7.3.20 (Python 3.11.13) and CPython 3.14.4.
+
+**Score: 136 of 146**, identical result tables on PyPy and CPython
+(123,410,909 CPU cycles, 4,144 frames; 91 s on PyPy, 276 s on CPython).
+`scripts/accuracycoin.py` presses Start on the page index (run all) and reads
+the result bytes at `$0400-$04FF`, names and addresses taken from the pinned
+`.asm`; `--test NAME` runs one test through the menu. The first run scored
+116. Every fix below was made against a hardware answer key in the test's
+source or README, then shown to fail its test when seeded back in.
+
+| Test (first result) | What the board lacked |
+| --- | --- |
+| Frame Counter IRQ (7) | a `$4015` read's clear waits for the next put -> get; the flag sets on 29828/29829 even when inhibited, clears on 29830, raises no IRQ (C7) |
+| Controller Strobing (4) | `$4016`'s OUT0 reaches the pads at the next put |
+| Controller Clocking (7), APU Register Activation (4), DMC DMA Bus Conflicts (2) | the register decode during DMA (C25), with the bus conflicts both expected tables pin |
+| Internal Data Bus (2) | an internal data bus: `$4015` bit 5 comes from it, DMA reads do not change it (C24) |
+| DMA + `$2002` Read (2) | passed once the frame IRQ's clear was right (its sync reads `$4015`) |
+| DMC Reload Timing (1) | a rate written in the cycle the DMC timer reloads is used |
+| Delta Modulation Channel (L) | an enabling `$4015` write holds reload DMAs off for 2 cycles |
+| Explicit, Implicit DMA Abort (2, 2) | the abort bug, and a scheduled DMA surviving a disable (the answer key matched byte for byte) |
+| SHA, SHS, SHY, SHX ×5 (7) | `dma_stalled` (6502-python PR #7, NMS p. 48) |
+| Address `$2004` behavior (A) | a rendering-time `$2004` write masks OAMADDR to a multiple of 4 |
+| Misaligned OAM behavior (4) | evaluation realigns: `+4 & $FC` for a Y out of range, the X byte range-checked too |
+| `$2004` Stress Test (2) | attribute bytes stored without bits 4-2; after evaluation, even dots read secondary OAM at its address |
+| OAM Corruption (2) | C26: a frozen secondary-OAM address corrupts its row when rendering begins at the pre-render line |
+| Sprites On Scanline 0 (2) | the pre-render line's sprite fetch range-checks against line 5 |
+| `$2002` flag timing (1) | the sprite flags pass through to M2's fall (`PPU.end_read`); now fails at 2 |
+
+**The ten left, each with its cause** (open item 18). PPUSim ran each of the
+fourteen PPU tests the board was failing at the time (on the board with
+PPUSim in place of the PPU, skew 3, `scripts/ppusim_board.py`), and
+`scripts/ppusim_lockstep.py` then ran board and PPUSim board side by side,
+both CPUs in lockstep from power-on, to the first divergence. Lockstep needed
+two power-on alignments: PPUSTATUS's overflow bit set at power (PPUSim's, and
+"+0+x xxxx" allows it, so the board now does it too) and palette RAM zeroed
+(PPUSim's; the board keeps blargg's table by default, so the lockstep run sets
+`PowerOn.palette`).
+
+| Test | Board | PPUSim | Cause |
+| --- | --- | --- | --- |
+| `$2002` flag timing | 2 | pass | the sprite-0 and overflow flags' set dots relative to each other (the board's fifth read sees both, hardware at most sprite 0); lockstep: first divergence at that read |
+| `$2007` Stress Test | 2 | pass | a read's buffer refill against the fetch cadence: the board's stable bytes are hardware's shifted by one tile (its first four are the key's fifth to eighth; near the line's start its refill lands after its own increment has moved v); lockstep: first divergence at the buffer read |
+| Stale BG Shift Registers | 3 | pass | mid-line rendering toggles (C12); lockstep: the sprite-0 hit differs |
+| BG Serial In | 2 | pass | the same; on the lines with the gap PPUSim draws colour $30 where the board draws $2D, six pixels a line |
+| ALE + Read | 2 | pass | the same family: a `$2007` read changing the fetch address |
+| Hybrid Addresses | 2 | pass | the same family: a `$2006` write changing the fetch address |
+| Stale Sprite Shift Regs | 3 | pass | mid-line toggles and the sprite shifters |
+| Frozen OAM2 Increment | 2 | pass | mid-line toggles and the secondary OAM address |
+| `$2004` Stress Test | 3 | fails at 2 | one byte of 341 (dot 199, the overflow scan's fourth copy read): no judge |
+| Misaligned OAM2 Address | 4 | fails at 3 | no judge |
+
+PPUSim also fails "OAM Corruption" (it models no analogue copying), "Misaligned
+OAM behavior" (at 6) and "Sprites On Scanline 0" (at 3), all of which the
+board passes against AccuracyCoin's hardware answers.
+
+For the mid-line toggles, driving both PPUs with the same writes
+(`ppusim_compare.py`'s harness: rendering off for 2 or 6 CPU cycles mid-line)
+showed PPUSim fetching about 3 dots past the board's stop and resuming 2-3
+dots after it, without the board's coarse-X increment. A 2-dot delay on
+PPUMASK's bits 4-1 matched those fetches but changed no AccuracyCoin outcome
+and made the PPUSim frame comparisons worse (`scanline` 16 pixels against 2,
+`colorwin` 7 against 6), so it was taken out (C12).
+
+**The gates can fail.** Each seeded fault below, in a copy of `src/`, fails
+its AccuracyCoin test (16 of 16): `$4015` clearing the frame IRQ at once; no
+flag while inhibited; the strobe at once; no decode composition; DMA reads
+always reaching `$4015-$4017`; `$4015` bit 5 from the external bus; a
+same-cycle `$4010` rate waiting; no enable hold; no abort bug; a disable
+cancelling a scheduled DMA; `dma_stalled` never set; `$2004` writes keeping
+OAMADDR's low bits; no X range check; attribute bytes stored whole; no OAM
+corruption; no sprites from the pre-render fetch.
+
+**Everything else again**: the CPU (10), PPU (41) and APU (38) ROMs pass on
+both interpreters with milestone 3's cycle and instruction counts, except
+`read_joy3/thorough_test`, 604 instructions more in the same cycles now that
+the strobe waits for a put. The quick suite passes (51). The PPUSim frame
+comparisons are milestone 2's (`scanline` 2, `colorwin` 6).
+
+**Speed** (240p Test Suite menu, as before): PyPy 40 frames/s (0.67x real
+time) and CPython 8.2 under today's load; milestone 3's code measures 41 on
+PyPy in the same A/B, so milestone 4 costs about 3 %.
