@@ -111,8 +111,9 @@ AccuracyCoin "Open Bus", README l.93–102).
 ### Controllers ($4016/$4017)
 
 - Write $4016: bits 2–0 become OUT2–OUT0; OUT0 is the strobe to both ports.
-  "OUT2-0 … are updated every APU cycle" (`Expansion_port.wiki` l.43), so the
-  strobe edge lands on an APU-cycle boundary (UNVERIFIED by a test).
+  "OUT2-0 … are updated every APU cycle" (`Expansion_port.wiki` l.43): the
+  strobe reaches the pads at the next get -> put transition (AccuracyCoin
+  "Controller Strobing" 3/4, milestone 4).
 - Read: D0–D4 come inverted from the port lines. The 4021 shift register in
   the pad shifts at the end of the /OE pulse. Standard pad order: A, B, Select,
   Start, Up, Down, Left, Right, then 1s on official pads. While the strobe is

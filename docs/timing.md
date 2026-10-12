@@ -211,9 +211,25 @@ in as its halt; OAM DMA reads on a get the DMC does not take and writes on
 the next put; every other cycle repeats the CPU's read. The APU raises the
 request (`APU.dmc_request`): a load on the get of the second APU cycle after
 the enabling `$4015` write, a reload on the put of the APU cycle whose output
-clock emptied the buffer. Not yet modelled: the address-composition quirk
-(the halted CPU's `$4000–$401F` read combined with the DMC address) and the
-two DMC bugs, both AccuracyCoin's (milestone 4).
+clock emptied the buffer. Added in milestone 4, each against an AccuracyCoin
+answer key from hardware:
+
+- an enabling `$4015` write holds reload DMAs off for 2 cycles (none halts
+  before the 3rd cycle after the write); a reload due meanwhile waits
+  ("Delta Modulation Channel" L-N);
+- a `$4010` rate written in the cycle the DMC timer reloads is the one it
+  reloads with ("DMC Reload Timing");
+- the abort bug: playback stopped (by `$4015` or by a one-byte sample's only
+  fetch) in the APU cycle before a reload would schedule leaves a 1-cycle
+  DMA, its halt cycle only, which a write cycle cancels outright; a DMA
+  already scheduled survives a disable ("Explicit/Implicit DMA Abort", whose
+  answer key the board matches byte for byte). The RP2A03H/late-G
+  "unexpected reload" is `Machine.dmc_unexpected_reload_bug`, off for the
+  RP2A03G and not modelled;
+- the register-decode composition (undocumented-behavior.md C25): DMA reads
+  with the core halted on `$4000-$401F` reach the APU and pad registers;
+- a DMA that stretches a read sets 6502-python's `dma_stalled`, so SHA, SHX,
+  SHY and TAS drop their AND (6502-python PR #7).
 
 The one place DMA changes the CPU's own result: SHA/SHX/SHY/TAS drop their
 "AND (high byte + 1)" when RDY was low before the write cycle (AccuracyCoin

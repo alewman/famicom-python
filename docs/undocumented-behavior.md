@@ -196,7 +196,10 @@ before the board takes a side.
   "9 +526" where hardware prints "8 +526"; every other APU test passes either
   way (hardware-corrected).
 - **C7. Frame IRQ flag while inhibited.** The wiki table: set only if inhibit is
-  clear. AccuracyCoin J/K: set for two cycles even when inhibited.
+  clear. AccuracyCoin J/K: set for two cycles even when inhibited. *Settled in
+  milestone 4 (AccuracyCoin, hardware-corrected)*: set on 29828 and 29829
+  whatever the inhibit, cleared on 29830 if inhibited, and no IRQ results; a
+  `$4015` read's clear lands at the next put -> get transition.
 - **C8. Noise LFSR at power.** Wiki and blargg: 1. `CPU_power_up_state.wiki`:
   $0000, the first clock shifts in a 1.
 - **C9. Which 2A03 revisions lack short noise.** Brad Taylor: "revisions before
@@ -224,7 +227,14 @@ before the board takes a side.
   one or two fetches differ from the board's (its first ALE carries v's
   nametable address, and its tile latch keeps the tile from before rendering
   went off), and turning it off, the last pixel can differ by one. Those stay
-  open, as does every revision but the 2C02G.
+  open, as does every revision but the 2C02G. *Milestone 4*: with rendering
+  off for 2 or 6 CPU cycles mid-line, PPUSim keeps fetching about 3 dots past
+  the board's stop and resumes 2-3 dots after the board, without the
+  coarse-X increment the board makes on resuming. Delaying PPUMASK's bits
+  4-1 by 2 dots matched those fetches but left every AccuracyCoin outcome as
+  it was and made the `scanline` and `colorwin` frames differ from PPUSim
+  more (16 and 7 pixels against 2 and 6), so it was not kept: the model of
+  enabling and disabling is still to be found (open item 18).
 - **C13. Odd-frame skip condition.** Diagram and blargg's tests: BG enabled.
   Wiki text: rendering enabled (BG or sprites). *Board*: BG or sprites,
   sampled as dot 338 runs; `ppu_vbl_nmi/10-even_odd_timing` pins the dot (a
@@ -276,8 +286,31 @@ before the board takes a side.
 - **C24. Does a `$4015` read drive the external bus?** `APU.wiki` l.204–205
   and the board: no, and open bus keeps its value. APUSim drives the data
   pads while `$4015` is read (`dma.cpp`: WR = NAND3(/R4015, /DBGRD, RW)), so
-  open bus would take the status. AccuracyCoin's open-bus page should decide
-  it (milestone 4).
+  open bus would take the status. *Settled in milestone 4 by AccuracyCoin
+  "Internal Data Bus"*: the 2A03 has an internal data bus beside the external
+  one. Every CPU read and write updates the internal bus, DMA reads do not;
+  every access but a `$4015` read updates the external bus, which open bus
+  returns. `$4015`'s bit 5 is the internal bus's. The board models both
+  (`Board.internal_bus`, `Board.data_bus`).
+- **C25. The 2A03's register decode during DMA.** DMA.wiki: bits 4-0 from the
+  DMA's address, 15-5 from the halted 6502's. *Board (milestone 4), to
+  AccuracyCoin's expected tables* ("APU Register Activation", "DMC DMA Bus
+  Conflicts", "Controller Clocking"): with the core halted on `$4000-$401F`,
+  any DMA read also selects register `$4000 | (address & $1F)`; `$4015`
+  drives every bit but 5 (from the bus), the pad ports clock their pad and
+  drive its bits onto the external bus under bits 7-5 of whatever else drives
+  it, while a DMA with a device at its address takes that device's byte.
+  With the core elsewhere, DMA reads of `$4000-$401F` see open bus.
+- **C26. OAM corruption.** Errata.wiki lists several mid-access row copies,
+  most alignment-dependent; AccuracyCoin "OAM Corruption" describes row 0
+  copied over the row of the secondary OAM address when rendering was turned
+  off, on "the first PPU cycle after rendering is enabled". blargg's
+  `sprite_overflow_tests/5.Emulator` (also passing on hardware) re-enables
+  rendering mid-frame and must see no corruption. *Board*: Errata's
+  deterministic case only: the address freezes when rendering goes off
+  mid-line, a visible-line re-enable lets it count again (back to 0 by the
+  line's end), and if it is still frozen when rendering begins at the
+  pre-render line, the OAMADDR row is copied over it. Both tests pass.
 - **C23. PPUSim's `$2002` bit 7.** Breaknes PPUSim `fb7de61` drives it as the
   complement of the VBL flag (`fsm.cpp`, `db_latch.nget()`); its own wiki
   drawing, its author's Verilog and the Visual2C02 netlist all show the true
@@ -347,3 +380,12 @@ before the board takes a side.
     0.8 dB loud and the DMC tone 0.4–1.5 dB loud (validation.md, milestone 3).
     The recording's analogue path is uncharacterised, so this is evidence, not
     a verdict on blargg's formula.
+18. **AccuracyCoin's remaining ten** (milestone 4, docs/validation.md): each
+    with its cause as far as found. PPUSim passes eight of them, so those are
+    open board bugs with a judge: mid-line rendering toggles ("Stale BG Shift
+    Registers", "BG Serial In", "ALE + Read", "Hybrid Addresses", "Stale
+    Sprite Shift Regs", "Frozen OAM2 Increment"; C12), the sprite flags' set
+    timing ("$2002 flag timing" 2) and the read buffer against the fetch
+    cadence ("$2007 Stress Test" 2). PPUSim fails the other two as well:
+    "$2004 Stress Test" 3 (one byte, dot 199, the overflow scan's fourth
+    copy read) and "Misaligned OAM2 Address" 4.
