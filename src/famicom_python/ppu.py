@@ -118,7 +118,10 @@ class PPU:
     # -- power and reset -------------------------------------------------
 
     def power(self) -> None:
-        self.status = 0
+        # PPUSTATUS at power is "+0+x xxxx", + often set (PPU_power_up_state.wiki);
+        # PPUSim powers on with the overflow bit set and VBL clear, and so does
+        # the board, so the two run in lockstep from the first $2002 read.
+        self.status = OVERFLOW
         self.oam_addr = 0
         self.v = 0
         # Background pipeline: the fetch latches and the 16-bit shifters (the
@@ -303,7 +306,9 @@ class PPU:
             else:  # 257
                 self._reload()
                 self.oam_addr = 0
-                self._sprite0_line = self._sprite0_next if visible else False
+                # Stale on the pre-render line: line 239's, or from before
+                # a forced blank (AccuracyCoin "Sprites On Scanline 0").
+                self._sprite0_line = self._sprite0_next
                 for i in range(WIDTH):
                     self._sprite_next[i] = 0
                 # The first garbage fetch's address goes out before hori(v)
@@ -498,14 +503,21 @@ class PPU:
         self.oam_addr = address
 
     def _sprite_fetch(self, line: int, dot: int, visible: bool) -> None:
-        """Dots 257-320: per slot, Y, tile, attribute, X, then the pattern pair."""
+        """Dots 257-320: per slot, Y, tile, attribute, X, then the pattern pair.
+
+        On the pre-render line the range checks see line 261 & 255 = 5, so
+        stale secondary OAM in range of line 5 is drawn on line 0
+        (AccuracyCoin "Sprites On Scanline 0" 2; nesdev-forum t=26291).
+        """
+        if not visible:
+            line &= 0xFF
         slot = (dot - 257) >> 3
         phase = (dot - 257) & 7
         oam2 = self.oam2
         base = slot << 2
         if phase == 0:
             if slot == 0:
-                self._sprite_count = min(self._oam2_index, 32) >> 2 if visible else 0
+                self._sprite_count = min(self._oam2_index, 32) >> 2 if visible else 8
             self.oam_bus = oam2[base]
             self._garbage = 0x2000 | (self.v & 0x0FFF)
             if self._watch:
@@ -530,7 +542,8 @@ class PPU:
                 self._ale(self._sprite_pattern(line, oam2[base]) | 8)
         else:
             hi = self._fetch(self._sprite_pattern(line, oam2[base]) | 8)
-            if slot < self._sprite_count:
+            height = 16 if self.ctrl & 0x20 else 8
+            if slot < self._sprite_count and (visible or 0 <= line - oam2[base] < height):
                 self._draw_sprite(slot, self._fetch_lo, hi)
         if phase >= 3:
             self.oam_bus = oam2[base + 3]
@@ -706,6 +719,15 @@ class PPU:
                     latch &= ~(1 << bit)
             self.latch = latch
         return latch
+
+    def end_read(self, register: int, value: int) -> int:
+        """A register read's value as M2 falls, the cycle's end. $2002 latches
+        VBL as M2 rises but passes the sprite-0 and overflow flags through
+        until M2 falls (AccuracyCoin "$2002 Flag Timing", whose notes give the
+        RP2A03G's M2 duty of 15/24; C3)."""
+        if register == 2:
+            return (value & 0x9F) | (self.status & 0x60)
+        return value
 
     def _complete_2007_read(self) -> None:
         """The read's bus cycle: refill the buffer from v (the nametable under a
