@@ -110,6 +110,13 @@ class Machine:
     # the fastest bit on lidnariq's (nesdev-forum/24639.html). A per-console
     # analogue figure, not a constant of the chip.
     ppu_latch_decay_seconds: float = 0.6
+    # The analogue stage after the 2A03's DACs, **fitted**: first-order filter
+    # corners from APU_Mixer.wiki (NES-001: high-pass 90 Hz and 440 Hz, low-pass
+    # 14 kHz, from blargg's measurements; Famicom: one high-pass at 37 Hz, before
+    # an RF stage nobody has characterised). Other fits disagree
+    # (undocumented-behavior.md C10): an assumption, cited, not a fact.
+    audio_high_pass_hz: tuple[float, ...] = (90.0, 440.0)
+    audio_low_pass_hz: float | None = 14_000.0
     certified: bool = True
 
 
@@ -133,6 +140,8 @@ FAMICOM = Machine(
     joypad_oe_per_cycle=True,
     famicom_audio_through_cart=True,
     dmc_unexpected_reload_bug=False,
+    audio_high_pass_hz=(37.0,),
+    audio_low_pass_hz=None,
 )
 
 AV_FAMICOM = Machine(

@@ -10,10 +10,9 @@ returned count is never added on top; :attr:`Board.cycles` is the truth.
 
 **DMA inside ``read_byte``** (docs/timing.md "The design"): a DMA halts the
 2A03's CPU only on a read cycle, and the halted CPU repeats that read, visibly
-on the bus, until the DMA is done. So when OAM DMA is due the board runs it
-inside the next read: the halt cycle and any alignment cycle as repeats of the
-CPU's read, the 256 get/put pairs, then the CPU's own read. The DMC DMA joins it
-in milestone 3.
+on the bus, until the DMA is done. So when OAM DMA or a DMC fetch is due the
+board runs it inside the next read: the halt, dummy and alignment cycles as
+repeats of the CPU's read, the DMA's own gets and puts, then the CPU's read.
 
 **Open bus** (Open_bus_behavior.wiki): one ``data_bus`` byte holds the last value
 on the CPU data bus; every read except $4015's, every write and every DMA read
@@ -24,7 +23,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from .apu import APU
+from .apu import APU, AnalogueStage
 from .cartridge.connector import Cartridge
 from .joypad import StandardController
 from .machine import Machine
@@ -50,6 +49,10 @@ class Board:
         self.ppu = PPU(timing, cartridge, machine.ppu_latch_decay_seconds)
         self.ppu.palette[:] = power.palette
         self.apu = APU(power.apu_put_first)
+        self.apu.set_cpu_rate(timing.master_hz / timing.cpu_divider)
+        self.analogue = AnalogueStage(
+            self.apu.sample_rate, machine.audio_high_pass_hz, machine.audio_low_pass_hz
+        )
         self.pads = [StandardController(), StandardController()]
         self.t = 0  # master ticks at the end of the last CPU cycle
         self.data_bus = 0
@@ -84,6 +87,25 @@ class Board:
         if self.machine.reset_resets_ppu:
             self.ppu.reset()
 
+    def set_sample_rate(self, rate: int) -> None:
+        """The host rate for :meth:`take_samples` (44,100 Hz by default)."""
+        self.apu.sample_rate = rate
+        machine = self.machine
+        self.analogue = AnalogueStage(rate, machine.audio_high_pass_hz, machine.audio_low_pass_hz)
+
+    def take_samples(self) -> list[float]:
+        """Audio since the last call at the APU's sample rate, through the
+        cartridge (Famicom pins 45/46) and the console's fitted analogue stage.
+
+        The cartridge sees each sample with the current time only: expansion
+        sound that must be mixed cycle by cycle arrives with milestone 8.
+        """
+        samples = self.apu.take_samples()
+        if self.machine.famicom_audio_through_cart:
+            audio, t = self.cartridge.audio, self.t
+            samples = [audio(sample, t) for sample in samples]
+        return self.analogue.process(samples)
+
     # -- one CPU cycle ---------------------------------------------------
 
     def _begin_cycle(self, address: int, reading: bool) -> int:
@@ -117,8 +139,8 @@ class Board:
     # -- the CPU's bus ---------------------------------------------------
 
     def read_byte(self, address: int) -> int:
-        if self._oam_dma_page is not None:
-            self._oam_dma(address)
+        if self._oam_dma_page is not None or self.apu.dmc_request:
+            self._dma(address)
         t = self._begin_cycle(address, True)
         value = self._read(address, t)
         self._end_cycle()
@@ -199,32 +221,64 @@ class Board:
 
     # -- DMA -------------------------------------------------------------
 
-    def _oam_dma(self, address: int) -> None:
-        """OAM DMA, run inside the CPU's stalled read of ``address`` (DMA.wiki "OAM DMA").
+    def _dma(self, address: int) -> None:
+        """OAM and DMC DMA, run inside the CPU's stalled read of ``address``.
 
-        The halt cycle repeats the CPU's read; if the next cycle would be a put,
-        one alignment cycle repeats it again, so that each DMA read lands on a
-        get and each write to $2004 on a put: 513 or 514 cycles before the
-        CPU's own read completes.
+        DMA.wiki "Behavior" and "DMC DMA during OAM DMA", cycle by cycle. The
+        first cycle halts the CPU, which repeats its read of ``address`` on
+        every cycle in which no DMA reads or writes. Then, on each cycle:
+
+        - a DMC fetch reads on a get, after its halt cycle and one dummy cycle;
+          a fetch requested while the CPU is already halted (during OAM DMA)
+          counts the cycle it appears in as its halt cycle;
+        - OAM DMA reads its next byte on a get the DMC does not take, and
+          writes it to $2004 on the following put;
+        - any other cycle is an idle repeat of the CPU's read: the "alignment"
+          cycles.
+
+        This reproduces every example in DMA.wiki: OAM 513/514 cycles, DMC load
+        3 and reload 4, DMC during OAM 2 (1 or 3 at its end).
         """
+        apu = self.apu
         page = self._oam_dma_page
-        assert page is not None
         self._oam_dma_page = None
-        self._repeat_read(address)  # halt
-        if not self.apu.put:  # the next cycle is a put: align
-            self._repeat_read(address)
-        base = page << 8
-        for offset in range(256):
-            t = self._begin_cycle(base | offset, True)  # get: DMA reads
-            value = self._read(base | offset, t)
-            self._end_cycle()
-            t = self._begin_cycle(0x2004, False)  # put: DMA writes $2004
-            self.data_bus = value
-            self.ppu.run_to(t + self._ppu_access)
-            self.ppu.oam_dma_write(value)
-            self.ppu.run_to(t)
-            self.cartridge.cpu_write(0x2004, value, t)
-            self._end_cycle()
+        oam_next = 0 if page is not None else 256  # the next OAM byte to read
+        oam_value: int | None = None  # read on a get, waiting for its put
+        # The DMC fetch: None idle, else cycles since its halt cycle.
+        dmc_age: int | None = 0 if apu.dmc_request else None
+        self._repeat_read(address)  # the halt cycle
+        while True:
+            if dmc_age is not None:
+                dmc_age += 1
+            elif apu.dmc_request:
+                dmc_age = 0  # halted already: this cycle is the DMC's halt cycle
+            if oam_next == 256 and oam_value is None and dmc_age is None:
+                return
+            get = apu.put  # the next cycle is a get if this one was a put
+            if get and dmc_age is not None and dmc_age >= 2:
+                dmc_address = apu.dmc_address
+                t = self._begin_cycle(dmc_address, True)
+                value = self._read(dmc_address, t)
+                apu.dmc_fill(value)
+                self._end_cycle()
+                dmc_age = None
+            elif get and oam_value is None and oam_next < 256:
+                source = page << 8 | oam_next  # type: ignore[operator]
+                t = self._begin_cycle(source, True)
+                oam_value = self._read(source, t)
+                self._end_cycle()
+                oam_next += 1
+            elif not get and oam_value is not None:
+                t = self._begin_cycle(0x2004, False)
+                self.data_bus = oam_value
+                self.ppu.run_to(t + self._ppu_access)
+                self.ppu.oam_dma_write(oam_value)
+                self.ppu.run_to(t)
+                self.cartridge.cpu_write(0x2004, oam_value, t)
+                self._end_cycle()
+                oam_value = None
+            else:
+                self._repeat_read(address)
 
     def _repeat_read(self, address: int) -> None:
         t = self._begin_cycle(address, True)

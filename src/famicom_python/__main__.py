@@ -2,7 +2,7 @@
 
 Prints how the cartridge was identified, runs it, and reports what a test ROM
 says: blargg's $6000 text if present, else the first nametable as text.
-``--png`` saves the last frame; ``--wav`` arrives with the APU (milestone 3).
+``--png`` saves the last frame; ``--wav`` saves the sound of the whole run.
 """
 
 from __future__ import annotations
@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+import wave
+from array import array
 
 from .machine import MACHINES
 from .system import System
@@ -26,6 +28,7 @@ def main(argv: list[str] | None = None) -> int:
         "--blargg", action="store_true", help="run to blargg's $6000 result instead of --frames"
     )
     parser.add_argument("--png", help="save the last frame as a PNG")
+    parser.add_argument("--wav", help="save the run's audio as a 16-bit mono WAV")
     parser.add_argument(
         "--palette", default=str(DEFAULT_PALETTE), help="a 64- or 512-colour .pal file"
     )
@@ -51,7 +54,15 @@ def main(argv: list[str] | None = None) -> int:
         status = "no result" if result.status is None else f"status {result.status}"
         print(f"{status}\n{result.text}")
     else:
-        system.run_frames(args.frames)
+        if args.wav:
+            samples: list[float] = []
+            for _ in range(args.frames):
+                system.run_frames(1)
+                samples += system.take_samples()
+            write_wav(args.wav, samples, system.board.apu.sample_rate)
+            print(f"{len(samples):,} samples written to {args.wav}")
+        else:
+            system.run_frames(args.frames)
         if bytes(peek(system, 0x6001 + i) for i in range(3)) == SIGNATURE:
             print(f"$6000 = {peek(system, 0x6000):02X}\n{blargg_text(system)}")
         else:
@@ -62,6 +73,18 @@ def main(argv: list[str] | None = None) -> int:
         write_png(args.png, to_rgb(system.board.ppu.picture, load_palette(args.palette)))
         print(f"frame {system.board.ppu.frame} written to {args.png}")
     return 0
+
+
+def write_wav(path: str, samples: list[float], rate: int) -> None:
+    """Samples (about -1.0 to 1.0 after the analogue stage) as 16-bit PCM, clipped."""
+    pcm = array("h", (max(-32768, min(32767, round(sample * 32767))) for sample in samples))
+    if sys.byteorder == "big":
+        pcm.byteswap()
+    with wave.open(path, "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes(pcm.tobytes())
 
 
 if __name__ == "__main__":

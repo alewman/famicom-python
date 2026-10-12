@@ -93,6 +93,13 @@ def run_blargg(system: System, *, max_seconds: float = 120.0) -> BlarggResult:
         if reset_requested():
             system.run_cycles(int(0.1 * cps) + 1)  # "no sooner than 100 ms from now"
             system.reset()
+            # $6000 still holds $81 until the ROM's reset code rewrites it, which
+            # in apu_reset/4017_timing comes after a 420,000-cycle measurement:
+            # one press per request.
+            remaining = max_cycles - (system.cycles - start)
+            system.run_until(
+                lambda: not reset_requested(), max_cycles=max(remaining, 0), check_every=2000
+            )
             continue
         break
     return BlarggResult(None, blargg_text(system), system.cycles, system.instructions)
@@ -212,6 +219,79 @@ PPU_ROMS = (
     RomCase("ppu_read_buffer/test_ppu_read_buffer.nes", "6000", 60),
     RomCase("oam_read/oam_read.nes", "6000", 30),
     RomCase("oam_stress/oam_stress.nes", "6000", 60),
+)
+
+
+#: Milestone 3's judges (docs/handoff-brief.md): the APU, DMA and interrupts.
+#: dma_2007_read and double_2007_read print only a CRC; their sources list the
+#: CRCs blargg's NES gave in each CPU-PPU synchronization, and the board must
+#: show the one for its own (PowerOn): PPUSim at the skew where it passes
+#: ppu_vbl_nmi prints 159A7A8F and F018C287 (docs/validation.md, milestone 3).
+#: read_joy3's
+#: count_errors ROMs only mark where DMC DMA met a pad read, and test_buttons
+#: needs a person: thorough_test is its judge.
+APU_ROMS = (
+    *(
+        RomCase(f"apu_test/rom_singles/{name}.nes", "6000", 30)
+        for name in (
+            "1-len_ctr",
+            "2-len_table",
+            "3-irq_flag",
+            "4-jitter",
+            "5-len_timing",
+            "6-irq_flag_timing",
+            "7-dmc_basics",
+            "8-dmc_rates",
+        )
+    ),
+    *(
+        RomCase(f"apu_reset/{name}.nes", "6000", 30)
+        for name in (
+            "4015_cleared",
+            "4017_timing",
+            "4017_written",
+            "irq_flag_cleared",
+            "len_ctrs_enabled",
+            "works_immediately",
+        )
+    ),
+    *(
+        RomCase(f"blargg_apu_2005.07.30/{name}.nes", "screen", 20, 0, "$01", "$0")
+        for name in (
+            "01.len_ctr",
+            "02.len_table",
+            "03.irq_flag",
+            "04.clock_jitter",
+            "05.len_timing_mode0",
+            "06.len_timing_mode1",
+            "07.irq_flag_timing",
+            "08.irq_timing",
+            "09.reset_timing",
+            "10.len_halt_timing",
+            "11.len_reload_timing",
+        )
+    ),
+    # nes20db gives these singles no PRG-RAM, so they report on screen only.
+    *(
+        RomCase(f"cpu_interrupts_v2/rom_singles/{name}.nes", "screen", 30)
+        for name in (
+            "1-cli_latency",
+            "2-nmi_and_brk",
+            "3-nmi_and_irq",
+            "4-irq_and_dma",
+            "5-branch_delays_irq",
+        )
+    ),
+    # Hardware gave 159A7A8F or 5E3DF9C4 (by synchronization); fails show their CRC.
+    RomCase("dmc_dma_during_read4/dma_2007_read.nes", "screen", 20, 0, "159A7A8F", "5E3DF9C4"),
+    RomCase("dmc_dma_during_read4/dma_2007_write.nes", "screen", 20),
+    RomCase("dmc_dma_during_read4/dma_4016_read.nes", "screen", 20),
+    # Hardware gave 85CFD627, F018C287, 440EF923 or E52F41A5 (by synchronization).
+    RomCase("dmc_dma_during_read4/double_2007_read.nes", "screen", 20, 0, "F018C287", "?"),
+    RomCase("dmc_dma_during_read4/read_write_2007.nes", "screen", 20),
+    RomCase("sprdma_and_dmc_dma/sprdma_and_dmc_dma.nes", "screen", 20),
+    RomCase("sprdma_and_dmc_dma/sprdma_and_dmc_dma_512.nes", "screen", 20),
+    RomCase("read_joy3/thorough_test.nes", "screen", 30),
 )
 
 

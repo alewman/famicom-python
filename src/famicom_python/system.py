@@ -65,6 +65,10 @@ class System:
         self.board.reset()
         self.cpu.request_reset()
 
+    def take_samples(self) -> list[float]:
+        """Audio since the last call (Board.take_samples)."""
+        return self.board.take_samples()
+
     # -- running ---------------------------------------------------------
 
     @property
