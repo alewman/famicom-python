@@ -302,6 +302,11 @@ gate fail (11 of 11):
 Not gated yet: MMC1's consecutive-write ignore and CNROM's bus conflicts
 (milestone 5's judges), the alignment and APU parity (milestones 2 and 3).
 
+**Repinned** to 6502-python `1ae3610015abcb643294fab986dbfb64a45d79b7` (main
+after PRs #5 and #6, adding branch poll points): the quick suite and all ten
+ROMs still pass on PyPy. Only `cpu_timing_test6` moved, to 29,482,696 cycles
+and 8,748,987 instructions, as branches now poll where hardware does.
+
 **Speed** (`cpu_timing_test6`, 300 frames after 60 of warm-up, rendering off):
 PyPy 180 frames/s (5.4 M CPU cycles/s, 3.0x real time); CPython 79 frames/s
 (2.4 M CPU cycles/s, 1.3x real time). The PPU advances dots 2-339 in one step

@@ -20,7 +20,7 @@ registers but do not yet render or sound (milestones 2 and 3).
   `instr_test-v5` (all 16), `instr_timing`, `instr_misc`, `cpu_timing_test6`
   (official and unofficial), `branch_timing_tests` 1-3, `cpu_dummy_reads`,
   `cpu_dummy_writes_ppumem`, `cpu_exec_space_ppuio`.
-- Pins: 6502-python `038aa5d` (its PR #6), `nes-test-roms` `95d8f62`.
+- Pins: 6502-python `1ae3610` (main after its PRs #5 and #6), `nes-test-roms` `95d8f62`.
   The record, with SHA-256s, cycle and instruction counts, wall times and
   the seeded faults each gate catches, is in
   [docs/validation.md](docs/validation.md#certification-record).
