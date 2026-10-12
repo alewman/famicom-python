@@ -144,6 +144,77 @@ CPU_ROMS = (
 )
 
 
+def _ppu_vbl_nmi(name: str) -> RomCase:
+    return RomCase(f"ppu_vbl_nmi/rom_singles/{name}.nes", "6000", 40)
+
+
+def _screen_2005(path: str, seconds: float = 20) -> RomCase:
+    return RomCase(path, "screen", seconds, 0, "PASSED", "FAILED")
+
+
+#: Milestone 2's judges (docs/handoff-brief.md): the PPU, dot by dot. The single
+#: ROMs of ppu_vbl_nmi run separately so a failure names its test; the 2005
+#: PPU tests print only a result code, "$01" when passed. power_up_palette is
+#: left out: it compares with blargg's own console's power-on palette.
+PPU_ROMS = (
+    *(
+        _ppu_vbl_nmi(name)
+        for name in (
+            "01-vbl_basics",
+            "02-vbl_set_time",
+            "03-vbl_clear_time",
+            "04-nmi_control",
+            "05-nmi_timing",
+            "06-suppression",
+            "07-nmi_on_timing",
+            "08-nmi_off_timing",
+            "09-even_odd_frames",
+            "10-even_odd_timing",
+        )
+    ),
+    *(
+        _screen_2005(f"vbl_nmi_timing/{name}.nes")
+        for name in (
+            "1.frame_basics",
+            "2.vbl_timing",
+            "3.even_odd_frames",
+            "4.vbl_clear_timing",
+            "5.nmi_suppression",
+            "6.nmi_disable",
+            "7.nmi_timing",
+        )
+    ),
+    *(
+        _screen_2005(f"sprite_hit_tests_2005.10.05/{name}.nes")
+        for name in (
+            "01.basics",
+            "02.alignment",
+            "03.corners",
+            "04.flip",
+            "05.left_clip",
+            "06.right_edge",
+            "07.screen_bottom",
+            "08.double_height",
+            "09.timing_basics",
+            "10.timing_order",
+            "11.edge_timing",
+        )
+    ),
+    *(
+        _screen_2005(f"sprite_overflow_tests/{name}.nes")
+        for name in ("1.Basics", "2.Details", "3.Timing", "4.Obscure", "5.Emulator")
+    ),
+    *(
+        RomCase(f"blargg_ppu_tests_2005.09.15b/{name}.nes", "screen", 10, 0, "$01", "$0")
+        for name in ("palette_ram", "sprite_ram", "vbl_clear_time", "vram_access")
+    ),
+    RomCase("ppu_open_bus/ppu_open_bus.nes", "6000", 30),
+    RomCase("ppu_read_buffer/test_ppu_read_buffer.nes", "6000", 60),
+    RomCase("oam_read/oam_read.nes", "6000", 30),
+    RomCase("oam_stress/oam_stress.nes", "6000", 60),
+)
+
+
 @dataclass
 class RomOutcome:
     case: RomCase

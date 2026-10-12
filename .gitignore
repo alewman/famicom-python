@@ -28,3 +28,6 @@ error.log
 
 # scripts/count_mappers.py output.
 coverage.json
+
+# PPUSim (scripts/build_ppusim.py) dumps its PLA tables into the working directory.
+[HV]PLA_*.bin

@@ -17,6 +17,12 @@ else of the board (``tests/test_cartridge_boundary.py`` enforces it).
   counts M2 cycles and must raise IRQ on an exact cycle sets
   :attr:`Cartridge.counts_m2` and receives :meth:`Cartridge.m2` every cycle;
   the others reconstruct cycle counts from ``t`` when they are next called.
+- **What the cartridge sees of the PPU.** Every /RD and /WR, with its address.
+  The address phase of each access (ALE: rendering fetches, and v whenever a
+  $2006 write or $2007 access moves it outside rendering) only when the mapper
+  sets :attr:`Cartridge.watches_ppu_address`: MMC3 counts A12 rises in it,
+  MMC5 counts repeated nametable addresses, and the others never look. The
+  rendering fetches are about 4 million address phases a second.
 - **"Not driven" is a value**: a read returns ``None`` and the board supplies
   open bus (the CPU data latch, or on the PPU side the address's low byte).
 - **Nametables**: the cartridge drives CIRAM /CE and CIRAM A10.
@@ -35,6 +41,7 @@ class Cartridge:
 
     snoops_cpu_reads = False  # also receive reads of $0000-$401F
     counts_m2 = False  # receive m2(t) every CPU cycle
+    watches_ppu_address = False  # receive ppu_address(address, t) on every ALE
 
     def __init__(self) -> None:
         self.irq = False  # /IRQ, wired-OR on the board: True asserts it
@@ -54,7 +61,10 @@ class Cartridge:
     # -- the PPU side ----------------------------------------------------
 
     def ppu_address(self, address: int, t: int) -> None:
-        """The PPU put ``address`` on its bus (ALE), rendering or not."""
+        """The PPU put ``address`` on its bus (ALE), rendering or not.
+
+        Only for a mapper that sets :attr:`watches_ppu_address`.
+        """
 
     def ciram_a10(self, address: int) -> int | None:
         """CIRAM A10 for a nametable address, or None to disable CIRAM."""

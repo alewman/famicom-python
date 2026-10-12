@@ -94,7 +94,7 @@ def test_palette_mirrors_and_reads_at_once_with_open_bus_above() -> None:
     assert ppu.palette[0] == 0x2D
     board.write_byte(0x2006, 0x3F)
     board.write_byte(0x2006, 0x00)
-    ppu.latch = 0xC0
+    ppu._drive(0xC0)  # the I/O latch
     assert board.read_byte(0x2007) == 0xED  # bits 7-6 from the I/O latch
 
 

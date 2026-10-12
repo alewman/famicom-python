@@ -17,11 +17,11 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-from famicom_python.testrom import CPU_ROMS, RomCase, RomOutcome, run_case
+from famicom_python.testrom import CPU_ROMS, PPU_ROMS, RomCase, RomOutcome, run_case
 
 ROOT = Path(__file__).resolve().parents[1]
 ROMS = ROOT / "tests" / "test_roms" / "nes-test-roms"
-SUITES = {"cpu": CPU_ROMS}
+SUITES = {"cpu": CPU_ROMS, "ppu": PPU_ROMS}
 
 
 def _run(case: RomCase) -> tuple[RomOutcome, float]:

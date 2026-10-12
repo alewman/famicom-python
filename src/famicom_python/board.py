@@ -30,6 +30,14 @@ from .joypad import StandardController
 from .machine import Machine
 from .ppu import PPU
 
+# When the PPU sees a register read or write: two dots (8 master ticks) into
+# its CPU cycle, inside M2's high phase. The cycle's other effects (the
+# cartridge, RAM, the APU) and the CPU's sampling of /NMI and /IRQ fall at its
+# end, M2's fall. Of the three possible dot positions for reads and for writes,
+# only this pair passes ppu_vbl_nmi and vbl_nmi_timing (docs/validation.md,
+# milestone 2): hardware-corrected, in blargg's preferred synchronization.
+PPU_ACCESS_TICKS = 8
+
 
 class Board:
     def __init__(self, machine: Machine, cartridge: Cartridge) -> None:
@@ -39,7 +47,8 @@ class Board:
         timing = machine.timing
         self.cycle_ticks = timing.cpu_divider
         self.ram = bytearray([power.ram_fill]) * 0x800
-        self.ppu = PPU(timing, cartridge, power.alignment)
+        self.ppu = PPU(timing, cartridge, machine.ppu_latch_decay_seconds)
+        self.ppu.palette[:] = power.palette
         self.apu = APU(power.apu_put_first)
         self.pads = [StandardController(), StandardController()]
         self.t = 0  # master ticks at the end of the last CPU cycle
@@ -54,6 +63,7 @@ class Board:
         self.request_nmi: Callable[[], None] = lambda: None
         self._irq = False
         self._nmi = False
+        self._ppu_access = PPU_ACCESS_TICKS - self.cycle_ticks  # relative to the cycle's end
         self._snoop_reads = cartridge.snoops_cpu_reads
         self._counts_m2 = cartridge.counts_m2
         # Observers of every CPU-bus cycle, (kind, address, value, t); the trace
@@ -79,18 +89,18 @@ class Board:
     def _begin_cycle(self, address: int, reading: bool) -> int:
         t = self.t + self.cycle_ticks
         self.t = t
-        self.ppu.run_to(t)
         self.apu.clock()
         oe = self._pad_oe
         if oe >= 0 and (self._oe_per_cycle or not reading or address != 0x4016 + oe):
             # /OE rose: the end of the pulse shifts the pad.
             self.pads[oe].clock()
             self._pad_oe = -1
-        if self._counts_m2:
-            self.cartridge.m2(t)
         return t
 
     def _end_cycle(self) -> None:
+        """M2 falls: the cartridge's cycle count, then /IRQ and /NMI as the CPU samples them."""
+        if self._counts_m2:
+            self.cartridge.m2(self.t)
         irq = self.apu.irq or self.cartridge.irq
         if irq != self._irq:
             self._irq = irq
@@ -120,11 +130,14 @@ class Board:
     def write_byte(self, address: int, value: int) -> None:
         t = self._begin_cycle(address, False)
         self.data_bus = value
+        ppu = self.ppu
+        if 0x2000 <= address < 0x4000:
+            ppu.run_to(t + self._ppu_access)
+            ppu.write_register(address & 7, value)
+        ppu.run_to(t)
         if address < 0x2000:
             self.ram[address & 0x7FF] = value
-        elif address < 0x4000:
-            self.ppu.write_register(address & 7, value)
-        elif address < 0x4020:
+        elif 0x4000 <= address < 0x4020:
             self._write_io(address, value)
         self.cartridge.cpu_write(address, value, t)
         self._end_cycle()
@@ -133,7 +146,21 @@ class Board:
                 observer("write", address, value, t)
 
     def _read(self, address: int, t: int) -> int:
-        """The access of one read cycle: decode, drive, update open bus."""
+        """The access of one read cycle: decode, drive, update open bus.
+
+        Runs the PPU to the cycle's end ``t``, stopping for a PPU register
+        read at the point inside the cycle where the PPU sees it.
+        """
+        ppu = self.ppu
+        if 0x2000 <= address < 0x4000:
+            ppu.run_to(t + self._ppu_access)
+            value = ppu.read_register(address & 7)
+            ppu.run_to(t)
+            if self._snoop_reads:
+                self.cartridge.cpu_read(address, t)
+            self.data_bus = value
+            return value
+        ppu.run_to(t)
         if address >= 0x4020:
             value = self.cartridge.cpu_read(address, t)
             if value is None:
@@ -144,8 +171,6 @@ class Board:
             self.cartridge.cpu_read(address, t)
         if address < 0x2000:
             value = self.ram[address & 0x7FF]
-        elif address < 0x4000:
-            value = self.ppu.read_register(address & 7)
         elif address == 0x4015:
             # Internal to the 2A03: bit 5 is open bus, and open bus keeps its
             # value (APU.wiki l.204-205).
@@ -195,7 +220,9 @@ class Board:
             self._end_cycle()
             t = self._begin_cycle(0x2004, False)  # put: DMA writes $2004
             self.data_bus = value
+            self.ppu.run_to(t + self._ppu_access)
             self.ppu.oam_dma_write(value)
+            self.ppu.run_to(t)
             self.cartridge.cpu_write(0x2004, value, t)
             self._end_cycle()
 

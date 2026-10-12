@@ -40,25 +40,37 @@ DENDY = Timing("Dendy", 26.601712e6, 15, 5, 312, 291, False)
 class PowerOn:
     """What a console holds when it is switched on; real consoles vary.
 
-    ``alignment`` is where the PPU's dot clock falls inside the CPU cycle, in
-    master ticks (0 to ``dot_divider - 1``): the CPU and PPU dividers start
-    independently, so a console powers on in one of four NTSC alignments
-    (blargg, hardware-captured over 50-60 power cycles, nesdev-forum/6186.html).
-    Which value is blargg's preferred third is settled against ``ppu_vbl_nmi``
-    in milestone 2. ``apu_put_first`` says whether the CPU's first cycle is an
-    APU put rather than a get (DMA.wiki "Cadence": either happens).
-    ``ram_fill`` is the byte the 2 KiB of work RAM holds (undefined on
-    hardware). ``a``/``x``/``y`` are the registers before the reset sequence:
-    0 by CPU_power_up_state.wiki (measured on an RP2A03G), noisy on many
-    consoles by AccuracyCoin's README l.829.
+    One variation is not a field: the CPU and PPU dividers start
+    independently, so an NTSC console powers on in one of four
+    synchronizations (blargg, hardware-captured over 50-60 power cycles,
+    nesdev-forum/6186.html). The board models his third, "the preferred one for
+    emulators and test ROMs, due to the least special cases, and highest
+    likelihood" (31 %), the one ``ppu_vbl_nmi`` and ``vbl_nmi_timing`` judge.
+    The other three move single events (NMI, VBL set and clear, sprite-0 hit,
+    overflow) by one dot each, in a pattern nothing pinned explains yet
+    (docs/undocumented-behavior.md, open items).
+
+    ``apu_put_first`` says whether the CPU's first cycle is an APU put rather
+    than a get (DMA.wiki "Cadence": either happens). ``ram_fill`` is the byte
+    the 2 KiB of work RAM holds (undefined on hardware). ``a``/``x``/``y`` are
+    the registers before the reset sequence: 0 by CPU_power_up_state.wiki
+    (measured on an RP2A03G), noisy on many consoles by AccuracyCoin's README
+    l.829. ``palette`` is palette RAM at power: "unspecified"
+    (PPU_power_up_state.wiki), "unique and consistent" per console
+    (AccuracyCoin); the default is the one console's table that was published,
+    blargg's (``blargg_ppu_tests_2005.09.15b/source/power_up_palette.asm``,
+    hardware-captured, "probably unique to my NES").
     """
 
-    alignment: int = 0
     apu_put_first: bool = False
     ram_fill: int = 0x00
     a: int = 0
     x: int = 0
     y: int = 0
+    palette: bytes = bytes.fromhex(
+        "09 01 00 01 00 02 02 0D 08 10 08 24 00 00 04 2C"
+        "09 01 34 03 00 04 00 14 08 3A 00 02 00 20 2C 08"
+    )
 
 
 @dataclass(frozen=True)
@@ -91,6 +103,13 @@ class Machine:
     # AccuracyCoin tests only what the constant cannot change.
     ane_constant: int = 0xEE
     lxa_constant: int = 0xFF
+    # How long a 1 bit of the PPU's I/O latch survives undriven (contradiction
+    # C1, docs/undocumented-behavior.md): about 600 ms on blargg's NES, the
+    # console his ppu_open_bus passes on (its readme; hardware-captured), and
+    # "some decay sooner, depending on the NES and temperature": 4-21 ms for
+    # the fastest bit on lidnariq's (nesdev-forum/24639.html). A per-console
+    # analogue figure, not a constant of the chip.
+    ppu_latch_decay_seconds: float = 0.6
     certified: bool = True
 
 
