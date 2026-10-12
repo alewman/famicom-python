@@ -203,6 +203,12 @@ class Board:
             ppu.run_to(t + self._ppu_access)
             value = ppu.read_register(address & 7)
             ppu.run_to(t)
+            if address & 7 == 2:
+                # $2002 latches VBL as M2 rises but passes the sprite-0 and
+                # overflow flags through until M2 falls, at the cycle's end
+                # (AccuracyCoin "$2002 Flag Timing", whose notes give the RP2A03G's
+                # M2 duty of 15/24; C3).
+                value = (value & 0x9F) | (ppu.status & 0x60)
             if self._snoop_reads:
                 self.cartridge.cpu_read(address, t)
             self.data_bus = value
