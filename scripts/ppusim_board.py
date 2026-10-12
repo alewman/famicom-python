@@ -125,6 +125,10 @@ class PPUSimPPU:
             value ^= 0x80
         return value
 
+    def end_read(self, register: int, value: int) -> int:
+        """The board's M2-fall hook: PPUSim's pins already carry it."""
+        return value
+
     def write_register(self, register: int, value: int) -> None:
         self._access(0, register, value)
 

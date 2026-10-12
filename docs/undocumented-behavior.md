@@ -50,7 +50,8 @@ start-here.md; tiers in [validation.md](validation.md).
   until the reset flag clears at the first pre-render line; $2002, $2003, $2004,
   $2007 and $4014 work at once (`PPU_power_up_state.wiki`, blargg 2008). The
   internal reset clears PPUCTRL, PPUMASK, t, x, w and the read buffer, **not v**.
-- PPUSTATUS at power `+0+x xxxx` (VBL often set). Palette RAM: undefined at
+- PPUSTATUS at power `+0+x xxxx` (VBL often set); the board powers on with
+  overflow set and VBL clear, as PPUSim does (milestone 4). Palette RAM: undefined at
   power, unchanged at reset; blargg's console:
   `09 01 00 01 00 02 02 0D 08 10 08 24 00 00 04 2C 09 01 34 03 00 04 00 14 08 3A 00 02 00 20 2C 08`
   ("probably unique to my NES"); AccuracyCoin: "every console tested appears to
