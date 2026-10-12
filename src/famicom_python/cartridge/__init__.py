@@ -19,11 +19,11 @@ from pathlib import Path
 from .banked import Banked
 from .connector import Cartridge
 from .database import load_mame_features, load_nes20db, lookup_mame, lookup_nes20db
-from .discrete import CNROM, NROM
+from .discrete import CNROM, NROM, UxROM
 from .ines import BoardInfo, RomImage, parse
 from .mmc1 import MMC1
 
-MAPPERS: dict[int, type[Banked]] = {0: NROM, 1: MMC1, 3: CNROM}
+MAPPERS: dict[int, type[Banked]] = {0: NROM, 1: MMC1, 2: UxROM, 3: CNROM}
 
 __all__ = ["MAPPERS", "BoardInfo", "Cartridge", "Loaded", "RomImage", "load", "read_rom_file"]
 
