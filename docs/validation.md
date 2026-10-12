@@ -130,7 +130,7 @@ belongs to the 2A03 pull request on 6502-python, not to this board.
 
 | Model | Covers | Licence | Runs here? |
 | --- | --- | --- | --- |
-| **PPUSim** (Breaknes, `fb7de61`) | gate-level 2C02G/H, 2C03/04/05, 2C07, UMC clones, from the Breaks schematics; pin-level API per master half-cycle (R/W, RS0–2, /DBE, /RES in; /INT, ALE, /RD, /WR and the full AD/A8–13 bus out, so every fetch is visible) | CC0-1.0 | **Yes**: compiles unchanged with g++ -std=c++20; a smoke test (scratchpad only) gave VBL set at H = 1 V = 241, clear at H = 1 V = 261, 89,342 dots per frame with rendering off, ~0.8 frames/s. Not yet checked against the PPU test ROMs (open item 1) |
+| **PPUSim** (Breaknes, `fb7de61`) | gate-level 2C02G/H, 2C03/04/05, 2C07, UMC clones, from the Breaks schematics; pin-level API per master half-cycle (R/W, RS0–2, /DBE, /RES in; /INT, ALE, /RD, /WR and the full AD/A8–13 bus out, so every fetch is visible) | CC0-1.0 | **Yes**: compiles unchanged with g++ -std=c++20 (`scripts/build_ppusim.py`, with our shim); on the board in place of the PPU (`scripts/ppusim_board.py`) it passes `ppu_vbl_nmi` 10/10 at one CPU/PPU skew, and `scripts/ppusim_compare.py` compares it with the board pin for pin (milestone 2 below). ~0.5 frames/s on the board. `$2002` bit 7 inverted (C23, emu-russia/breaknes#529) |
 | **APUSim** (Breaknes, `fb7de61`) | gate-level 2A03 (6502 + APU); RAW mode gives the 5 digital channel levels per half-clock, plus /IRQ, M2, the bus; `APUPlayerBoard.cpp` runs a bare APU from register dumps through a fake 6502 | CC0-1.0 | builds with g++/cmake (not run); effectively 2A03G only; DAC fitted to one voltage, so not a mixer judge (open item 2) |
 | Breaks (emu-russia, `5a55bac`) | transistor→gate documentation of the 6502 core, APU, PPU, MMC1; Verilog HDL (PPU still work in progress) | CC0-1.0 | documentation; HDL needs iverilog (not installed) |
 | Visual 2A03 / Visual 2C02 (Quietust) | transistor-level RP2A03G and 2C02G netlists in the visual6502 JS simulator | simulator MIT; **netlist data: no licence stated** | `reference/docs/visual2a03`, `visual2c02`; the simulator core has no DOM references and node 22 is installed, so a headless runner is feasible (not built); very slow |
@@ -312,3 +312,230 @@ PyPy 180 frames/s (5.4 M CPU cycles/s, 3.0x real time); CPython 79 frames/s
 (2.4 M CPU cycles/s, 1.3x real time). The PPU advances dots 2-339 in one step
 while nothing happens on them; dot by dot, PyPy managed 1.8x real time,
 because its JIT handles a three-iteration loop per CPU cycle badly.
+
+### Milestone 2: the PPU, dot by dot (2026-10-11)
+
+**Pins.** famicom-python at the commit that adds this record; 6502-python
+`1ae3610015abcb643294fab986dbfb64a45d79b7`; `nes-test-roms` `95d8f62`;
+detectors Mesen2 `b9fa69d` (2.1.1) and, as a candidate die judge, Breaknes
+PPUSim `fb7de61`. Machine NES-001 (RP2A03G + RP2C02G), `PowerOn()` defaults
+(blargg's third synchronization, blargg's power-on palette, latch decay
+0.6 s). PyPy 7.3.20 (Python 3.11.13) and CPython 3.14.4, on the shared
+32-core machine with 2 ROMs at a time.
+
+**The PPU test ROMs** (hardware-corrected), `pytest -m slow` and
+`scripts/run_test_roms.py --suite ppu`: 41 of 41 pass under PyPy and under
+CPython with identical cycle counts. `ppu_vbl_nmi` and `ppu_open_bus`,
+`ppu_read_buffer`, `oam_read`, `oam_stress` report through `$6000`;
+`vbl_nmi_timing`, `sprite_hit_tests` and `sprite_overflow_tests` on screen
+("PASSED"/"FAILED"); blargg's 2005 PPU tests on screen as result `$01`.
+`power_up_palette` is left out: it checks one console's power-on palette
+(undocumented-behavior.md, "Power-up and reset").
+
+| ROM | SHA-256 | CPU cycles | Instructions | Wall s, PyPy | Wall s, CPython |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `ppu_vbl_nmi/rom_singles/01-vbl_basics.nes` | `06aea5af4eda` | 4,263,124 | 1,698,000 | 4.7 | 6.7 |
+| `ppu_vbl_nmi/rom_singles/02-vbl_set_time.nes` | `dd9885613007` | 5,362,976 | 1,804,000 | 5.0 | 6.7 |
+| `ppu_vbl_nmi/rom_singles/03-vbl_clear_time.nes` | `787fdaa4dd6c` | 5,005,262 | 1,712,000 | 5.3 | 10.9 |
+| `ppu_vbl_nmi/rom_singles/04-nmi_control.nes` | `84722c75b896` | 1,044,526 | 342,000 | 0.7 | 2.0 |
+| `ppu_vbl_nmi/rom_singles/05-nmi_timing.nes` | `72e515d689d7` | 6,494,195 | 2,210,000 | 3.1 | 7.4 |
+| `ppu_vbl_nmi/rom_singles/06-suppression.nes` | `811dd5997bbf` | 6,583,873 | 2,188,000 | 3.5 | 7.5 |
+| `ppu_vbl_nmi/rom_singles/07-nmi_on_timing.nes` | `1ed154363660` | 5,839,672 | 1,930,000 | 3.6 | 9.6 |
+| `ppu_vbl_nmi/rom_singles/08-nmi_off_timing.nes` | `1d2a4093091c` | 6,556,211 | 2,316,000 | 3.0 | 7.5 |
+| `ppu_vbl_nmi/rom_singles/09-even_odd_frames.nes` | `1ac04283021d` | 2,295,994 | 836,000 | 1.7 | 5.9 |
+| `ppu_vbl_nmi/rom_singles/10-even_odd_timing.nes` | `7217d2d172ce` | 4,201,658 | 1,508,000 | 2.2 | 5.0 |
+| `vbl_nmi_timing/1.frame_basics.nes` | `719bf4b4ea90` | 5,360,505 | 2,118,031 | 3.3 | 11.4 |
+| `vbl_nmi_timing/2.vbl_timing.nes` | `39231f002784` | 5,360,515 | 2,073,526 | 3.2 | 10.5 |
+| `vbl_nmi_timing/3.even_odd_frames.nes` | `268d5e305ab7` | 3,573,676 | 1,379,713 | 2.9 | 6.1 |
+| `vbl_nmi_timing/4.vbl_clear_timing.nes` | `8552a65de49b` | 3,573,679 | 1,379,857 | 1.7 | 4.2 |
+| `vbl_nmi_timing/5.nmi_suppression.nes` | `059c8df6a9b4` | 5,360,518 | 2,080,668 | 2.7 | 8.0 |
+| `vbl_nmi_timing/6.nmi_disable.nes` | `4573dcff3c57` | 3,573,679 | 1,388,129 | 1.8 | 6.2 |
+| `vbl_nmi_timing/7.nmi_timing.nes` | `26a2475828ef` | 3,573,678 | 1,377,608 | 1.6 | 6.1 |
+| `sprite_hit_tests_2005.10.05/01.basics.nes` | `51819e8e502b` | 1,786,835 | 640,190 | 2.1 | 4.6 |
+| `sprite_hit_tests_2005.10.05/02.alignment.nes` | `125bbb3ce1e6` | 893,419 | 299,935 | 0.5 | 2.4 |
+| `sprite_hit_tests_2005.10.05/03.corners.nes` | `9dd57776bc62` | 893,417 | 330,210 | 0.6 | 2.1 |
+| `sprite_hit_tests_2005.10.05/04.flip.nes` | `5f7142bddb51` | 893,417 | 335,367 | 0.7 | 2.4 |
+| `sprite_hit_tests_2005.10.05/05.left_clip.nes` | `69b329658c17` | 893,419 | 309,398 | 0.8 | 1.8 |
+| `sprite_hit_tests_2005.10.05/06.right_edge.nes` | `8e6653fcb869` | 893,418 | 325,017 | 0.9 | 2.6 |
+| `sprite_hit_tests_2005.10.05/07.screen_bottom.nes` | `05849956f802` | 893,417 | 319,803 | 0.6 | 2.4 |
+| `sprite_hit_tests_2005.10.05/08.double_height.nes` | `127fd966b6b3` | 893,418 | 330,211 | 0.7 | 2.2 |
+| `sprite_hit_tests_2005.10.05/09.timing_basics.nes` | `311698c717e5` | 2,680,255 | 1,022,614 | 1.6 | 7.8 |
+| `sprite_hit_tests_2005.10.05/10.timing_order.nes` | `0f36bc07bfe5` | 2,680,254 | 1,017,765 | 1.5 | 6.2 |
+| `sprite_hit_tests_2005.10.05/11.edge_timing.nes` | `5a7c121f6e76` | 1,786,836 | 684,745 | 0.9 | 3.4 |
+| `sprite_overflow_tests/1.Basics.nes` | `1a6782f63ccb` | 893,419 | 334,610 | 0.8 | 2.5 |
+| `sprite_overflow_tests/2.Details.nes` | `6405a7ff1042` | 893,418 | 314,542 | 0.7 | 2.0 |
+| `sprite_overflow_tests/3.Timing.nes` | `2252ec8fc359` | 3,573,679 | 1,376,130 | 1.8 | 7.2 |
+| `sprite_overflow_tests/4.Obscure.nes` | `aebf21993443` | 893,418 | 323,128 | 0.6 | 2.4 |
+| `sprite_overflow_tests/5.Emulator.nes` | `cf9944542196` | 893,416 | 333,378 | 0.7 | 4.6 |
+| `blargg_ppu_tests_2005.09.15b/palette_ram.nes` | `11c1de16c677` | 893,419 | 322,724 | 0.8 | 2.2 |
+| `blargg_ppu_tests_2005.09.15b/sprite_ram.nes` | `81275795ea64` | 893,417 | 313,855 | 0.9 | 2.0 |
+| `blargg_ppu_tests_2005.09.15b/vbl_clear_time.nes` | `1a1d3ae8062c` | 893,418 | 313,594 | 0.7 | 1.7 |
+| `blargg_ppu_tests_2005.09.15b/vram_access.nes` | `a0cde2a3c98d` | 893,417 | 322,621 | 0.5 | 2.7 |
+| `ppu_open_bus/ppu_open_bus.nes` | `d4208a3ff634` | 7,444,120 | 3,046,000 | 3.8 | 11.0 |
+| `ppu_read_buffer/test_ppu_read_buffer.nes` | `230a52fc557c` | 38,922,445 | 13,094,000 | 28.7 | 122.5 |
+| `oam_read/oam_read.nes` | `f298973dabeb` | 804,396 | 234,000 | 0.8 | 2.1 |
+| `oam_stress/oam_stress.nes` | `95882d72a7ac` | 50,746,904 | 16,398,000 | 17.2 | 57.7 |
+
+**The CPU ROMs again**, with the PPU rendering: 10 of 10 pass on both. Cycle
+counts moved from milestone 1 where a ROM waits on the PPU (its VBL polls and
+screen writes now see a real PPU): `all_instrs`, `instr_timing`,
+`cpu_dummy_reads`, `cpu_dummy_writes_ppumem`, `cpu_exec_space_ppuio`.
+
+| ROM | SHA-256 | CPU cycles | Instructions | Wall s, PyPy | Wall s, CPython |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `instr_test-v5/all_instrs.nes` | `353870c15724` | 71,536,744 | 23,192,000 | 36.9 | 125.9 |
+| `instr_timing/instr_timing.nes` | `3d1bca14266f` | 38,687,273 | 11,070,000 | 19.0 | 109.9 |
+| `instr_misc/instr_misc.nes` | `b6762e20a285` | 6,641,245 | 2,478,000 | 7.4 | 9.6 |
+| `cpu_timing_test6/cpu_timing_test.nes` | `6ab4fe8af23b` | 29,482,696 | 8,744,746 | 16.4 | 96.0 |
+| `branch_timing_tests/1.Branch_Basics.nes` | `7b69e3044eae` | 893,417 | 325,910 | 0.9 | 2.2 |
+| `branch_timing_tests/2.Backward_Branch.nes` | `f7966e9b86b0` | 893,419 | 335,742 | 0.5 | 2.2 |
+| `branch_timing_tests/3.Forward_Branch.nes` | `d0fbc6b1899b` | 893,417 | 335,534 | 0.4 | 2.2 |
+| `cpu_dummy_reads/cpu_dummy_reads.nes` | `db4f91b80c5f` | 1,786,833 | 625,852 | 1.3 | 5.7 |
+| `cpu_dummy_writes/cpu_dummy_writes_ppumem.nes` | `f59ac329f487` | 7,026,951 | 2,018,000 | 5.2 | 22.7 |
+| `cpu_exec_space/test_cpu_exec_space_ppuio.nes` | `9f7f24d42003` | 1,220,282 | 352,000 | 1.8 | 3.2 |
+
+**The access point.** Where in a CPU cycle the PPU sees a register access is
+not documented to the dot. Of read and write points 4, 8 and 12 master ticks
+into the cycle (one, two or three dots), swept over the 17 `ppu_vbl_nmi` and
+`vbl_nmi_timing` ROMs, only reads and writes both at 8 pass all 17; the board
+uses that (`PPU_ACCESS_TICKS`, timing.md). Sampling /NMI earlier than the
+cycle's end makes NMI one cycle late (`05-nmi_timing`). The odd-frame skip's
+sample dot came from the same kind of measurement: logging
+`10-even_odd_timing`'s `$2001` writes shows one landing after dot 337 counts
+for this frame and one after 338 does not.
+
+**The gates can fail.** Each seeded fault below, in a copy of `src/`, makes
+its gate fail (14 of 14):
+
+| Fault | Gate that fails |
+| --- | --- |
+| VBL sets on dot 2, not 1 | `02-vbl_set_time` |
+| no `$2002` read race at (241, 0) | `06-suppression` |
+| register accesses at the cycle's end | `05-nmi_timing` |
+| odd-frame skip sampled on dot 339 | `10-even_odd_timing` |
+| no odd-frame skip | `09-even_odd_frames` |
+| sprite-0 hit at x = 255 | `sprite_hit_tests/06.right_edge` |
+| sprite-0 hit ignores the left clip | `sprite_hit_tests/05.left_clip` |
+| fine X ignored | quick (`test_ppu_rendering`) |
+| overflow scan without the m++ bug | `sprite_overflow_tests/4.Obscure` |
+| secondary OAM not cleared on dots 1-64 | quick (`test_empty_sprite_slots_fetch_tile_ff`) |
+| the I/O latch never decays | `ppu_open_bus` (#3) |
+| OAMADDR never cleared on 257-320 | quick |
+| palette reads buffered like VRAM | `blargg_ppu_tests/palette_ram` |
+| hori(v) not copied at dot 257 | `sprite_hit_tests/02.alignment` |
+
+Two needed stronger gates first: the empty-slot test now fills two slots on
+another line so a stale secondary OAM shows; OAMADDR cleared only on 257 (not
+258-320) is near-equivalent and nothing distinguishes it.
+
+**Fetches on the connector** (`test_ppu_rendering`, 241 rendered lines): 84
+pattern reads per line, 170 ALE addresses per line for a cartridge that
+watches them (`Cartridge.watches_ppu_address`), A12 rising 8 times per line
+with sprites at `$1000` but only once after a long low stretch: the rise
+MMC3's filter counts.
+
+**Speed** (the 240p Test Suite's menu, 300 frames after 120 of warm-up,
+rendering on): PyPy 111 frames/s (1.85x real time), CPython 10.4 frames/s
+(0.17x). Before the PPUSim changes below PyPy managed 59 (A/B, same load);
+the frames are the same (Mesen2: 0 pixels differ), so this is PyPy's JIT
+taking a better trace, not work dropped. With rendering off the PPU still
+skips dots 2-337 in one step.
+
+**Against Mesen2, pixel for pixel** (`scripts/mesen_frames.py`, a detector).
+Mesen2 runs with a 512-entry identity palette, so its "RGB" is the PPU's 9-bit
+value, plus its power-up write-ignore and zeroed RAM to match the board. Its
+frame N is the board's N-3 (N-1 for some ROMs; the closest of ±3 is
+reported). Differing pixels of 61,440:
+
+| ROM | Frame 200 | Frame 600 | What differs |
+| --- | ---: | ---: | --- |
+| `240p-test-mini/240pee.nes` | 0 | 0 | |
+| `nmi_sync/demo_ntsc.nes` | 0 | 0 | |
+| `spritecans-2011/spritecans.nes` | 0 | 0 | |
+| `nes15-1.0.0/nes15-NTSC.nes` | 0 | 0 | |
+| `tvpassfail/tv.nes` | 0 | 0 | |
+| `ny2011/ny2011.nes` | 0 | 0 | |
+| `scrolltest/scroll.nes` | 0 | 0 | hangs in both: it enables NMI inside the power-up write-ignore, as on hardware |
+| `blargg_litewall/litewall5.nes` | 0 | 0 | |
+| `full_palette/full_palette.nes` | 6,129 | 6,129 | when a `$2007` write lands and v increments (C22): PPUSim sides with the board, 0 pixels differ |
+| `full_palette/flowing_palette.nes` | 5,368 | 16,397 | the same, with mid-line `$2006`/`$2007` writes: PPUSim 0 |
+| `scanline/scanline.nes` | 2 | 2 | mid-line BG toggle (C12, open): PPUSim differs from the board at the same 2 pixels |
+| `window5/colorwin_ntsc.nes` | 8 | 8 | mid-line BG toggle (C12, open) |
+
+Every difference is a dot-level effect of a register write mid-line, which no
+test ROM pins; PPUSim judged them (below). Before that, the board applied
+`$2006`/`$2007` writes at the access and differed from Mesen2 by 767 pixels in
+`full_palette`; `litewall5` showed 2-4 pixels at the start of row 0, which
+were the comparison's own fault (it read our picture a few dots into the next
+frame; it now reads it at line 240).
+
+**PPUSim as a judge** (die-derived; open item 1). `scripts/build_ppusim.py`
+builds Breaknes PPUSim `fb7de61` with our shim (`scripts/ppusim/`), which owns
+the NES-001 parts beside the PPU (the octal latch, CHR, CIRAM) and records the
+pins per master half-cycle. `scripts/ppusim_board.py` puts it on the board in
+place of our PPU: our CPU, bus and cartridge, each register access a /DBE
+window while M2 is high (9 to 24 half-cycles into the CPU cycle), the
+`$2002` bit 7 inversion corrected (C23).
+
+*First, does it reproduce `ppu_vbl_nmi`?* The CPU/PPU phase at power is free,
+so PPUSim was started 0-7 master half-cycles ahead of the CPU (one dot), and
+each of the 10 singles run to its verdict (400 frames at most):
+
+| ROM | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| `01-vbl_basics` | pass | pass | pass | pass | pass | pass | pass | pass |
+| `02-vbl_set_time` | #1 | #1 | #1 | pass | #1 | #1 | #1 | #1 |
+| `03-vbl_clear_time` | pass | pass | pass | pass | pass | pass | pass | pass |
+| `04-nmi_control` | pass | pass | pass | pass | pass | pass | pass | pass |
+| `05-nmi_timing` | #1 | #1 | #1 | pass | #1 | #1 | #1 | #1 |
+| `06-suppression` | #1 | #1 | #1 | pass | #1 | #1 | #1 | #1 |
+| `07-nmi_on_timing` | #1 | #1 | #1 | pass | #1 | #1 | #1 | #1 |
+| `08-nmi_off_timing` | #1 | #1 | #1 | pass | #1 | #1 | #1 | #1 |
+| `09-even_odd_frames` | pass | pass | pass | pass | pass | pass | pass | pass |
+| `10-even_odd_timing` | #2 | #2 | #2 | pass | pass | pass | pass | pass |
+
+At skew 3 PPUSim passes all ten, the board's own result. At the other seven,
+02 and 05-08 print the same tables as each other, every VBL and NMI event one
+row (one dot) early against the CPU, and 10 fails at skews 0-2 only: three
+regions, as blargg's readme says other synchronizations make some of these
+fail on hardware. That the passing region is one half-cycle wide is a
+property of this pairing (our CPU's access window against PPUSim's clock
+phases), not something hardware shows; so PPUSim judges below at skew 3, the
+skew where it agrees with the hardware-corrected tests.
+
+*Then the open questions, pin for pin* (`scripts/ppusim_compare.py`: both PPUs
+fed the same register accesses on the same master-clock timeline, accesses
+spaced as `STA`/`LDA abs` space them; ours reports through the connector and
+`picture`, PPUSim through its pins; PPUSim shows pixel x at H = x + 4 and its
+ALE a dot before ours, constant offsets found by `calibrate`):
+
+| Question | PPUSim | The board before | Now |
+| --- | --- | --- | --- |
+| every ALE address of rendered lines with sprites (`fetches`) | | 2 of 170 per line differed | equal, 3 lines |
+| first sprite-phase garbage fetch (dot 257) | v before the hori(v) copy | after | before (fixed) |
+| second garbage fetch (C15) | nametable | nametable | settled |
+| empty-slot row: secondary OAM after evaluation | the next free slot keeps OAM[63].Y once n wraps | kept copying after the wrap | equal (fixed) |
+| odd-frame skip with sprites only (C13) | skips | skips | settled |
+| second `$2006` write, t -> v (C21) | 2 dots after the access point | at it | `ppu.DELAYS` (fixed) |
+| `$2007` write, and v's increment after a write or read (C22) | 3 and 4 dots after | at it | `ppu.DELAYS` (fixed) |
+| greyscale and emphasis (C12) | reach the pixel looked up a dot earlier | did not | equal (fixed) |
+| BG turned on or off mid-line (C12) | first 1-2 fetches and up to a pixel differ | | open |
+
+Each was run with the CPU's data valid for all of M2 and with the early-write
+open-bus value ($20) for its first dot; only greyscale differed (one pixel
+further back with the clean bus), and the board follows the early-write
+model, which hardware has (PPU_glitches.wiki). `test_ppu_rendering`'s
+`test_register_effects_land_dots_after_the_access` pins the delays (7 of 7
+seeded off-by-ones caught). The test ROMs gave identical verdicts and cycle
+counts before and after.
+
+*End to end*: `scripts/ppusim_compare.py frame ROM 60` runs a ROM on the board
+with PPUSim, CPU and all, and compares frame 60 with ours. `full_palette` and
+`flowing_palette` (mid-line `$2006`/`$2007` throughout): 0 pixels differ.
+`scanline` 2 and `colorwin_ntsc` 5 (mid-line BG toggles, the open part of
+C12). In `litewall5` (frames 60 and 61) and `colorwin_ntsc` PPUSim also shows
+the backdrop at (0, 0), the frame's first pixel and no other x = 0: a
+PPUSim-only observation nothing else confirms, left open. So in
+`full_palette` and `flowing_palette` the differences from Mesen2 are
+Mesen2's: it applies a `$2007` write a dot after the access, PPUSim and now
+the board three dots after, the increment a dot later still.

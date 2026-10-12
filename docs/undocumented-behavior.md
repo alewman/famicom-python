@@ -54,7 +54,10 @@ start-here.md; tiers in [validation.md](validation.md).
   power, unchanged at reset; blargg's console:
   `09 01 00 01 00 02 02 0D 08 10 08 24 00 00 04 2C 09 01 34 03 00 04 00 14 08 3A 00 02 00 20 2C 08`
   ("probably unique to my NES"); AccuracyCoin: "every console tested appears to
-  have a unique and consistent power on state". Mesen2 boots with blargg's table.
+  have a unique and consistent power on state". Mesen2 boots with blargg's table;
+  so does the board (`PowerOn.palette`).
+  `blargg_ppu_tests_2005.09.15b/power_up_palette` checks that table, so it
+  judges one console rather than the 2C02, and is not a gate.
 - OAM is DRAM: undefined at power; it decays when not refreshed (holds at least
   one vblank, "not much longer"; `PPU_OAM.wiki`).
 
@@ -167,7 +170,9 @@ before the board takes a side.
   test #3 needs zero after 1 s, #5/#7 assume bits survive 10 ms). lidnariq's
   2023 hardware test: the fastest bit decays in 4–21 ms, faster when warm
   (`nesdev-forum/24639.html`). The wiki: "3 ms to 30 ms" and elsewhere "at least
-  1 ms". Mesen2: 3 frames.
+  1 ms". Mesen2: 3 frames. *Board (milestone 2)*: per-bit decay, timeout
+  `Machine.ppu_latch_decay_seconds`, default 0.6 s (blargg's figure, so his test
+  passes); lidnariq's measurement says hardware is faster.
 - **C2. NMI suppression window.** The wiki says suppression "may" extend to
   "the following dot or two"; blargg's tests give exactly −1, 0, +1 (other
   alignments shift it by ±1 dot).
@@ -201,12 +206,28 @@ before the board takes a side.
   "load 3, reload 4". The wiki's get/put model reproduces blargg's table:
   a difference of framing, document the wiki's model.
 - **C12. Rendering-enable latency.** Wiki: 3–4 dots. Mesen2: 1 dot.
+  AccuracyCoin: 2–5 dots depending on the PPU revision and the CPU/PPU
+  alignment. *Settled in part on PPUSim (milestone 2)*: greyscale and
+  emphasis act a stage after the palette lookup, so a `$2001` write reaches
+  the pixel looked up on the dot before it (with the early-write bus; with the
+  written value on the bus for all of M2, greyscale reaches one pixel
+  further back). The board does that. Turning BG on mid-line, PPUSim's first
+  one or two fetches differ from the board's (its first ALE carries v's
+  nametable address, and its tile latch keeps the tile from before rendering
+  went off), and turning it off, the last pixel can differ by one. Those stay
+  open, as does every revision but the 2C02G.
 - **C13. Odd-frame skip condition.** Diagram and blargg's tests: BG enabled.
-  Wiki text: rendering enabled (BG or sprites).
+  Wiki text: rendering enabled (BG or sprites). *Board*: BG or sprites,
+  sampled as dot 338 runs; `ppu_vbl_nmi/10-even_odd_timing` pins the dot (a
+  `$2001` write landing after 337 counts, after 338 does not) but not which
+  enable bit. *Settled on PPUSim*: sprites alone make the skip too (the wiki
+  text, and the board).
 - **C14. Sprite evaluation end.** `PPU_sprite_priority.wiki`: dot 240;
   `PPU_sprite_evaluation.wiki`: 256.
 - **C15. The second garbage fetch of each sprite slot.** Diagram: an AT fetch;
-  text: an NT fetch.
+  text: an NT fetch. *Settled on PPUSim*: a nametable fetch. And the first
+  (dot 257) goes out before hori(v) is copied, so its address is v's from the
+  end of the line; the board had it after (fixed in milestone 2).
 - **C16. 2C07 vblank length.** 70 lines (cycle chart) vs 71 (variants page).
 - **C17. MMC3 revision names.** The wiki says the IRQ behaviour splits Sharp vs
   NEC, not by letter; blargg's `mmc3_irq_tests` call the old behaviour "rev A",
@@ -222,18 +243,37 @@ before the board takes a side.
   counts A13; both scroll copies at dot 256; 4 dots per evaluation step) are
   wrong where the wiki has since been corrected. Cite them for history only.
 - **C21. $2006 t→v delay.** "1 to 1.5 dots after the write completes" vs "about
-  3 dots after the register write begins": probably the same instant; pin on
-  PPUSim.
+  3 dots after the register write begins": probably the same instant. *Settled
+  on PPUSim*: the copy lands 2 dots after the board's access point (a dot
+  after M2 falls), on either bus model; `ppu.DELAYS`. With rendering off,
+  PPUSim emits no ALE for it (v reaches the cartridge on PA8–13 only); the
+  board reports it as an ALE address, which gives a mapper the same A12.
+- **C22. When a `$2007` access increments v.** Mesen2 increments one dot after
+  the access, so with rendering off the backdrop override shows the *written*
+  palette entry for one dot; the board incremented at the access. Found by
+  pixel comparison: `full_palette` differed from Mesen2 in exactly one pixel
+  per colour boundary (767). *Settled on PPUSim*: a write reaches palette RAM 3
+  dots after the board's access point and v increments a dot later, after a
+  read too, on either bus model; the override shows the old entry for 3 dots
+  and the written one for 1. The board does that (`ppu.DELAYS`), so it now
+  differs from Mesen2 the other way (validation.md, milestone 2).
+- **C23. PPUSim's `$2002` bit 7.** Breaknes PPUSim `fb7de61` drives it as the
+  complement of the VBL flag (`fsm.cpp`, `db_latch.nget()`); its own wiki
+  drawing, its author's Verilog and the Visual2C02 netlist all show the true
+  flag. Reported as emu-russia/breaknes#529 (with the netlist trace);
+  `scripts/ppusim_board.py` corrects it until a fixed pin.
 
 ## Open items
 
-1. **Settle on PPUSim (die-derived)**: the garbage-fetch addresses (C15), the
-   row of the empty-slot tile-$FF fetch (Mesen2 uses row 0; the evaluation page
-   implies line − OAM[63].Y), the odd-frame skip's sampled signal and dot (C13),
-   the PPUMASK latency (C12), the $2006 delay (C21). But first check PPUSim
-   reproduces blargg's alignment-dependent results: Breaknes as a whole scores
-   70/140 on AccuracyCoin, so a gate-level model is evidence, not a verdict,
-   until the circuit in question is checked.
+1. **Settle on PPUSim (die-derived)**: *done in milestone 2* for C13, C15, C21,
+   C22, the colour half of C12 and the empty-slot row (PPUSim: once n wraps
+   nothing more lands in secondary OAM, so the next free slot keeps OAM[63]'s
+   Y and the row is line − OAM[63].Y, flipped by the $FF attribute; Mesen2
+   uses row 0). PPUSim first reproduced `ppu_vbl_nmi` 10/10, at one of eight
+   half-cycle skews (validation.md). Still open: mid-line BG enable and
+   disable (C12), whether the board's CPU-side bus timing (M2 duty, C3; the
+   early-write value) is right, every PPU revision but 2C02G, and PPUSim's
+   backdrop at the frame's first pixel (0, 0) (validation.md, milestone 2).
 2. **Check APUSim (die-derived) against `apu_test`, `apu_reset`, the 2005 suite
    and AccuracyCoin pages 13–14** before using it as a per-cycle APU judge. It
    stores a revision but branches on none: effectively 2A03G only. Its DAC is
@@ -259,3 +299,8 @@ before the board takes a side.
 14. MMC6 IRQ behaviour (C18), MMC3 Sharp vs NEC per licensed game (nes20db
     assigns 4.0 to all), MMC2 latch timing (no test ROM), MMC5's in-frame exit
     on $2001 and its $4014 snooping ("believed but not tested").
+15. The other three CPU/PPU synchronizations. The board models blargg's third
+    only (timing.md): accesses at whole-dot positions cannot tell the four
+    apart, and the per-event sub-dot phases that would are not pinned by any
+    oracle we have. Tests that pass on hardware in only some alignments
+    (`oam_stress`, `double_2007_read`, ...) judge the board only in that one.
