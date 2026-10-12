@@ -48,9 +48,10 @@ sms-python does):
 - `joypad_oe_per_cycle` (RF Famicom: every read cycle clocks the pad);
 - `famicom_audio_through_cart`;
 - `dmc_unexpected_reload_bug` (late RP2A03G and H, `DMA.wiki` "Bugs");
-- power-on parameters: CPU/PPU alignment (1 of 4, default blargg's third),
-  APU get/put parity (1 of 2), RAM fill, CPU registers (usually 0, measured
-  noisy: undocumented-behavior.md).
+- power-on parameters: APU get/put parity (1 of 2), RAM fill, CPU registers
+  (usually 0, measured noisy: undocumented-behavior.md), the palette (blargg's
+  console's). The CPU/PPU alignment is not one: the board models blargg's
+  third synchronization only (timing.md).
 
 ## Clocks
 
@@ -152,8 +153,8 @@ AccuracyCoin "Open Bus", README l.93–102).
 | $2003 OAMADDR | W | forced to 0 on dots 257–320 of rendering lines |
 | $2004 OAMDATA | RW | write: OAM[addr], addr++. Read: no increment; byte 2 bits 2–4 read 0. Readable on 2C02G/H only |
 | $2005 PPUSCROLL | W×2 | 1st: t[4:0] = d[7:3], x = d[2:0]; 2nd: t[14:12] = d[2:0], t[9:5] = d[7:3] |
-| $2006 PPUADDR | W×2 | 1st: t[13:8] = d[5:0], t[14] = 0; 2nd: t[7:0] = d, then v = t about a dot later |
-| $2007 PPUDATA | RW | access v, then v += 1 or 32; **during rendering** an access increments coarse X and Y together instead |
+| $2006 PPUADDR | W×2 | 1st: t[13:8] = d[5:0], t[14] = 0; 2nd: t[7:0] = d, then v = t 2 dots after the access point (PPUSim; `ppu.DELAYS`) |
+| $2007 PPUDATA | RW | access v (a write lands 3 dots after the access point), then v += 1 or 32 a dot after that; **during rendering** an access increments coarse X and Y together instead |
 
 `PPU_registers.wiki`, `PPU_scrolling.wiki`. The internal registers (loopy's
 names) are v (15-bit current address), t (temporary), x (3-bit fine X) and w

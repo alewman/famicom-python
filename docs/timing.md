@@ -168,7 +168,10 @@ H an implicit stop on the reload's APU cycle schedules an extra reload
 
 - The halted 6502 **repeats its stalled read** on every DMA cycle that is not a
   DMA access, visibly on the bus. A stalled `LDA $2007` therefore increments v
-  2–3 extra times (blargg `dma_2007_read`); a stalled $4015 read clears the
+  2–3 extra times (blargg `dma_2007_read`; since milestone 2 each increment
+  lands 4 dots after its read, so a read one CPU cycle after another still
+  sees the old v: milestone 3 checks this against `dma_2007_read` and
+  `double_2007_read`); a stalled $4015 read clears the
   frame IRQ flag (AccuracyCoin "DMA + $4015 Read"); a stalled $2002 read clears
   VBL.
 - $4016/$4017: pads are clocked by /OE, not by the address, so on the NES-001 a
