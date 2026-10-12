@@ -11,12 +11,12 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "alewman" }]
-# A git revision, never a local path, until 6502-python is released: 1ae3610
-# (main after PRs #5 and #6) has RP2A03 (#2), polling at the second-to-last
-# cycle (#3), branch poll points (#4, re-landed as #5) and the per-CPU ANE/LXA
-# constant (#6).
+# A git revision, never a local path, until 6502-python is released: fdef250
+# (PR #7, dma_stalled, on main 1ae3610) adds to main's RP2A03 (#2), polling at
+# the second-to-last cycle (#3), branch poll points (#5) and the per-CPU ANE/LXA
+# constant (#6). Repin to main once #7 is merged.
 dependencies = [
-    "6502-python @ git+https://github.com/alewman/6502-python@1ae3610015abcb643294fab986dbfb64a45d79b7",
+    "6502-python @ git+https://github.com/alewman/6502-python@fdef25092d9ae7b04a7b62ab4ed2b6aa50548279",
 ]
 
 [project.optional-dependencies]

@@ -31,6 +31,7 @@ class System:
         board.request_irq = cpu.request_maskable_interrupt
         board.clear_irq = cpu.clear_maskable_interrupt
         board.request_nmi = cpu.request_non_maskable_interrupt
+        board.cpu = cpu
         self.instructions = 0
         self.loaded: Loaded | None = None  # how from_rom identified the cartridge
         # ANE and LXA's constant varies from chip to chip (6502-python

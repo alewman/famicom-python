@@ -65,6 +65,9 @@ class Board:
         self._oe_per_cycle = machine.joypad_oe_per_cycle
         self._oam_dma_page: int | None = None
         self._strobe: bool | None = None  # a $4016 OUT0 write, until the next put
+        # The CPU, told when a DMA stretched its read (6502-python's
+        # ``dma_stalled``: SHA/SHX/SHY/TAS drop their AND after one). Set by System.
+        self.cpu = None
         # The CPU's interrupt inputs (set by System to the CPU's methods).
         self.request_irq: Callable[[], None] = lambda: None
         self.clear_irq: Callable[[], None] = lambda: None
@@ -150,11 +153,17 @@ class Board:
     # -- the CPU's bus ---------------------------------------------------
 
     def read_byte(self, address: int) -> int:
+        stalled = False
         if self.apu.dmc_abort:  # an aborted DMC DMA: its halt cycle only
             self.apu.dmc_abort = False
             self._repeat_read(address)
+            stalled = True
         if self._oam_dma_page is not None or self.apu.dmc_request:
             self._dma(address)
+            stalled = True
+        cpu = self.cpu
+        if cpu is not None and cpu.dma_stalled != stalled:
+            cpu.dma_stalled = stalled
         t = self._begin_cycle(address, True)
         value = self._read(address, t)
         self.internal_bus = value
