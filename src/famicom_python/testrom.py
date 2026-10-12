@@ -392,6 +392,12 @@ def accuracycoin_tests(asm_text: str) -> list[AccuracyCoinTest]:
     return tests
 
 
+def _finished(value: int) -> bool:
+    """A result byte that is final: pass (1) or fail (2) in the low bits, or
+    $FF skipped; 3 marks a test still running."""
+    return value & 3 in (1, 2) or value == 0xFF
+
+
 def run_accuracycoin(
     system: System, tests: list[AccuracyCoinTest], *, max_seconds: float = 300
 ) -> dict[AccuracyCoinTest, int]:
@@ -414,7 +420,7 @@ def run_accuracycoin(
     frames, limit = 0, int(max_seconds * 60)
 
     def done() -> bool:
-        return all(ram[t.address & 0x7FF] & 3 in (1, 2) or ram[t.address & 0x7FF] == 0xFF for t in tests)
+        return all(_finished(ram[t.address & 0x7FF]) for t in tests)
 
     while frames < limit and not done():
         system.run_frames(30)
@@ -424,7 +430,7 @@ def run_accuracycoin(
 
 def run_accuracycoin_test(system: System, test: AccuracyCoinTest, max_seconds: float = 20) -> int:
     """Run one test from the menu: Right to its page, Down to its row, A."""
-    from .joypad import A, DOWN, RIGHT
+    from .joypad import DOWN, RIGHT, A
 
     pad = system.board.pads[0]
 
@@ -442,8 +448,7 @@ def run_accuracycoin_test(system: System, test: AccuracyCoinTest, max_seconds: f
     press(A)
     ram = system.board.ram
     for _ in range(int(max_seconds * 2)):
-        value = ram[test.address & 0x7FF]
-        if value & 3 in (1, 2) or value == 0xFF:  # (3 while it runs)
+        if _finished(ram[test.address & 0x7FF]):
             break
         system.run_frames(30)
     return ram[test.address & 0x7FF]
