@@ -14,9 +14,11 @@ on the bus, until the DMA is done. So when OAM DMA or a DMC fetch is due the
 board runs it inside the next read: the halt, dummy and alignment cycles as
 repeats of the CPU's read, the DMA's own gets and puts, then the CPU's read.
 
-**Open bus** (Open_bus_behavior.wiki): one ``data_bus`` byte holds the last value
-on the CPU data bus; every read except $4015's, every write and every DMA read
-updates it, and an undriven read returns it.
+**Open bus** (Open_bus_behavior.wiki): ``data_bus`` holds the last value on the
+external data bus; every read except $4015's, every write and every DMA read
+updates it, and an undriven read returns it. The 2A03 also has an internal data
+bus, ``internal_bus``: every CPU read and write updates it, DMA reads do not,
+and $4015's bit 5 comes from it (AccuracyCoin "Internal Data Bus").
 """
 
 from __future__ import annotations
@@ -56,10 +58,13 @@ class Board:
         self.pads = [StandardController(), StandardController()]
         self.t = 0  # master ticks at the end of the last CPU cycle
         self.data_bus = 0
+        self.internal_bus = 0
+        self._undriven = False  # the last DMA read found nothing on the bus
         # The pad whose /OE was low on the last cycle (-1: none).
         self._pad_oe = -1
         self._oe_per_cycle = machine.joypad_oe_per_cycle
         self._oam_dma_page: int | None = None
+        self._strobe: bool | None = None  # a $4016 OUT0 write, until the next put
         # The CPU's interrupt inputs (set by System to the CPU's methods).
         self.request_irq: Callable[[], None] = lambda: None
         self.clear_irq: Callable[[], None] = lambda: None
@@ -112,6 +117,12 @@ class Board:
         t = self.t + self.cycle_ticks
         self.t = t
         self.apu.clock()
+        if self._strobe is not None and self.apu.put:
+            # OUT0-2 update on the get -> put transition (Expansion_port.wiki
+            # l.43; AccuracyCoin "Controller Strobing" 3 and 4).
+            for pad in self.pads:
+                pad.set_strobe(self._strobe)
+            self._strobe = None
         oe = self._pad_oe
         if oe >= 0 and (self._oe_per_cycle or not reading or address != 0x4016 + oe):
             # /OE rose: the end of the pulse shifts the pad.
@@ -139,10 +150,14 @@ class Board:
     # -- the CPU's bus ---------------------------------------------------
 
     def read_byte(self, address: int) -> int:
+        if self.apu.dmc_abort:  # an aborted DMC DMA: its halt cycle only
+            self.apu.dmc_abort = False
+            self._repeat_read(address)
         if self._oam_dma_page is not None or self.apu.dmc_request:
             self._dma(address)
         t = self._begin_cycle(address, True)
         value = self._read(address, t)
+        self.internal_bus = value
         self._end_cycle()
         if self.bus_observers:
             for observer in self.bus_observers:
@@ -150,8 +165,9 @@ class Board:
         return value
 
     def write_byte(self, address: int, value: int) -> None:
+        self.apu.dmc_abort = False  # an aborted DMA meeting a write never happens
         t = self._begin_cycle(address, False)
-        self.data_bus = value
+        self.data_bus = self.internal_bus = value
         ppu = self.ppu
         if 0x2000 <= address < 0x4000:
             ppu.run_to(t + self._ppu_access)
@@ -186,6 +202,7 @@ class Board:
         if address >= 0x4020:
             value = self.cartridge.cpu_read(address, t)
             if value is None:
+                self._undriven = True
                 return self.data_bus
             self.data_bus = value
             return value
@@ -194,9 +211,10 @@ class Board:
         if address < 0x2000:
             value = self.ram[address & 0x7FF]
         elif address == 0x4015:
-            # Internal to the 2A03: bit 5 is open bus, and open bus keeps its
-            # value (APU.wiki l.204-205).
-            return self.apu.read_status() | (self.data_bus & 0x20)
+            # Internal to the 2A03: bit 5 is the internal bus's, and the
+            # external bus keeps its value (APU.wiki l.204-205; AccuracyCoin
+            # "Internal Data Bus" 2 and 3).
+            return self.apu.read_status() | (self.internal_bus & 0x20)
         elif address == 0x4016 or address == 0x4017:
             port = address - 0x4016
             self._pad_oe = port
@@ -211,11 +229,8 @@ class Board:
         if address == 0x4014:
             self._oam_dma_page = value
         elif address == 0x4016:
-            # OUT0 is both pads' strobe. "OUT2-0 ... are updated every APU cycle"
-            # (Expansion_port.wiki l.43) is UNVERIFIED by a test: applied at once.
-            strobe = bool(value & 1)
-            for pad in self.pads:
-                pad.set_strobe(strobe)
+            # OUT0 is both pads' strobe; it reaches them at the next put.
+            self._strobe = bool(value & 1)
         else:
             self.apu.write(address, value)
 
@@ -257,15 +272,15 @@ class Board:
             get = apu.put  # the next cycle is a get if this one was a put
             if get and dmc_age is not None and dmc_age >= 2:
                 dmc_address = apu.dmc_address
-                t = self._begin_cycle(dmc_address, True)
-                value = self._read(dmc_address, t)
+                t = self._begin_cycle(_decoded(dmc_address, address), True)
+                value = self._dma_read(dmc_address, address, t)
                 apu.dmc_fill(value)
                 self._end_cycle()
                 dmc_age = None
             elif get and oam_value is None and oam_next < 256:
                 source = page << 8 | oam_next  # type: ignore[operator]
-                t = self._begin_cycle(source, True)
-                oam_value = self._read(source, t)
+                t = self._begin_cycle(_decoded(source, address), True)
+                oam_value = self._dma_read(source, address, t)
                 self._end_cycle()
                 oam_next += 1
             elif not get and oam_value is not None:
@@ -280,7 +295,49 @@ class Board:
             else:
                 self._repeat_read(address)
 
+    def _dma_read(self, address: int, halted: int, t: int) -> int:
+        """A DMA unit's read of ``address`` while the CPU is halted reading ``halted``.
+
+        The 2A03 decodes its own registers from bits 4-0 of the bus it drives
+        and bits 15-5 of the 6502 core's address (DMA.wiki "Register
+        conflicts"; Breaks APU/core.md). With the core halted on $4000-$401F,
+        any DMA read also selects register $4000 | (address & $1F). $4015
+        drives every bit but 5, which comes from the bus. $4016/$4017 clock a
+        pad and drive its low bits onto the external bus: with nothing else
+        there the DMA reads them under open bus's bits 7-5; with a device at
+        ``address`` the DMA gets the device's byte while the external bus is
+        left with the device's bits 7-5 and the pad's below (AccuracyCoin
+        "APU Register Activation" 5-7 and "DMC DMA Bus Conflicts" 2, whose
+        expected tables pin each case). With the core elsewhere, a DMA read of
+        $4000-$401F selects nothing and sees open bus.
+        """
+        self._undriven = 0x4000 <= address < 0x4020
+        external = self.data_bus if self._undriven else self._read(address, t)
+        if halted & 0xFFE0 != 0x4000:
+            if 0x4000 <= address < 0x4020:
+                self.ppu.run_to(t)
+            return external
+        register = 0x4000 | (address & 0x1F)
+        if register == 0x4015:
+            return self.apu.read_status() | (external & 0x20)
+        if register == 0x4016 or register == 0x4017:
+            port = register - 0x4016
+            self._pad_oe = port
+            mixed = (external & 0xE0) | self.pads[port].read()
+            self.data_bus = mixed
+            return mixed if self._undriven else external
+        return external
+
     def _repeat_read(self, address: int) -> None:
         t = self._begin_cycle(address, True)
-        self._read(address, t)
+        self.internal_bus = self._read(address, t)
         self._end_cycle()
+
+
+def _decoded(address: int, halted: int) -> int:
+    """The address the 2A03's register decode sees during a DMA access
+    (``Board._dma_read``): the core's bits 15-5 with the DMA's bits 4-0 when
+    the core is halted on $4000-$401F."""
+    if halted & 0xFFE0 == 0x4000:
+        return 0x4000 | (address & 0x1F)
+    return address

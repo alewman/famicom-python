@@ -2422,12 +2422,12 @@
  },
  {
   "path": "tests/test_roms/AccuracyCoin/AccuracyCoin.nes",
-  "url": "https://raw.githubusercontent.com/100thCoin/AccuracyCoin/4151899fd39bacd0b51bf3321127eb89ff762bb0/AccuracyCoin.nes",
-  "sha256": "5de89b27f537ae182ef54a52ea1f5dffb078b02df72c315b8e58dff7d7ca8f31",
+  "url": "https://raw.githubusercontent.com/100thCoin/AccuracyCoin/6bee919529289c555803b612b8c9e4f7eaaeeabb/AccuracyCoin.nes",
+  "sha256": "8ac8904a3cf26fbdfa6be501e414d45886ff4478d30dee8e58fa436cf5fd5adc",
   "size": 40976,
   "kind": "test-rom",
   "license": "MIT (Chris Siebert 2025)",
-  "note": "144 tests + 5 DRAW; results $0400-$04FF low 2 bits 1=PASS 2=FAIL; run-all needs Start at page index"
+  "note": "146 tests + 5 DRAW; results $0400-$04FF low 2 bits 1=PASS 2=FAIL; run-all needs Start at page index"
  },
  {
   "path": "tests/test_roms/holy-mapperel/holy-mapperel-bin-0.02.7z",

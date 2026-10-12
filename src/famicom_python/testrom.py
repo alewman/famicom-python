@@ -317,3 +317,133 @@ def run_case(case: RomCase, root) -> RomOutcome:
             system, passed=case.passed, failed=case.failed, max_seconds=case.seconds
         )
     return RomOutcome(case, passed, detail, system.cycles, system.instructions)
+
+
+# -- AccuracyCoin ---------------------------------------------------------
+
+#: The page names and test names AccuracyCoin's .asm gives its "str_" bytes.
+_ACCURACYCOIN_STRINGS = {
+    "str_Indirect": "(Indirect)",
+    "str_ZeroPage": "Zero Page",
+    "str_Absolute": "Absolute",
+    "str_Immediate": "#Immediate",
+    "str_UnofficialInstructions": "Unofficial Instructions: ",
+}
+
+
+@dataclass(frozen=True)
+class AccuracyCoinTest:
+    page: str
+    name: str
+    address: int  # its result byte in $0400-$04FF
+    page_number: int  # 1-based, as the menu counts pages
+    row: int  # 1-based position on its page, DRAW entries counted
+
+
+def accuracycoin_tests(asm_text: str) -> list[AccuracyCoinTest]:
+    """The tests in the order of AccuracyCoin's ``TestPages:`` table, DRAW entries left out.
+
+    Each ``table``/``tblf1``/``tblf2`` line names a test, its result address
+    (a ``result_`` constant) and its routine; each ``Suite_`` label's first
+    ``.byte`` line names the page.
+    """
+    import re
+
+    constants = {
+        name: int(value.replace("$", ""), 16)
+        for name, value in re.findall(r"^(result_\w+)\s*=\s*\$([0-9A-Fa-f]+)", asm_text, re.M)
+    }
+    tests = []
+    page = ""
+    page_number = row = 0
+    pending_page = False
+    section = asm_text[re.search(r"^TestPages:", asm_text, re.M).start() :]  # type: ignore[union-attr]
+    for line in section.splitlines():
+        stripped = line.split(";", 1)[0].strip()
+        if re.match(r"Suite_\w+:", stripped):
+            pending_page, page = True, ""
+            page_number += 1
+            row = 0
+            continue
+        if pending_page and stripped.startswith(".byte"):
+            parts = re.findall(r'"([^"]*)"|(str_\w+)', stripped)
+            page += "".join(text or _ACCURACYCOIN_STRINGS.get(sym, "") for text, sym in parts)
+            if stripped.rstrip().endswith("$FF"):
+                pending_page = False
+            continue
+        if ".macro" in stripped:  # the table's macros follow it
+            break
+        match = re.match(r"(table|tblf1|tblf2)\s+(.*)", stripped)
+        if not match:
+            continue
+        # Commas inside quotes ("$03   SLO", str_Indirect, ",X") are text.
+        fields = [field.strip() for field in re.findall(r'\s*("[^"]*"|[^,]+)', match.group(2))]
+        result = next(field for field in fields if field.startswith("result_"))
+        row += 1
+        if result == "result_DrawTest":
+            continue
+        name = ""
+        for field in fields[: fields.index("$FF")]:
+            text = field.strip('"') if field.startswith('"') else _ACCURACYCOIN_STRINGS[field]
+            name += text if text.startswith(",") or not name else " " + text
+        tests.append(
+            AccuracyCoinTest(page, " ".join(name.split()), constants[result], page_number, row)
+        )
+    return tests
+
+
+def run_accuracycoin(
+    system: System, tests: list[AccuracyCoinTest], *, max_seconds: float = 300
+) -> dict[AccuracyCoinTest, int]:
+    """Press Start on the page index (run all), then read every result byte.
+
+    AccuracyCoin README "Navigating the menus": Start at the page index runs
+    all tests and draws the results table. A result byte's low 2 bits are 1
+    for pass and 2 for fail, the bits above the error code; $FF is skipped
+    (docs/validation.md "The result protocols"). Stops when every test has a
+    result or after ``max_seconds`` of emulated time.
+    """
+    from .joypad import START
+
+    pad = system.board.pads[0]
+    system.run_frames(60)  # the menu is up
+    pad.buttons = START
+    system.run_frames(4)
+    pad.buttons = 0
+    ram = system.board.ram
+    frames, limit = 0, int(max_seconds * 60)
+
+    def done() -> bool:
+        return all(ram[t.address & 0x7FF] & 3 in (1, 2) or ram[t.address & 0x7FF] == 0xFF for t in tests)
+
+    while frames < limit and not done():
+        system.run_frames(30)
+        frames += 30
+    return {t: ram[t.address & 0x7FF] for t in tests}
+
+
+def run_accuracycoin_test(system: System, test: AccuracyCoinTest, max_seconds: float = 20) -> int:
+    """Run one test from the menu: Right to its page, Down to its row, A."""
+    from .joypad import A, DOWN, RIGHT
+
+    pad = system.board.pads[0]
+
+    def press(button: int) -> None:
+        pad.buttons = button
+        system.run_frames(3)
+        pad.buttons = 0
+        system.run_frames(3)
+
+    system.run_frames(60)
+    for _ in range(test.page_number - 1):
+        press(RIGHT)
+    for _ in range(test.row):
+        press(DOWN)
+    press(A)
+    ram = system.board.ram
+    for _ in range(int(max_seconds * 2)):
+        value = ram[test.address & 0x7FF]
+        if value & 3 in (1, 2) or value == 0xFF:  # (3 while it runs)
+            break
+        system.run_frames(30)
+    return ram[test.address & 0x7FF]

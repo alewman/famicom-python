@@ -350,6 +350,7 @@ class DMC:
         self.bits = 8  # bits remaining in the output cycle
         self.silence = True
         self.irq = False
+        self.reloaded = False  # the timer reloaded during the current CPU cycle
 
     def write(self, register: int, value: int) -> None:
         if register == 0:
@@ -358,6 +359,10 @@ class DMC:
                 self.irq = False
             self.loop = bool(value & 0x40)
             self.period = DMC_RATES[value & 0x0F] // 2 - 1
+            if self.reloaded:
+                # A rate written in the cycle the timer reloads is the one it
+                # reloads with (AccuracyCoin "DMC Reload Timing", hardware).
+                self.timer = self.period
         elif register == 1:
             self.output = value & 0x7F
         elif register == 2:
@@ -375,6 +380,7 @@ class DMC:
             self.timer -= 1
             return False
         self.timer = self.period
+        self.reloaded = True
         if not self.silence:
             level = self.output
             if self.shift & 1:
@@ -408,6 +414,7 @@ class APU:
         self.channels = (self.pulse1, self.pulse2, self.triangle, self.noise)
         self.lengths = tuple(channel.length for channel in self.channels)
         self.frame_irq = False
+        self._frame_irq_clear = False  # a $4015 read's clear, pending
         self.irq = False
         self.steps = STEPS_4
         self.mode5 = False
@@ -420,6 +427,18 @@ class APU:
         # the countdown of a load DMA (DMA.wiki "DMC DMA").
         self.dmc_request = False
         self._load_countdown = 0
+        # An enabling $4015 write holds off reload DMAs for 2 cycles: none
+        # halts before the 3rd cycle after the write (AccuracyCoin "Delta
+        # Modulation Channel" L-N); a reload due meanwhile waits.
+        self._enable_hold = 0
+        self._reload_waiting = False
+        # The DMA abort bug (DMA.wiki "Bugs", hardware-captured by Fiskbit):
+        # playback stopped, explicitly or by its last fetch, in the APU cycle
+        # before a reload would schedule still starts that DMA, which stops
+        # after its halt cycle. The board performs that one cycle.
+        self.dmc_abort = False
+        self._apu_cycle = 0  # APU cycles since power, counted on gets
+        self._stopped_in = -2  # the APU cycle playback last stopped in
         # Length counters written this cycle, settled at the next clock.
         self._unsettled: list[LengthCounter] = []
         # The mixer: a box filter at the host rate (see take_samples).
@@ -458,6 +477,19 @@ class APU:
     def clock(self) -> None:
         """One CPU cycle."""
         put = self.put = not self.put
+        self.dmc.reloaded = False
+        if self._frame_irq_clear and not put:
+            # A $4015 read's clear lands at the next put -> get transition
+            # (AccuracyCoin "Frame Counter IRQ" 6, 7, E-H).
+            self._frame_irq_clear = False
+            self.frame_irq = False
+            self._update_irq()
+        if self._enable_hold:
+            self._enable_hold -= 1
+            if not self._enable_hold and self._reload_waiting:
+                self._reload_waiting = False
+                if self.dmc.buffer is None and self.dmc.remaining:
+                    self.dmc_request = True
         if self._load_countdown:
             self._load_countdown -= 1
             if not self._load_countdown and self.dmc.buffer is None and self.dmc.remaining:
@@ -475,12 +507,19 @@ class APU:
         if not put:
             if self.pulse1.clock_timer() | self.pulse2.clock_timer() | self.noise.clock_timer():
                 self._level_dirty = True
+            self._apu_cycle += 1
             dmc = self.dmc
             if not dmc.timer and not dmc.silence:
                 self._level_dirty = True
-            if dmc.clock_timer() and dmc.remaining:
-                # A reload DMA: it halts on this APU cycle's put (DMA.wiki).
-                self.dmc_request = True
+            if dmc.clock_timer():
+                if dmc.remaining:
+                    # A reload DMA: it halts on this APU cycle's put (DMA.wiki).
+                    if self._enable_hold:
+                        self._reload_waiting = True
+                    else:
+                        self.dmc_request = True
+                elif self._stopped_in == self._apu_cycle - 1:
+                    self.dmc_abort = True
         # The mixer, one CPU cycle's worth.
         if self._level_dirty:
             self._level = self._mix()
@@ -504,9 +543,12 @@ class APU:
         self.frame_cycle = cycle
         event = self.steps.get(cycle)
         if event:
-            if event & IRQ and not self.inhibit:
-                self.frame_irq = True
-                self.irq = True
+            if event & IRQ:
+                # Set on 29828 and 29829 even with interrupts inhibited (no IRQ
+                # results); on 29830 only if not, and an inhibited flag is
+                # cleared there (AccuracyCoin "Frame Counter IRQ" J-M, C7).
+                self.frame_irq = not (event & WRAP and self.inhibit)
+                self._update_irq()
             if event & QUARTER:
                 self._quarter_frame()
             if event & HALF:
@@ -570,11 +612,15 @@ class APU:
         self.dmc_request = False
         dmc.buffer = value
         dmc.address = (dmc.address + 1) & 0xFFFF or 0x8000
+        if not dmc.remaining:  # stopped after this DMA was scheduled
+            return
         dmc.remaining -= 1
         if not dmc.remaining:
             if dmc.loop:
                 dmc.restart()
-            elif dmc.irq_enabled:
+                return
+            self._stopped_in = self._apu_cycle
+            if dmc.irq_enabled:
                 dmc.irq = True
                 self.irq = True
 
@@ -608,7 +654,7 @@ class APU:
             self.pending_frame_write = value
             self.pending_delay = 3 if self.put else 4
         self._level_dirty = True
-        self.irq = self.frame_irq or self.dmc.irq
+        self._update_irq()
 
     def _channel_write(self, channel, register: int, value: int) -> None:
         channel.write(register, value)
@@ -621,11 +667,15 @@ class APU:
         dmc = self.dmc
         dmc.irq = False
         if not value & 0x10:
+            if dmc.remaining:
+                self._stopped_in = self._apu_cycle
             dmc.remaining = 0
-            self.dmc_request = False
+            # A DMA already scheduled still runs (AccuracyCoin "Explicit DMA
+            # Abort": 3 and 4 cycles in hardware's answer key at those points).
             self._load_countdown = 0
         elif not dmc.remaining:
             dmc.restart()
+            self._enable_hold = 2
             if dmc.buffer is None:
                 # A load DMA halts on the get of the second APU cycle after this
                 # one: the 4th CPU cycle after a write on a get, the 3rd after
@@ -644,9 +694,12 @@ class APU:
             | (lengths[1].value > 0) << 1
             | (lengths[0].value > 0)
         )
-        self.frame_irq = False
-        self.irq = self.dmc.irq
+        self._frame_irq_clear = True
         return value
+
+    def _update_irq(self) -> None:
+        """/IRQ: the DMC's flag, or the frame counter's unless inhibited."""
+        self.irq = self.dmc.irq or (self.frame_irq and not self.inhibit)
 
 
 class AnalogueStage:
