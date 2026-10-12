@@ -34,15 +34,23 @@ class TraceLoggerOptions(ctypes.Structure):
     ]
 
 
-def main() -> int:
-    p = argparse.ArgumentParser()
-    p.add_argument("rom", type=Path)
-    p.add_argument("--seconds", type=float, default=2.0, help="wall-clock timeout")
-    p.add_argument("--frames", type=int, default=0, help="stop at this frame (via Lua)")
-    p.add_argument("--trace", type=Path)
-    p.add_argument("--lua", type=Path)
-    p.add_argument("--home", type=Path, default=Path("mesen-home"))
-    a = p.parse_args()
+# Mesen2 2.1.1's NesConfig (Core/Shared/SettingTypes.h), measured with
+# offsetof() against that header: its size, and where the fields this script
+# touches lie. run_mesen checks two known defaults before trusting them.
+NES_CONFIG_SIZE = 14184
+NES_CONFIG_SPRITES_ENABLED = 11932  # bool, default true
+NES_CONFIG_RESTRICT_FIRST_FRAME = 11989  # bool: RestrictPpuAccessOnFirstFrame
+NES_CONFIG_RAM_POWER_ON = 11996  # RamState: 0 random, 1 zeros, 2 ones
+NES_CONFIG_INPUT_SCANLINE = 12016  # int32, default 241
+NES_CONFIG_FULL_COLOR_PALETTE = 12020  # bool
+NES_CONFIG_USER_PALETTE = 12024  # uint32[512]
+
+
+class NesConfig(ctypes.Structure):
+    _fields_ = [("raw", ctypes.c_ubyte * NES_CONFIG_SIZE)]
+
+
+def load_library() -> ctypes.CDLL:
     m = ctypes.CDLL(str(LIB))
     m.InitializeEmu.argtypes = [ctypes.c_char_p, ctypes.c_void_p, ctypes.c_void_p] + [
         ctypes.c_bool
@@ -57,21 +65,76 @@ def main() -> int:
     m.GetScriptLog.argtypes = [ctypes.c_int32, ctypes.c_char_p, ctypes.c_uint32]
     m.SetTraceOptions.argtypes = [ctypes.c_uint8, TraceLoggerOptions]
     m.StartLogTraceToFile.argtypes = [ctypes.c_char_p]
+    m.GetNesConfig.restype = NesConfig
+    m.SetNesConfig.argtypes = [NesConfig]
+    return m
 
-    a.home.mkdir(parents=True, exist_ok=True)
+
+def configure_for_comparison(m: ctypes.CDLL) -> None:
+    """Make Mesen2's frames comparable with the board's, pixel value for pixel value.
+
+    - A 512-entry identity palette: headless, nothing loads a palette (the UI
+      normally does), so frames come out black; with entry i = i,
+      ``emu.getScreenBuffer()`` returns palette value | emphasis << 6, the
+      board's own pixel format.
+    - The PPU ignores $2000/$2001/$2005/$2006 writes until the first pre-render
+      line, as hardware does (PPU_power_up_state.wiki); Mesen2 does not by default.
+    - Work RAM powers on as zeros, the board's default ``PowerOn.ram_fill``;
+      Mesen2's default is random.
+    """
+    config = m.GetNesConfig()
+    raw = config.raw
+    if (
+        raw[NES_CONFIG_SPRITES_ENABLED] != 1
+        or int.from_bytes(
+            bytes(raw[NES_CONFIG_INPUT_SCANLINE : NES_CONFIG_INPUT_SCANLINE + 4]), "little"
+        )
+        != 241
+    ):
+        raise SystemExit("NesConfig layout does not match Mesen2 2.1.1; re-measure the offsets")
+    raw[NES_CONFIG_RESTRICT_FIRST_FRAME] = 1
+    raw[NES_CONFIG_RAM_POWER_ON] = 1
+    raw[NES_CONFIG_FULL_COLOR_PALETTE] = 1
+    for i in range(512):
+        at = NES_CONFIG_USER_PALETTE + 4 * i
+        raw[at : at + 4] = list(i.to_bytes(4, "little"))
+    m.SetNesConfig(config)
+
+
+def run_mesen(
+    rom: Path,
+    *,
+    lua: bytes | None = None,
+    lua_name: str = "script.lua",
+    seconds: float = 2.0,
+    home: Path = Path("mesen-home"),
+    trace: Path | None = None,
+    until: str | None = None,
+    max_speed: bool = True,
+    for_comparison: bool = False,
+) -> tuple[int, str, float]:
+    """Run ``rom`` at maximum speed until the Lua script stops it or ``seconds`` pass.
+
+    Mesen2 discards a script's log when ``emu.stop`` ends emulation, so a script
+    that reports through its log prints ``until`` as its last line instead and
+    keeps running; this polls for it and then stops (stop code 0). Returns the
+    stop code (-1 on timeout), the script's log and the wall time.
+    """
+    m = load_library()
+    home.mkdir(parents=True, exist_ok=True)
     m.InitDll()
-    m.InitializeEmu(str(a.home.resolve()).encode(), None, None, True, True, True, True)
+    m.InitializeEmu(str(home.resolve()).encode(), None, None, True, True, True, True)
     m.Pause()
     m.SetEmulationFlag(CONSOLE_MODE, True)
-    if not m.LoadRom(str(a.rom.resolve()).encode(), b""):
+    if for_comparison:
+        configure_for_comparison(m)
+    if not m.LoadRom(str(rom.resolve()).encode(), b""):
         raise SystemExit("LoadRom failed")
     m.InitializeDebugger()
     script_id = -1
-    if a.lua:
-        script_id = m.LoadScript(
-            a.lua.name.encode(), str(a.lua.parent).encode(), a.lua.read_bytes(), -1
-        )
-    if a.trace:
+    if lua is not None:
+        script_id = m.LoadScript(lua_name.encode(), str(home.resolve()).encode(), lua, -1)
+    if trace:
         opts = TraceLoggerOptions(
             True,
             False,
@@ -81,25 +144,53 @@ def main() -> int:
             b"CYC:[CycleCount] SL:[Scanline] DOT:[Cycle] FR:[FrameCount]",
         )
         m.SetTraceOptions(CPU_NES, opts)
-        m.StartLogTraceToFile(str(a.trace.resolve()).encode())
-    m.SetEmulationFlag(MAXIMUM_SPEED, True)
+        m.StartLogTraceToFile(str(trace.resolve()).encode())
+    m.SetEmulationFlag(MAXIMUM_SPEED, max_speed)
     began = time.monotonic()
     m.Resume()
     result = -1
-    while time.monotonic() - began < a.seconds:
+    log = ""
+    buf = ctypes.create_string_buffer(1 << 22)
+    while time.monotonic() - began < seconds:
         time.sleep(0.05)
+        if until is not None:
+            m.GetScriptLog(script_id, buf, len(buf))
+            log = buf.value.decode(errors="replace")
+            if until in log:
+                result = 0
+                break
         if not m.IsRunning():
             result = m.GetStopCode()
             break
-    if a.trace:
+    if trace:
         m.StopLogTraceToFile()
-    if script_id >= 0:
-        buf = ctypes.create_string_buffer(1 << 20)
+    if script_id >= 0 and until is None:
         m.GetScriptLog(script_id, buf, len(buf))
-        print(buf.value.decode(errors="replace"))
+        log = buf.value.decode(errors="replace")
     m.Stop()
     m.Release()
-    print(f"stop code {result} after {time.monotonic() - began:.1f} s")
+    return result, log, time.monotonic() - began
+
+
+def main() -> int:
+    p = argparse.ArgumentParser()
+    p.add_argument("rom", type=Path)
+    p.add_argument("--seconds", type=float, default=2.0, help="wall-clock timeout")
+    p.add_argument("--trace", type=Path)
+    p.add_argument("--lua", type=Path)
+    p.add_argument("--home", type=Path, default=Path("mesen-home"))
+    a = p.parse_args()
+    result, log, wall = run_mesen(
+        a.rom,
+        lua=a.lua.read_bytes() if a.lua else None,
+        lua_name=a.lua.name if a.lua else "script.lua",
+        seconds=a.seconds,
+        home=a.home,
+        trace=a.trace,
+    )
+    if log:
+        print(log)
+    print(f"stop code {result} after {wall:.1f} s")
     return result
 
 
