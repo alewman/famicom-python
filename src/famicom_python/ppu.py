@@ -108,6 +108,8 @@ class PPU:
         # applied as the first dot at or after ``time`` begins (DELAYS).
         self._events: list[tuple[int, Callable[[], None]]] = []
         self._read_in_flight_until = -1  # a $2007 read's refill and increment pending
+        self._oam_corrupt: int | None = None  # the OAM row a frozen OAM2 address will corrupt
+        self._refill_from_fetch = False  # a $2007 read's refill, waiting on a fetch
         self._last_pixel = -1  # picture index of the last pixel computed
         self._last_value = 0  # its palette value, before greyscale and emphasis
         self._last_pixel_time = -1  # the dot (its time) that computed it
@@ -264,6 +266,8 @@ class PPU:
                 self.resetting = False
         if line < HEIGHT or line == self.prerender_line:
             if rendering:
+                if self._oam_corrupt is not None:
+                    self._corrupt_oam()
                 self._render(line, dot)
             elif line < HEIGHT and 2 <= dot <= WIDTH + 1:
                 self._fill_backdrop(line, dot, dot)
@@ -442,8 +446,9 @@ class PPU:
             # free slot keeps the last failed copy, OAM[63]'s Y, and empty
             # slots fetch their row from it (PPUSim, docs/validation.md
             # milestone 2).
-            if index >= 32:
-                self.oam_bus = self.oam2[0]
+            # Even dots read secondary OAM at its address, wrapped to 0 once full
+            # (AccuracyCoin "$2004 Stress Test" 2).
+            self.oam_bus = self.oam2[index & 31]
             self.oam_addr = (address + 4) & 0xFC
             return
         if index < 32:
@@ -452,6 +457,11 @@ class PPU:
                 self._copying -= 1
                 self._oam2_index = index + 1
                 address = (address + 1) & 0xFF
+                if not self._copying and not 0 <= line - value < height:
+                    # The X byte gets Y's range check too: out of range, the
+                    # address is masked back into alignment (AccuracyCoin
+                    # "Misaligned OAM behavior" 4-7; aligned OAM cannot tell).
+                    address &= 0xFC
                 if address < 4 and not self._copying:
                     self._eval_done = True  # n wrapped: all 64 seen
             elif 0 <= line - value < height:
@@ -461,7 +471,9 @@ class PPU:
                 self._oam2_index = index + 1
                 address = (address + 1) & 0xFF
             else:
-                address = (address + 4) & 0xFF
+                # Out of range: +4, realigned (AccuracyCoin "Misaligned OAM
+                # behavior" 2).
+                address = (address + 4) & 0xFC
                 if address < 4:
                     self._eval_done = True
             self.oam_addr = address
@@ -562,9 +574,17 @@ class PPU:
         if address >= 0x2000:
             a10 = self.cartridge.ciram_a10(address)
             if a10 is not None:
-                return self.ciram[(a10 << 10) | (address & 0x3FF)]
+                value = self.ciram[(a10 << 10) | (address & 0x3FF)]
+                if self._refill_from_fetch:
+                    self._refill_from_fetch = False
+                    self.buffer = value
+                return value
         value = self.cartridge.ppu_read(address, self.time)
-        return address & 0xFF if value is None else value
+        value = address & 0xFF if value is None else value
+        if self._refill_from_fetch:
+            self._refill_from_fetch = False
+            self.buffer = value
+        return value
 
     def bus_read(self, address: int) -> int:
         address &= 0x3FFF
@@ -592,6 +612,37 @@ class PPU:
         index = address & 0x1F
         return index & 0x0F if index & 0x13 == 0x10 else index
 
+    def _oam2_row(self) -> int:
+        """The secondary OAM address (0-31) at this dot, as AccuracyCoin's "OAM
+        Corruption" notes give it (hardware-corrected): every other dot on
+        1-64; the evaluation's write index on 65-256, raised to a multiple of 4
+        (0 once full); on 257-320 it restarts and counts slot fetches (+1 on
+        phases 0-2 and 7 of each 8); 0 on 321-340."""
+        dot = self.dot
+        if 1 <= dot <= 64:
+            return (dot - 1) >> 1
+        if 65 <= dot <= 256:
+            index = self._oam2_index
+            return 0 if index >= 32 else ((index + 3) & ~3) & 31
+        if 257 <= dot <= 320:
+            phase = (dot - 257) & 7
+            return (((dot - 257) >> 3) << 2) + min(phase, 3)
+        return 0
+
+    def _corrupt_oam(self) -> None:
+        """Rendering begins at the pre-render line with the secondary OAM
+        address still frozen at row n: the OAMADDR row (row 0 after a DMA) is
+        copied over row n of OAM, and secondary OAM's byte 0 over its byte n
+        (Errata.wiki "OAM and Sprites", 2C02C-H; AccuracyCoin "OAM
+        Corruption"). A mid-frame re-enable leaves no corruption, as blargg's
+        sprite_overflow_tests/5.Emulator needs on hardware."""
+        row = self._oam_corrupt
+        assert row is not None
+        self._oam_corrupt = None
+        source = self.oam_addr & 0xF8
+        self.oam[row * 8 : row * 8 + 8] = self.oam[source : source + 8]
+        self.oam2[row] = self.oam2[0]
+
     @property
     def rendering_now(self) -> bool:
         """Rendering is on and this is a line on which the PPU fetches."""
@@ -612,12 +663,7 @@ class PPU:
             self._drive(value, 0xE0)
             return value
         if register == 4:
-            if self.rendering_now:
-                value = self.oam_bus
-            else:
-                value = self.oam[self.oam_addr]
-                if self.oam_addr & 3 == 2:
-                    value &= 0xE3  # attribute bits 4-2 do not exist
+            value = self.oam_bus if self.rendering_now else self.oam[self.oam_addr]
             self._drive(value)
             return value
         if register == 7:
@@ -663,9 +709,15 @@ class PPU:
 
     def _complete_2007_read(self) -> None:
         """The read's bus cycle: refill the buffer from v (the nametable under a
-        palette address), then increment."""
-        v = self.v & 0x3FFF
-        self.buffer = self.bus_read(v - 0x1000 if v >= 0x3F00 else v)
+        palette address), then increment. While rendering, the PPU's bus is
+        busy with fetches, and the buffer takes what the fetch reads (on a
+        fetch's read dot; on its address dot the outcome is analogue): the
+        next rendering fetch's byte (AccuracyCoin "$2007 Stress Test")."""
+        if self.rendering_now:
+            self._refill_from_fetch = True
+        else:
+            v = self.v & 0x3FFF
+            self.buffer = self.bus_read(v - 0x1000 if v >= 0x3F00 else v)
         self._increment_after_2007()
 
     def _increment_after_2007(self) -> None:
@@ -690,6 +742,15 @@ class PPU:
             self.nmi = bool(value & 0x80 and self.status & VBL)
         elif register == 1:
             if not self.resetting:
+                if self.rendering_now and not value & 0x18:
+                    # Rendering turned off mid-line freezes the secondary OAM
+                    # address; if it is still frozen when rendering begins at
+                    # the pre-render line, OAM's row there is overwritten.
+                    self._oam_corrupt = self._oam2_row()
+                elif value & 0x18 and self.line < HEIGHT:
+                    # Back on during a visible line, the address counts again
+                    # and is 0 by the line's end: nothing to corrupt.
+                    self._oam_corrupt = None
                 self.mask = value
                 # Greyscale and emphasis act a stage after the palette lookup,
                 # so they reach the pixel already looked up (PPUSim, DELAYS).
@@ -700,11 +761,16 @@ class PPU:
             self.oam_addr = value
         elif register == 4:
             if self.rendering_now:
-                # Not written; OAMADDR's high six bits bump (PPU_registers.wiki).
-                self.oam_addr = (self.oam_addr + 4) & 0xFF
+                # Not written; OAMADDR's high six bits bump (PPU_registers.wiki)
+                # and the low two clear (AccuracyCoin "Address $2004 behavior" A).
+                self.oam_addr = (self.oam_addr + 4) & 0xFC
             else:
-                self.oam[self.oam_addr] = value
-                self.oam_addr = (self.oam_addr + 1) & 0xFF
+                # Attribute bytes have no bits 4-2 in the array itself, so every
+                # reader sees them missing, sprite evaluation's included
+                # (AccuracyCoin "$2004 Stress Test" 2).
+                address = self.oam_addr
+                self.oam[address] = value & 0xE3 if address & 3 == 2 else value
+                self.oam_addr = (address + 1) & 0xFF
         elif register == 5:
             if self.resetting:
                 return

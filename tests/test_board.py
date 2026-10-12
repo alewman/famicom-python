@@ -119,7 +119,8 @@ def test_oam_dma_takes_513_or_514_cycles_and_copies_the_page() -> None:
     for put_first in (False, True):
         cycles, oam = _oam_dma_cycles(put_first)
         stolen.add(cycles)
-        assert oam == bytes(range(256))
+        # Attribute bytes (every 4th from 2) have no bits 4-2 (PPU_OAM.wiki).
+        assert oam == bytes(b & 0xE3 if i & 3 == 2 else b for i, b in enumerate(range(256)))
     assert stolen == {513, 514}
 
 
