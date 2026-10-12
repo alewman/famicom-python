@@ -61,6 +61,11 @@ DELAYS = {
     "2007_write": 3,  # a $2007 write reaches palette RAM or the bus
     "2007_increment": 4,  # ... and v increments (after a $2007 read too)
 }
+# A $2007 read's buffer refill lands with its increment, and a second read
+# before then is ignored: it returns the buffer and starts nothing. PPUSim at
+# the board's skew prints blargg's hardware results for both reads one CPU
+# cycle apart (dmc_dma_during_read4: double_2007_read F018C287, dma_2007_read
+# 159A7A8F; docs/validation.md milestone 3).
 
 DOTS = 341
 WIDTH, HEIGHT = 256, 240
@@ -102,6 +107,7 @@ class PPU:
         # Register effects that land some dots after the access: (time, action),
         # applied as the first dot at or after ``time`` begins (DELAYS).
         self._events: list[tuple[int, Callable[[], None]]] = []
+        self._read_in_flight_until = -1  # a $2007 read's refill and increment pending
         self._last_pixel = -1  # picture index of the last pixel computed
         self._last_value = 0  # its palette value, before greyscale and emphasis
         self._last_pixel_time = -1  # the dot (its time) that computed it
@@ -621,13 +627,14 @@ class PPU:
                 if self.mask & 0x01:
                     value &= 0x30
                 value |= self._decayed_latch() & 0xC0
-                self.buffer = self.bus_read(v - 0x1000)  # the nametable underneath
                 self._drive(value, 0x3F)
             else:
                 value = self.buffer
-                self.buffer = self.bus_read(v)
                 self._drive(value)
-            self._schedule(DELAYS["2007_increment"], self._increment_after_2007)
+            if self.time >= self._read_in_flight_until:
+                dots = DELAYS["2007_increment"]
+                self._read_in_flight_until = self.time + (dots + 1) * self.dot_ticks  # as _schedule
+                self._schedule(dots, self._complete_2007_read)
             return value
         return self._decayed_latch()  # write-only registers read the I/O latch
 
@@ -653,6 +660,13 @@ class PPU:
                     latch &= ~(1 << bit)
             self.latch = latch
         return latch
+
+    def _complete_2007_read(self) -> None:
+        """The read's bus cycle: refill the buffer from v (the nametable under a
+        palette address), then increment."""
+        v = self.v & 0x3FFF
+        self.buffer = self.bus_read(v - 0x1000 if v >= 0x3F00 else v)
+        self._increment_after_2007()
 
     def _increment_after_2007(self) -> None:
         if self.rendering_now:
@@ -710,8 +724,10 @@ class PPU:
                 self._schedule(DELAYS["2006_copy"], self._copy_t)
             self.w ^= 1
         elif register == 7:
-            v = self.v & 0x3FFF
-            self._schedule(DELAYS["2007_write"], lambda: self._write_2007(v, value))
+            # The address is v as the write lands, not as it was at the access:
+            # a read one CPU cycle earlier has incremented v by then (blargg
+            # dmc_dma_during_read4/read_write_2007, STA $2007,X).
+            self._schedule(DELAYS["2007_write"], lambda: self._write_2007(self.v & 0x3FFF, value))
             self._schedule(DELAYS["2007_increment"], self._increment_after_2007)
 
     def _copy_t(self) -> None:

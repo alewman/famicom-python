@@ -134,3 +134,39 @@ def test_nmi_is_taken_at_vblank_when_enabled() -> None:
         system.step()
     assert system.cpu.pc == 0x8100
     assert ppu.line == 241
+
+
+def _vram_11_to_77(board) -> None:
+    """$2000-$2006 = $11-$77 (blargg's CHR RAM pattern, in a nametable here)."""
+    _sta(board, 0x2006, 0x20)
+    _sta(board, 0x2006, 0x00)
+    for value in (0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77):
+        _sta(board, 0x2007, value)
+    _sta(board, 0x2006, 0x20)
+    _sta(board, 0x2006, 0x01)
+    _lda(board, 0x2007)  # the buffer now holds $22
+
+
+def test_a_2007_read_one_cpu_cycle_after_another_is_ignored() -> None:
+    # ppu.py "A $2007 read's buffer refill...": blargg double_2007_read's
+    # "22 33 44 55 66" (F018C287), which PPUSim prints at the board's skew.
+    board, _ = _ppu_after_warmup()
+    _vram_11_to_77(board)
+    for _ in range(3):
+        board.read_byte(0x0000)
+    assert board.read_byte(0x2007) == 0x22
+    assert board.read_byte(0x2007) == 0x22  # the very next cycle: ignored
+    assert [_lda(board, 0x2007) for _ in range(4)] == [0x33, 0x44, 0x55, 0x66]
+
+
+def test_a_2007_write_right_after_a_read_lands_at_the_incremented_address() -> None:
+    # blargg read_write_2007: STA $2007,X reads $2007, then writes it.
+    board, ppu = _ppu_after_warmup()
+    _vram_11_to_77(board)
+    for _ in range(3):
+        board.read_byte(0x0000)
+    board.read_byte(0x2007)
+    board.write_byte(0x2007, 0x09)
+    for _ in range(3):
+        board.read_byte(0x0000)
+    assert [ppu.bus_read(0x2000 + a) for a in range(5)] == [0x11, 0x22, 0x33, 0x09, 0x55]
