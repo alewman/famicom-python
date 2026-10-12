@@ -18,6 +18,18 @@ using namespace PPUSim;
 
 namespace {
 
+// One master half-cycle as the pins and counters show it, for comparisons
+// with famicom-python's PPU (scripts/ppusim_compare.py).
+struct TraceEntry {
+    uint64_t half;
+    uint16_t h, v;
+    uint16_t address;   // PA0-13: the octal latch and PA8-13
+    uint16_t video;     // RAW: eeellcccc, 0 outside the picture
+    uint8_t pins;       // bit 0 ALE, 1 /RD low, 2 /WR low, 3 /INT low
+    uint8_t pad[5];
+};
+static_assert(sizeof(TraceEntry) == 24);
+
 struct Board {
     PPU ppu{Revision::RP2C02G};
     TriState in[(size_t)InputPad::Max]{};
@@ -31,7 +43,8 @@ struct Board {
     uint8_t ciram[0x800]{};
     uint64_t half = 0;           // master half-cycles simulated
     uint8_t clk = 0;
-    uint16_t pixels[256 * 240]{};
+    std::vector<TraceEntry> trace;   // filled while tracing (ppusim_trace)
+    bool tracing = false;
 
     uint16_t address() const { return (uint16_t)(((ahi & 0x3F) << 8) | latch); }
 
@@ -54,6 +67,19 @@ struct Board {
         if (out[(size_t)OutputPad::n_WR] == Zero) {
             uint16_t a = address();
             if ((a & 0x2000) || chr_writable) *cell(a) = ad;
+        }
+        if (tracing) {
+            TraceEntry e{};
+            e.half = half;
+            e.h = (uint16_t)ppu.GetHCounter();
+            e.v = (uint16_t)ppu.GetVCounter();
+            e.address = address();
+            e.video = (uint16_t)(video.RAW.raw & 0x1FF);
+            e.pins = (uint8_t)((out[(size_t)OutputPad::ALE] == One)
+                               | (out[(size_t)OutputPad::n_RD] == Zero) << 1
+                               | (out[(size_t)OutputPad::n_WR] == Zero) << 2
+                               | (out[(size_t)OutputPad::n_INT] == Zero) << 3);
+            trace.push_back(e);
         }
         half++;
     }
@@ -127,6 +153,18 @@ int ppusim_ciram(void *h, int index) { return ((Board *)h)->ciram[index & 0x7FF]
 int ppusim_chr(void *h, int index) {
     auto *b = (Board *)h;
     return b->chr[index % b->chr.size()];
+}
+// Start (clearing) or stop recording a TraceEntry per half-cycle.
+void ppusim_trace(void *h, int on) {
+    auto *b = (Board *)h;
+    if (on) b->trace.clear();
+    b->tracing = on != 0;
+}
+uint64_t ppusim_trace_len(void *h) { return ((Board *)h)->trace.size(); }
+const void *ppusim_trace_data(void *h) { return ((Board *)h)->trace.data(); }
+// Secondary ("temp") OAM, 32 bytes, as the evaluation left it.
+int ppusim_temp_oam(void *h, int index) {
+    return ((Board *)h)->ppu.Dbg_TempOAMReadByte((size_t)(index & 31));
 }
 int ppusim_raw_video(void *h) { return ((Board *)h)->video.RAW.raw; }
 

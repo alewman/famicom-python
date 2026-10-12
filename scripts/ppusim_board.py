@@ -68,6 +68,11 @@ class PPUSimPPU:
         self.dot = 0
         self.resetting = False
         self._last_v = 0
+        # The CPU's data bus at the start of a write cycle: by default the
+        # written value throughout M2; ppusim_compare.py also tries the
+        # "early write" open-bus value for the first ``early_halves``.
+        self.early_value: int | None = None
+        self.early_halves = 0
 
     def _update(self) -> None:
         lib, h = self.lib, self.h
@@ -93,7 +98,10 @@ class PPUSimPPU:
     def _access(self, rnw: int, register: int, value: int) -> int:
         start = self._target - ACCESS_TICKS
         self._settle(start)
-        result = self.lib.ppusim_access(self.h, rnw, register, value, value, 0, M2_RISE, M2_HIGH)
+        early = value if self.early_value is None else self.early_value
+        result = self.lib.ppusim_access(
+            self.h, rnw, register, value, early, self.early_halves, M2_RISE, M2_HIGH
+        )
         self.time = start + 12
         self._update()
         return result

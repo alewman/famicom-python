@@ -23,6 +23,7 @@ from pathlib import Path
 
 from mesen_run import ROOT, run_mesen
 
+from famicom_python.ppu import HEIGHT
 from famicom_python.system import System
 from famicom_python.video import load_palette, write_png
 
@@ -48,6 +49,18 @@ emu.addEventCallback(function()
   end
 end, emu.eventType.endFrame)
 """
+
+
+def finished_picture(system: System) -> list[int]:
+    """The frame just begun, once its 240 rows are drawn.
+
+    ``run_frames`` stops inside the instruction that starts a frame, by when
+    the first pixels of row 0 already belong to it; so run on to line 240.
+    """
+    ppu = system.board.ppu
+    while not HEIGHT <= ppu.line < ppu.prerender_line:
+        system.step()
+    return list(ppu.picture)
 
 
 def mesen_frame(rom: Path, frame: int, seconds: float) -> list[list[int]]:
@@ -77,12 +90,12 @@ def compare(rom: Path, frame: int, window: int, seconds: float, png: Path | None
     first = max(1, frame - window)
     system.run_frames(first)
     for ours_frame in range(first, frame + window + 1):
-        picture = system.board.ppu.picture
+        picture = finished_picture(system)
         diffs = [
             (y, x) for y in range(240) for x in range(256) if picture[y * 256 + x] != theirs[y][x]
         ]
         if best is None or len(diffs) < len(best[1]):
-            best = (ours_frame, diffs, list(picture))
+            best = (ours_frame, diffs, picture)
         system.run_frames(1)
     assert best is not None
     ours_frame, diffs, picture = best
