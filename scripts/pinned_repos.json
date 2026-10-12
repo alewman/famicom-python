@@ -150,6 +150,7 @@
   "date": "2026-09-04T11:32:28+03:00",
   "sparse": [
    "/Chips/APUSim/",
+   "/Chips/M6502Core/",
    "/Chips/PPUSim/",
    "/Chips/Readme.md",
    "/Common/BaseLogicLib/",
