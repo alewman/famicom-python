@@ -18,16 +18,20 @@ def rom(relative: str) -> Path:
 
 
 def nrom_image(
-    program: bytes, *, vectors: tuple[int, int, int] = (0x8100, 0x8000, 0x8200)
+    program: bytes,
+    *,
+    vectors: tuple[int, int, int] = (0x8100, 0x8000, 0x8200),
+    chr_rom: bytes = b"",
 ) -> bytes:
-    """A 16 KiB NROM file: ``program`` at $8000 (and $C000), NMI/RESET/IRQ vectors."""
+    """A 16 KiB NROM file: ``program`` at $8000 (and $C000), NMI/RESET/IRQ vectors, 8 KiB CHR."""
     prg = bytearray(0x4000)
     prg[: len(program)] = program
     nmi, reset, irq = vectors
     prg[0x3FFA:0x4000] = bytes(
         (nmi & 0xFF, nmi >> 8, reset & 0xFF, reset >> 8, irq & 0xFF, irq >> 8)
     )
-    return b"NES\x1a" + bytes((1, 1, 0, 0)) + bytes(8) + bytes(prg) + bytes(0x2000)
+    chr_data = bytes(chr_rom) + bytes(0x2000 - len(chr_rom))
+    return b"NES\x1a" + bytes((1, 1, 0, 0)) + bytes(8) + bytes(prg) + chr_data
 
 
 def nrom_system(program: bytes, machine=None, **kwargs):

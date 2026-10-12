@@ -18,8 +18,17 @@ tiers are in [validation.md](validation.md). Paths as in
   `nesdev-forum/6186.html`). "The third synchronization is the preferred one for
   emulators and test ROMs, due to the least special cases, and highest
   likelihood." Independently, the CPU powers up on a get or a put (2
-  possibilities, `DMA.wiki`). So there are 8 NTSC power-on phases; the board
-  takes both as parameters, default blargg's third and a stated parity.
+  possibilities, `DMA.wiki`). So there are 8 NTSC power-on phases. *Settled in
+  milestone 2*: the board models blargg's third synchronization only; the APU
+  parity stays a parameter (`PowerOn.apu_put_first`). Within a CPU cycle the
+  PPU sees a register access **two dots (8 master ticks) in**, while M2 is
+  high; the CPU samples /NMI and /IRQ at the cycle's end. Of the three dot
+  positions for reads and for writes, only that pair passes `ppu_vbl_nmi` and
+  `vbl_nmi_timing` (17 ROMs; docs/validation.md, milestone 2). With accesses at
+  whole-dot positions the four alignments cannot differ, so `PowerOn` has no
+  alignment field; blargg's table shows the other three moving single events
+  by a dot each, which needs per-event sub-dot phases nothing pinned gives
+  (undocumented-behavior.md, open items).
 - Alignment-sensitive tests, by their own readmes: `dmc_dma_during_read4/dma_2007_read`
   (two valid CRCs), `double_2007_read` (four), `cpu_interrupts_v2/2-nmi_and_brk`
   ("occasionally fails on NES"), `oam_stress` (passes in 1 of 4), `oam_read`,
@@ -260,10 +269,15 @@ disabling 1 dot before, on, or 1 dot after the set suppresses the NMI, 2+ dots
 after does not.
 
 **Odd-frame skip**: blargg `09-even_odd_frames` (`00 01 01 02`) and
-`10-even_odd_timing` (`08 08 09 07`) pin when rendering is sampled. Mesen2
-samples at pre-render dot 339 through its 1-dot delayed rendering flag
-(`NesPpu.cpp` 946–954). Whether BG alone or BG-or-sprites gates it is a
-contradiction (undocumented-behavior.md); PPUSim decides.
+`10-even_odd_timing` (`08 08 09 07`) pin when rendering is sampled. *Settled in
+milestone 2*: with register writes two dots into the CPU cycle, the board
+samples rendering **as dot 338 runs**: a $2001 write that lands after dot 338,
+enabling or disabling, is too late for that frame's skip (logged on
+`10-even_odd_timing`: enables landing after dots 337 and 338, one skipping and
+one not, as the expected `08 08` requires). Mesen2 gets the same answer from a
+1-dot delayed rendering flag sampled at 339 (`NesPpu.cpp` 946–954); the two
+cannot be told apart by this test. Whether BG alone or BG-or-sprites gates it
+(C13) the test cannot say (it uses BG only); the board uses either.
 
 **Turning rendering off or on mid-frame**: v stops incrementing and is driven on
 the bus (backdrop override if it points at the palette); during evaluation it

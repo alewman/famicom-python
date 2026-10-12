@@ -79,6 +79,7 @@ what milestone 1 decided:
 class Cartridge:
     snoops_cpu_reads = False  # also receive reads of $0000-$401F
     counts_m2 = False  # receive m2(t) every CPU cycle
+    watches_ppu_address = False  # receive ppu_address(address, t) on every ALE
     irq: bool  # /IRQ, wired-OR on the board
 
     # the CPU side
@@ -97,14 +98,25 @@ class Cartridge:
     def battery_ram(self) -> bytes | None: ...
 ```
 
-Still open, for milestone 2: whether `ppu_address` and `ppu_read` stay two
-calls (MMC2/MMC4 latch *after* the read, which argues for two), and their cost
-(about 5.4 M PPU-side calls a second). Milestone 1's PPU does not render, so
-only $2007 accesses reach the connector so far.
+**Milestone 2 settled the PPU side** (the one change since milestone 1, with
+its reason): `ppu_address` and `ppu_read` stay two calls, because MMC2/MMC4
+latch *after* a pattern read and MMC3 sees A12 on the address phase; but
+`ppu_address` is an opt-in, **`watches_ppu_address`**, like the CPU side's
+`snoops_cpu_reads`. The address phases are about 4 M calls a second while
+rendering (four per tile and per sprite slot, plus dots 337 and 339), only
+MMC3 (A12) and MMC5 (three equal nametable addresses) and their relatives
+look at them, and a call per phase cost every other mapper for nothing. Every
+/RD and /WR still reaches the cartridge: pattern fetches (34 tiles and 8 sprite
+slots, two planes each, per rendering line; tile $FF for empty slots) through
+`ppu_read`, nametable and attribute fetches through `ciram_a10` and, when it
+returns `None`, `ppu_read`. Outside rendering v is on the bus, so a $2006
+write or a $2007 access gives watchers an address phase too.
+`tests/test_ppu_rendering.py` counts them on a synthetic NROM.
 
 Milestone 1 implements mappers 0 (NROM), 1 (MMC1) and 3 (CNROM), because the
 CPU test ROMs need them (`all_instrs`, `instr_timing` and `instr_misc` are MMC1
-boards; `cpu_dummy_reads` is CNROM). Their judges are milestone 5's.
+boards; `cpu_dummy_reads` is CNROM); milestone 2 adds 2 (UxROM) for the 240p
+Test Suite. Their judges are milestone 5's.
 
 ### Which mappers stress which part
 
