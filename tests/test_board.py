@@ -14,6 +14,13 @@ from famicom_python.joypad import RIGHT, START, A
 from famicom_python.machine import FAMICOM, NES_001, PowerOn
 
 
+def _strobe(board, value: int) -> None:
+    """Write $4016, then two cycles: OUT0 reaches the pads at the next put."""
+    board.write_byte(0x4016, value)
+    board.read_byte(0x0000)
+    board.read_byte(0x0000)
+
+
 def test_power_on_state_after_the_reset_sequence() -> None:
     # CPU_power_up_state.wiki: S = $FD, I set (P = $24 as nestest.log shows); 7 cycles.
     system = nrom_system(b"")
@@ -45,22 +52,24 @@ def test_undriven_reads_return_the_last_bus_value() -> None:
     assert system.cpu.y == 0x40
 
 
-def test_4015_read_takes_bit_5_from_open_bus_and_leaves_it_alone() -> None:
-    # APU.wiki l.204-205: $4015 is internal to the 2A03.
+def test_4015_read_takes_bit_5_from_the_internal_bus_and_leaves_the_external_alone() -> None:
+    # APU.wiki l.204-205: $4015 is internal to the 2A03. AccuracyCoin "Internal
+    # Data Bus" 2/3: bit 5 is the internal bus's; the external bus keeps its value.
     board = nrom_system(b"").board
-    board.data_bus = 0xE0
+    board.internal_bus, board.data_bus = 0x20, 0x00
     assert board.read_byte(0x4015) & 0x20 == 0x20
-    assert board.data_bus == 0xE0
-    board.data_bus = 0x00
+    assert board.data_bus == 0x00
+    board.internal_bus, board.data_bus = 0x00, 0xE0
     assert board.read_byte(0x4015) & 0x20 == 0
+    assert board.data_bus == 0xE0
 
 
 def test_4016_reads_the_pad_in_order_with_open_bus_above() -> None:
     # Standard_controller.wiki: A, B, Select, Start, Up, Down, Left, Right, then 1s.
     board = nrom_system(b"").board
     board.pads[0].buttons = A | START | RIGHT
-    board.write_byte(0x4016, 1)
-    board.write_byte(0x4016, 0)
+    _strobe(board, 1)
+    _strobe(board, 0)
     bits = []
     for _ in range(9):
         board.data_bus = 0x40
@@ -74,7 +83,7 @@ def test_4016_reads_the_pad_in_order_with_open_bus_above() -> None:
 def test_strobe_high_returns_a_every_read() -> None:
     board = nrom_system(b"").board
     board.pads[0].buttons = A
-    board.write_byte(0x4016, 1)
+    _strobe(board, 1)
     assert [board.read_byte(0x4016) & 1 for _ in range(4)] == [1, 1, 1, 1]
 
 
@@ -83,8 +92,8 @@ def test_back_to_back_reads_clock_the_pad_once_on_the_nes_and_twice_on_the_rf_fa
     for machine, expected in ((NES_001, 1), (FAMICOM, 2)):
         board = nrom_system(b"", machine).board
         board.pads[0].buttons = 0
-        board.write_byte(0x4016, 1)
-        board.write_byte(0x4016, 0)
+        _strobe(board, 1)
+        _strobe(board, 0)
         board.read_byte(0x4016)
         board.read_byte(0x4016)
         board.read_byte(0x0000)
@@ -124,4 +133,8 @@ def test_frame_irq_arrives_about_29830_cycles_after_4017() -> None:
     # JMP in progress finishes (up to 3 cycles), then the 7-cycle entry.
     assert 3 + 29828 + 7 <= system.cycles - write <= 4 + 29828 + 3 + 7
     assert system.board.read_byte(0x4015) & 0x40
-    assert not system.board.read_byte(0x4015) & 0x40  # the read cleared it
+    # The read's clear lands at the next put -> get transition, a cycle or two
+    # on (AccuracyCoin "Frame Counter IRQ" 6 and 7).
+    system.board.read_byte(0x0000)
+    system.board.read_byte(0x0000)
+    assert not system.board.read_byte(0x4015) & 0x40

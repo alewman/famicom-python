@@ -29,8 +29,8 @@
  {
   "path": "reference/src/AccuracyCoin",
   "url": "https://github.com/100thCoin/AccuracyCoin",
-  "rev": "4151899fd39bacd0b51bf3321127eb89ff762bb0",
-  "date": "2026-10-04T14:46:02-04:00",
+  "rev": "6bee919529289c555803b612b8c9e4f7eaaeeabb",
+  "date": "2026-10-10T12:48:09-04:00",
   "sparse": [
    "/README.md",
    "/AccuracyCoin.asm",
@@ -340,8 +340,8 @@
  {
   "path": "tests/test_roms/AccuracyCoin",
   "url": "https://github.com/100thCoin/AccuracyCoin",
-  "rev": "4151899fd39bacd0b51bf3321127eb89ff762bb0",
-  "date": "2026-10-04T18:46:02Z",
+  "rev": "6bee919529289c555803b612b8c9e4f7eaaeeabb",
+  "date": "2026-10-10T16:48:09Z",
   "sparse": [],
   "note": "MIT"
  },
