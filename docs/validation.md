@@ -131,7 +131,7 @@ belongs to the 2A03 pull request on 6502-python, not to this board.
 | Model | Covers | Licence | Runs here? |
 | --- | --- | --- | --- |
 | **PPUSim** (Breaknes, `fb7de61`) | gate-level 2C02G/H, 2C03/04/05, 2C07, UMC clones, from the Breaks schematics; pin-level API per master half-cycle (R/W, RS0–2, /DBE, /RES in; /INT, ALE, /RD, /WR and the full AD/A8–13 bus out, so every fetch is visible) | CC0-1.0 | **Yes**: compiles unchanged with g++ -std=c++20 (`scripts/build_ppusim.py`, with our shim); on the board in place of the PPU (`scripts/ppusim_board.py`) it passes `ppu_vbl_nmi` 10/10 at one CPU/PPU skew, and `scripts/ppusim_compare.py` compares it with the board pin for pin (milestone 2 below). ~0.5 frames/s on the board. `$2002` bit 7 inverted (C23, emu-russia/breaknes#529) |
-| **APUSim** (Breaknes, `fb7de61`) | gate-level 2A03 (6502 + APU); RAW mode gives the 5 digital channel levels per half-clock, plus /IRQ, M2, the bus; `APUPlayerBoard.cpp` runs a bare APU from register dumps through a fake 6502 | CC0-1.0 | builds with g++/cmake (not run); effectively 2A03G only; DAC fitted to one voltage, so not a mixer judge (open item 2) |
+| **APUSim** (Breaknes, `fb7de61`) | gate-level 2A03 (6502 + APU); RAW mode gives the 5 digital channel levels per half-clock, plus /IRQ, M2, the bus; `APUPlayerBoard.cpp` runs a bare APU from register dumps through a fake 6502 | CC0-1.0 | **Runs, not yet a judge**: built with our shim (`scripts/build_apusim.py`; the sparse checkout now includes `Chips/M6502Core`), a stub board around the whole chip runs blargg's ROMs (`scripts/apusim_board.py`, ~9,500 CPU cycles/s). It passes 3 of 8 `apu_test` singles: `$4015` bits 0-3 never reach its 6502 (open item 2; milestone 3 below). Effectively 2A03G only; DAC fitted to one voltage, so not a mixer judge |
 | Breaks (emu-russia, `5a55bac`) | transistor→gate documentation of the 6502 core, APU, PPU, MMC1; Verilog HDL (PPU still work in progress) | CC0-1.0 | documentation; HDL needs iverilog (not installed) |
 | Visual 2A03 / Visual 2C02 (Quietust) | transistor-level RP2A03G and 2C02G netlists in the visual6502 JS simulator | simulator MIT; **netlist data: no licence stated** | `reference/docs/visual2a03`, `visual2c02`; the simulator core has no DOM references and node 22 is installed, so a headless runner is feasible (not built); very slow |
 | MetalNES (`6acddfb`) | transistor-level NES-001 from the Visual netlists plus the board | MIT | macOS only |
@@ -539,3 +539,200 @@ PPUSim-only observation nothing else confirms, left open. So in
 `full_palette` and `flowing_palette` the differences from Mesen2 are
 Mesen2's: it applies a `$2007` write a dot after the access, PPUSim and now
 the board three dots after, the increment a dot later still.
+
+### Milestone 3: the APU, DMA and interrupts (2026-10-12)
+
+**Pins.** famicom-python at the commit that adds this record; 6502-python
+`1ae3610015abcb643294fab986dbfb64a45d79b7` (penultimate-cycle polling and the
+branch poll points, its PRs #3 and #5, are what `cpu_interrupts_v2` judges);
+`nes-test-roms` `95d8f62`; detectors Mesen2 `b9fa69d` (2.1.1); die-derived
+candidates Breaknes PPUSim and APUSim `fb7de61`. Machine NES-001, `PowerOn()`
+defaults (APU get first). PyPy 7.3.20 (Python 3.11.13) and CPython 3.14.4,
+14 ROMs at a time on the shared machine; short ROMs run faster on CPython
+than on PyPy, whose JIT has not warmed up by the time they finish.
+
+**The APU, DMA and interrupt test ROMs** (hardware-corrected),
+`pytest -m slow` and `scripts/run_test_roms.py --suite apu`: 38 of 38 pass
+under PyPy and under CPython with identical cycle and instruction counts.
+`apu_test`, `apu_reset` report through `$6000` (the harness presses reset once
+per `$81` request: `4017_timing`'s reset code measures for 420,000 cycles
+before it clears the request); blargg's 2005 APU tests on screen as `$01`;
+`cpu_interrupts_v2`, `dmc_dma_during_read4`, `sprdma_and_dmc_dma` and
+`read_joy3` on screen (nes20db gives the interrupt singles no PRG-RAM).
+`dma_2007_read` and `double_2007_read` print only a CRC, and blargg's sources
+list one per CPU/PPU synchronization (2 and 4): the case accepts the one
+PPUSim prints at the board's skew (`159A7A8F`, `F018C287`; below).
+`read_joy3`'s `count_errors` ROMs only mark where DMC DMA met a pad read (no
+verdict) and `test_buttons` needs a person; `thorough_test` is the judge.
+
+| ROM | SHA-256 | CPU cycles | Instructions | Wall s, PyPy | Wall s, CPython |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `apu_test/rom_singles/1-len_ctr.nes` | `aacf86c1d773` | 627,708 | 212,000 | 5.9 | 2.5 |
+| `apu_test/rom_singles/2-len_table.nes` | `c002ff1483b4` | 482,018 | 148,000 | 9.2 | 2.3 |
+| `apu_test/rom_singles/3-irq_flag.nes` | `dd8885516659` | 599,240 | 204,000 | 7.3 | 4.5 |
+| `apu_test/rom_singles/4-jitter.nes` | `bff573d72d0f` | 567,369 | 190,000 | 6.2 | 2.7 |
+| `apu_test/rom_singles/5-len_timing.nes` | `4d88f8cc0b21` | 3,396,916 | 1,358,000 | 11.3 | 14.5 |
+| `apu_test/rom_singles/6-irq_flag_timing.nes` | `fc1daff82dd1` | 658,487 | 224,000 | 5.6 | 4.5 |
+| `apu_test/rom_singles/7-dmc_basics.nes` | `547324867ee0` | 749,409 | 262,000 | 8.5 | 5.1 |
+| `apu_test/rom_singles/8-dmc_rates.nes` | `5d9a79a505b3` | 835,365 | 302,000 | 7.6 | 2.8 |
+| `apu_reset/4015_cleared.nes` | `ef83bc2831f0` | 926,825 | 278,277 | 9.7 | 7.3 |
+| `apu_reset/4017_timing.nes` | `0e6072c6dcee` | 1,373,931 | 452,493 | 6.4 | 4.7 |
+| `apu_reset/4017_written.nes` | `022bd3b45a73` | 1,671,052 | 533,066 | 12.6 | 8.6 |
+| `apu_reset/irq_flag_cleared.nes` | `e2435b213bf2` | 898,525 | 272,766 | 6.8 | 4.0 |
+| `apu_reset/len_ctrs_enabled.nes` | `e05546cbfaa1` | 1,048,381 | 328,499 | 8.8 | 8.2 |
+| `apu_reset/works_immediately.nes` | `c750113762ee` | 1,047,596 | 334,328 | 5.8 | 5.5 |
+| `blargg_apu_2005.07.30/01.len_ctr.nes` | `e1e3a29ab536` | 893,420 | 347,854 | 2.4 | 2.2 |
+| `blargg_apu_2005.07.30/02.len_table.nes` | `63cc6a57fae3` | 893,418 | 330,317 | 1.8 | 3.1 |
+| `blargg_apu_2005.07.30/03.irq_flag.nes` | `6f71c7e3de4b` | 893,417 | 348,686 | 2.3 | 2.6 |
+| `blargg_apu_2005.07.30/04.clock_jitter.nes` | `46fa69b26fe8` | 893,418 | 342,755 | 2.2 | 2.7 |
+| `blargg_apu_2005.07.30/05.len_timing_mode0.nes` | `606802d6849c` | 893,418 | 338,156 | 1.9 | 2.3 |
+| `blargg_apu_2005.07.30/06.len_timing_mode1.nes` | `0f34e26d56ad` | 893,419 | 337,372 | 2.3 | 5.3 |
+| `blargg_apu_2005.07.30/07.irq_flag_timing.nes` | `851c9698941d` | 893,418 | 341,300 | 3.0 | 6.1 |
+| `blargg_apu_2005.07.30/08.irq_timing.nes` | `0a20a2b9ca9a` | 893,419 | 343,262 | 1.5 | 3.1 |
+| `blargg_apu_2005.07.30/09.reset_timing.nes` | `bb04f8328a51` | 893,416 | 332,677 | 2.8 | 3.4 |
+| `blargg_apu_2005.07.30/10.len_halt_timing.nes` | `cbdaa9a5cf9c` | 893,417 | 342,752 | 1.8 | 6.4 |
+| `blargg_apu_2005.07.30/11.len_reload_timing.nes` | `40e633285a4a` | 893,418 | 335,237 | 2.1 | 3.0 |
+| `cpu_interrupts_v2/rom_singles/1-cli_latency.nes` | `e402d36118f7` | 893,418 | 318,812 | 1.7 | 3.2 |
+| `cpu_interrupts_v2/rom_singles/2-nmi_and_brk.nes` | `6e6bf6205930` | 3,573,682 | 1,123,000 | 6.1 | 8.4 |
+| `cpu_interrupts_v2/rom_singles/3-nmi_and_irq.nes` | `3008a9524d17` | 4,467,095 | 1,475,014 | 7.5 | 10.2 |
+| `cpu_interrupts_v2/rom_singles/4-irq_and_dma.nes` | `6d7b4c1947ad` | 2,680,246 | 982,600 | 5.7 | 11.2 |
+| `cpu_interrupts_v2/rom_singles/5-branch_delays_irq.nes` | `f9e10b4a24d8` | 11,614,397 | 4,567,879 | 9.2 | 48.6 |
+| `dmc_dma_during_read4/dma_2007_read.nes` | `a2e0fa3f6f15` | 893,420 | 297,956 | 1.8 | 2.2 |
+| `dmc_dma_during_read4/dma_2007_write.nes` | `54c75d491c68` | 893,420 | 285,728 | 3.2 | 2.2 |
+| `dmc_dma_during_read4/dma_4016_read.nes` | `c6af72e11c19` | 893,417 | 320,833 | 2.8 | 5.8 |
+| `dmc_dma_during_read4/double_2007_read.nes` | `779e6e7db863` | 893,419 | 301,692 | 2.1 | 2.6 |
+| `dmc_dma_during_read4/read_write_2007.nes` | `bc5281ca3f12` | 893,418 | 294,448 | 1.8 | 2.6 |
+| `sprdma_and_dmc_dma/sprdma_and_dmc_dma.nes` | `db3199bc1b0b` | 4,467,098 | 1,648,619 | 6.4 | 8.3 |
+| `sprdma_and_dmc_dma/sprdma_and_dmc_dma_512.nes` | `3789f5134b05` | 4,467,100 | 1,652,785 | 6.3 | 8.9 |
+| `read_joy3/thorough_test.nes` | `e59de3d54204` | 4,467,078 | 1,677,602 | 6.9 | 19.2 |
+
+**How they were reached.** With the stub of milestone 1 replaced, `apu_test`
+1-6, `blargg_apu_2005` 1-9, `cpu_interrupts_v2` 1-3 and 5 passed at once.
+The rest, in order:
+
+- *Length-counter races* (2005 `10.len_halt_timing`, `11.len_reload_timing`):
+  a halt or length write settles after the next cycle's length clock, and a
+  load is dropped if that clock changed the counter.
+- *Reset* (`apu_reset/irq_flag_cleared`): reset clears the frame IRQ flag.
+- *DMC and its DMA* (`7-dmc_basics`, `8-dmc_rates`, `sprdma_and_dmc_dma`,
+  `dma_4016_read`): the get/put model of DMA.wiki, one loop for both units
+  (timing.md "The design"). `dma_4016_read` printed hardware's
+  `08 08 07 08 08` on the first run: /OE contiguity was already right.
+- *The `$4017` delay* (C6): `4-irq_and_dma` printed "9 +526" where hardware
+  prints "8 +526" until "during an APU cycle" was read as a write on a put.
+  Every other ROM passes either way.
+- *`$2007` one CPU cycle apart* (C22): the two CRC ROMs printed values in no
+  hardware list, and `read_write_2007` failed (its `STA $2007,X` reads, then
+  writes, on consecutive cycles). Run on the board with PPUSim in place of
+  the PPU (`scripts/ppusim_board.py`, all 8 skews), PPUSim prints at skew 3,
+  the one where it passes `ppu_vbl_nmi`, `159A7A8F` and `F018C287`, both in
+  blargg's hardware lists (`dma_2007_read` gives `159A7A8F` at all eight;
+  `double_2007_read` gives `AD987CB5` at skews 0-2 and `31D9ED83` at 4-7,
+  in no list: only skew 3 matches hardware, as with `ppu_vbl_nmi`). The board now does what skew 3 implies: a read's refill lands
+  with its increment, a read in between is ignored, a write takes v as it
+  lands. All three pass.
+
+The CPU and PPU ROMs again: 10 of 10 and 41 of 41 on both interpreters. CPU
+cycle counts are milestone 2's. Eight `sprite_hit_tests` ROMs moved by one
+cycle and one or two instructions at the frame the harness stops on: they
+enable the DMC, whose DMA now takes cycles (with DMC DMA disabled the counts
+are milestone 2's exactly).
+
+**The gates can fail.** Each seeded fault below, in a copy of `src/`, makes
+its gate fail (17 of 17):
+
+| Fault | Gate that fails |
+| --- | --- |
+| length table entry 1 = 253 | `apu_test/2-len_table` |
+| a halt write takes effect at once | 2005 `10.len_halt_timing` |
+| a length load during a length clock not dropped | 2005 `11.len_reload_timing` |
+| `$4017` delay 3 after a get (the other reading of C6) | `cpu_interrupts_v2/4-irq_and_dma` |
+| reset keeps the frame IRQ flag | `apu_reset/irq_flag_cleared` |
+| the DMC IRQ never set | `apu_test/7-dmc_basics` (#9) |
+| DMC rate 0 = 426 | `apu_test/8-dmc_rates` |
+| DMC load DMA a cycle early | quick (`test_apu`) |
+| DMC DMA without its dummy cycle | `dma_2007_read` |
+| OAM DMA's get before the DMC's | `sprdma_and_dmc_dma` |
+| adjacent `$2007` reads both count | `double_2007_read` |
+| a `$2007` write's address taken at the access | `read_write_2007` |
+| pulse 1 negates like pulse 2 | quick |
+| noise feedback from bit 2 | quick |
+| mixer pulse coefficient 8000 | quick |
+| triangle clocked on APU cycles | quick |
+| a `$4015` read keeps the frame IRQ flag | `apu_test/3-irq_flag` (#5) |
+
+Two needed stronger gates first: `double_2007_read` accepted every
+synchronization's CRC, so adjacent reads both counting printed another
+hardware value (`85CFD627`); the case now takes only the board's. The
+triangle test called the timer directly, missing the clock that drives it.
+
+**Sound against hardware** (`scripts/volume_levels.py`; hardware-captured,
+through an uncharacterised analogue path, so relative levels only).
+`volume_tests` plays 12 tones near 1 kHz three times, the DMC held at 0, 48
+and 96; its `recordings/nes-001.ogg` is an NES-001. Each tone's RMS over
+pulse 1 at 1/2 duty in the same pass, the board through its fitted NES-001
+stage:
+
+| Tone | DMC 0: NES-001, board | DMC 48 | DMC 96 |
+| --- | --- | --- | --- |
+| pulse 1, 1/8 | 0.650, 0.651 (+0.02 dB) | 0.675, 0.651 (-0.32 dB) | 0.674, 0.673 (-0.02 dB) |
+| pulse 1, 1/4 | 0.878, 0.871 (-0.07 dB) | 0.877, 0.871 (-0.06 dB) | 0.876, 0.871 (-0.05 dB) |
+| pulse 1, 1/2 | 1.000, 1.000 (+0.00 dB) | 1.000, 1.000 (+0.00 dB) | 1.000, 1.000 (+0.00 dB) |
+| pulse 1, 3/4 | 0.865, 0.865 (+0.00 dB) | 0.866, 0.866 (-0.00 dB) | 0.867, 0.896 (+0.29 dB) |
+| pulses 1+2, 1/8 | 1.161, 1.126 (-0.26 dB) | 1.164, 1.125 (-0.29 dB) | 1.165, 1.165 (-0.00 dB) |
+| pulses 1+2, 1/4 | 1.505, 1.506 (+0.00 dB) | 1.512, 1.505 (-0.04 dB) | 1.514, 1.506 (-0.04 dB) |
+| pulses 1+2, 1/2 | 1.715, 1.729 (+0.07 dB) | 1.791, 1.728 (-0.31 dB) | 1.724, 1.728 (+0.02 dB) |
+| pulses 1+2, 3/4 | 1.481, 1.496 (+0.09 dB) | 1.548, 1.496 (-0.30 dB) | 1.491, 1.547 (+0.32 dB) |
+| triangle | 1.502, 1.652 (+0.83 dB) | 1.046, 1.140 (+0.75 dB) | 0.773, 0.860 (+0.92 dB) |
+| noise, long | 0.476, 0.539 (+1.07 dB) | 0.382, 0.368 (-0.33 dB) | 0.259, 0.268 (+0.30 dB) |
+| noise, short | 0.470, 0.509 (+0.70 dB) | 0.453, 0.348 (-2.30 dB) | 0.251, 0.285 (+1.12 dB) |
+| DMC, 30 | 1.566, 1.867 (+1.53 dB) | 1.208, 1.270 (+0.44 dB) | 0.786, 0.865 (+0.83 dB) |
+
+The pulses, alone and summed non-linearly, agree within 0.3 dB, and the
+DMC's attenuation of the triangle as it rises (0.70 and 0.52 of its level at
+0 on hardware, 0.69 and 0.52 here) is the formula's. The triangle reads
+0.8-0.9 dB loud and the DMC tone 0.4-1.5 dB loud; noise is random and within
+about 1 dB. Open item 17.
+
+**Against Mesen2's sound** (`scripts/mesen_audio.py`, a detector). Mesen2
+records its own mixer output (its channel volumes, 0 when headless, set to
+100); both streams pass the same 90 Hz high-pass, each window gets its own
+alignment (within 1 ms) and gain. `apu_mixer` (20 s each) plays a beep, a
+tone cancelled by inverse `$4011` writes, then a beep: the beeps start on the
+same sample in both, at the same pitch, Mesen2 1.64 times quieter
+throughout (its output scale), with waveforms differing by -11 to -16 dB
+(its integer mixer and band-limited synthesis). The cancellation depth,
+residual over beep, window by window:
+
+| Test | Board | Mesen2 |
+| --- | --- | --- |
+| `square` | -41 to -12 dB | -41 to -12 dB |
+| `triangle` | -33 to -12 dB | -33 to -12 dB |
+| `noise` (a fade, not a cancellation) | -25 to -11 dB | -25 to -10 dB |
+| `dmc` | -34 to -16 dB | -40 to -14 dB |
+
+In `dmc`, cycle by cycle, the board leaves a one-CPU-cycle step at every
+pulse edge (the triangle test cancels on the cycle): open item 16. Mesen2
+was not run on `volume_tests`: the NES-001 recording outranks it.
+
+**APUSim** (die-derived candidate, open item 2). Built with our shim
+(`scripts/build_apusim.py`): a stub board around the whole simulated 2A03,
+its 6502 included, with work RAM, NROM PRG and PRG-RAM, a `$2002` that sets
+bit 7 once a frame (`scripts/apusim_board.py`, about 9,500 CPU cycles/s).
+`apu_test`: 3 of 8 pass (`3-irq_flag`, `4-jitter`, `6-irq_flag_timing`). The
+length tests fail on `$4015` bits 0-3: a six-instruction program shows the
+counters load (channel 0's reads $1D) and bits 4 and 6 reach the CPU, but bits
+0-3 never do. The length counters drive them from `sim_SoundGenerators`,
+which runs only on PHI0 edges and after the core in each step, while the core
+samples the bus at that edge. `7-dmc_basics` #19 and `8-dmc_rates` #2 are not
+diagnosed (the stub board may be the cause). Not a judge at `fb7de61`.
+
+**Speed** (the 240p Test Suite's menu, 300 frames after 120 of warm-up):
+PyPy 53.6 frames/s (0.89x real time), CPython 9.0 (0.15x). The APU's
+per-cycle clock costs about half of PyPy's milestone 2 speed (A/B under the
+same load: 94-102 before, 42-57 after); the mix is recomputed only when a
+channel step can be heard. The board stays a reference, not a player
+(reference boards are correct, not fast).
+
+**Frames against Mesen2**, frames 200 and 600 of milestone 2's twelve ROMs: the
+same counts as milestone 2, ROM for ROM.
