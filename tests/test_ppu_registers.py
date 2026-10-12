@@ -14,6 +14,19 @@ from conftest import nrom_system
 from famicom_python.ppu import VBL
 
 
+def _sta(board, address: int, value: int) -> None:
+    """A write as ``STA abs`` makes it: three cycles of fetch, then the write."""
+    for _ in range(3):
+        board.read_byte(0x0000)
+    board.write_byte(address, value)
+
+
+def _lda(board, address: int) -> int:
+    for _ in range(3):
+        board.read_byte(0x0000)
+    return board.read_byte(address)
+
+
 def _ppu_after_warmup():
     system = nrom_system(b"")
     board, ppu = system.board, system.board.ppu
@@ -76,24 +89,27 @@ def test_writes_are_ignored_until_the_first_prerender_line() -> None:
 def test_2007_reads_are_buffered_except_palette() -> None:
     board, _ = _ppu_after_warmup()
     for address, value in ((0x2105, 0x11), (0x2106, 0x22)):
-        board.write_byte(0x2006, address >> 8)
-        board.write_byte(0x2006, address & 0xFF)
-        board.write_byte(0x2007, value)
-    board.write_byte(0x2006, 0x21)
-    board.write_byte(0x2006, 0x05)
-    assert board.read_byte(0x2007) != 0x11  # the stale buffer
-    assert board.read_byte(0x2007) == 0x11
-    assert board.read_byte(0x2007) == 0x22
+        _sta(board, 0x2006, address >> 8)
+        _sta(board, 0x2006, address & 0xFF)
+        _sta(board, 0x2007, value)
+    _sta(board, 0x2006, 0x21)
+    _sta(board, 0x2006, 0x05)
+    assert _lda(board, 0x2007) != 0x11  # the stale buffer
+    assert _lda(board, 0x2007) == 0x11
+    assert _lda(board, 0x2007) == 0x22
 
 
 def test_palette_mirrors_and_reads_at_once_with_open_bus_above() -> None:
     board, ppu = _ppu_after_warmup()
-    board.write_byte(0x2006, 0x3F)
-    board.write_byte(0x2006, 0x10)
-    board.write_byte(0x2007, 0xED)  # $3F10 is $3F00's cell; 6 bits stored
+    _sta(board, 0x2006, 0x3F)
+    _sta(board, 0x2006, 0x10)
+    _sta(board, 0x2007, 0xED)  # $3F10 is $3F00's cell; 6 bits stored
+    board.read_byte(0x0000)  # the write lands 3 dots after the access (ppu.DELAYS)
     assert ppu.palette[0] == 0x2D
-    board.write_byte(0x2006, 0x3F)
-    board.write_byte(0x2006, 0x00)
+    _sta(board, 0x2006, 0x3F)
+    _sta(board, 0x2006, 0x00)
+    for _ in range(3):
+        board.read_byte(0x0000)
     ppu._drive(0xC0)  # the I/O latch
     assert board.read_byte(0x2007) == 0xED  # bits 7-6 from the I/O latch
 

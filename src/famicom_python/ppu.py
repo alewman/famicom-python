@@ -46,9 +46,21 @@ cartridge that sets ``watches_ppu_address`` also sees every ALE dot's address.
 from __future__ import annotations
 
 from array import array
+from collections.abc import Callable
 
 from .cartridge.connector import Cartridge
 from .machine import Timing
+
+# Dots after the access before a register write's effect: 0 is the first dot
+# after the CPU cycle's access point (board.PPU_ACCESS_TICKS). Measured on
+# Breaknes PPUSim co-simulated at the skew where it passes ppu_vbl_nmi
+# (scripts/ppusim_compare.py, docs/validation.md milestone 2); no test ROM pins
+# them (undocumented-behavior.md C21, C22).
+DELAYS = {
+    "2006_copy": 2,  # the second $2006 write's t -> v copy
+    "2007_write": 3,  # a $2007 write reaches palette RAM or the bus
+    "2007_increment": 4,  # ... and v increments (after a $2007 read too)
+}
 
 DOTS = 341
 WIDTH, HEIGHT = 256, 240
@@ -87,6 +99,12 @@ class PPU:
         # (Machine.ppu_latch_decay_seconds; contradiction C1).
         self.latch_decay_ticks = int(latch_decay_seconds * timing.master_hz)
         self._latch_times = [0] * 8  # when each latch bit was last driven
+        # Register effects that land some dots after the access: (time, action),
+        # applied as the first dot at or after ``time`` begins (DELAYS).
+        self._events: list[tuple[int, Callable[[], None]]] = []
+        self._last_pixel = -1  # picture index of the last pixel computed
+        self._last_value = 0  # its palette value, before greyscale and emphasis
+        self._last_pixel_time = -1  # the dot (its time) that computed it
         self.power()
 
     # -- power and reset -------------------------------------------------
@@ -117,6 +135,7 @@ class PPU:
         self._sprite0_line = False
         self._fetch_tile = 0xFF
         self._fetch_attr = 0xFF
+        self._garbage = 0x2000  # the first garbage fetch's address (dot 257)
         self._fetch_x = 0xFF
         self._fetch_lo = 0
         # The sprite pixels of the line being drawn and of the next one.
@@ -156,6 +175,11 @@ class PPU:
                 # Idle until the line's end: no fetches and no events on dots
                 # 2-337; visible lines show the backdrop.
                 dots = min((time - self.time + ticks - 1) // ticks, DOTS - 4 - dot)
+                if self._events:  # stop short of a pending register effect
+                    dots = min(dots, (self._events[0][0] - self.time) // ticks - 1)
+                    if dots <= 0:
+                        self._step()
+                        continue
                 if line < HEIGHT:
                     self._fill_backdrop(line, dot + 1, dot + dots)
                 self.dot = dot + dots
@@ -178,10 +202,24 @@ class PPU:
         picture = self.picture
         for index in range(base + first, base + last + 1):
             picture[index] = value
+        self._last_pixel = base + last
+        self._last_value = self.palette[self.palette_index(v) if v >= 0x3F00 else 0]
+        self._last_pixel_time = self.time + (last - self.dot) * self.dot_ticks  # dot ``last``
+
+    def _schedule(self, dots: int, action: Callable[[], None]) -> None:
+        """Run ``action`` before the work of the ``dots``-th dot after the next."""
+        due = self.time + (dots + 1) * self.dot_ticks
+        events = self._events
+        events.append((due, action))
+        events.sort(key=lambda event: event[0])
 
     def _step(self) -> None:
         """Advance one dot and do its work."""
         self.time += self.dot_ticks
+        if self._events:
+            events = self._events
+            while events and events[0][0] <= self.time:
+                events.pop(0)[1]()
         dot = self.dot + 1
         line = self.line
         rendering = self.mask & 0x18
@@ -254,12 +292,15 @@ class PPU:
                     self._increment_y()
             else:  # 257
                 self._reload()
-                self.v = (self.v & ~0x041F) | (self.t & 0x041F)
                 self.oam_addr = 0
                 self._sprite0_line = self._sprite0_next if visible else False
                 for i in range(WIDTH):
                     self._sprite_next[i] = 0
+                # The first garbage fetch's address goes out before hori(v)
+                # is copied, and the octal latch holds it for the read on 258
+                # (PPUSim, docs/validation.md milestone 2).
                 self._sprite_fetch(line, dot, visible)
+                self.v = (self.v & ~0x041F) | (self.t & 0x041F)
         elif dot <= 320:
             self.oam_addr = 0
             if line == self.prerender_line and 280 <= dot <= 304:
@@ -360,6 +401,9 @@ class PPU:
         else:
             index = bg
         value = self.palette[index]
+        self._last_pixel = line * WIDTH + x
+        self._last_value = value
+        self._last_pixel_time = self.time
         if mask & 0x01:
             value &= 0x30
         self.picture[line * WIDTH + x] = value | ((mask & 0xE0) << 1)
@@ -388,9 +432,11 @@ class PPU:
         index = self._oam2_index
         height = 16 if self.ctrl & 0x20 else 8
         if self._eval_done:
-            if index < 32:
-                self.oam2[index] = value  # the failed copy lands but does not advance
-            else:
+            # Once n has wrapped nothing more lands in secondary OAM: the next
+            # free slot keeps the last failed copy, OAM[63]'s Y, and empty
+            # slots fetch their row from it (PPUSim, docs/validation.md
+            # milestone 2).
+            if index >= 32:
                 self.oam_bus = self.oam2[0]
             self.oam_addr = (address + 4) & 0xFC
             return
@@ -443,11 +489,12 @@ class PPU:
             if slot == 0:
                 self._sprite_count = min(self._oam2_index, 32) >> 2 if visible else 0
             self.oam_bus = oam2[base]
+            self._garbage = 0x2000 | (self.v & 0x0FFF)
             if self._watch:
-                self._ale(0x2000 | (self.v & 0x0FFF))
+                self._ale(self._garbage)
         elif phase == 1:
             self._fetch_tile = self.oam_bus = oam2[base + 1]
-            self._fetch(0x2000 | (self.v & 0x0FFF))
+            self._fetch(self._garbage)
         elif phase == 2:
             self._fetch_attr = self.oam_bus = oam2[base + 2]
             if self._watch:
@@ -580,7 +627,7 @@ class PPU:
                 value = self.buffer
                 self.buffer = self.bus_read(v)
                 self._drive(value)
-            self._increment_after_2007()
+            self._schedule(DELAYS["2007_increment"], self._increment_after_2007)
             return value
         return self._decayed_latch()  # write-only registers read the I/O latch
 
@@ -630,6 +677,11 @@ class PPU:
         elif register == 1:
             if not self.resetting:
                 self.mask = value
+                # Greyscale and emphasis act a stage after the palette lookup,
+                # so they reach the pixel already looked up (PPUSim, DELAYS).
+                if self._last_pixel_time == self.time:  # still in the pipeline
+                    colour = self._last_value & (0x30 if value & 0x01 else 0x3F)
+                    self.picture[self._last_pixel] = colour | ((value & 0xE0) << 1)
         elif register == 3:
             self.oam_addr = value
         elif register == 4:
@@ -655,17 +707,24 @@ class PPU:
                 self.t = (self.t & 0x00FF) | ((value & 0x3F) << 8)
             else:
                 self.t = (self.t & 0x7F00) | value
-                self.v = self.t
-                if self._watch and not self.rendering_now:
-                    self._ale(self.v & 0x3FFF)
+                self._schedule(DELAYS["2006_copy"], self._copy_t)
             self.w ^= 1
         elif register == 7:
             v = self.v & 0x3FFF
-            if v >= 0x3F00:
-                self.palette[self.palette_index(v)] = value & 0x3F
-            else:
-                self.bus_write(v, value)
-            self._increment_after_2007()
+            self._schedule(DELAYS["2007_write"], lambda: self._write_2007(v, value))
+            self._schedule(DELAYS["2007_increment"], self._increment_after_2007)
+
+    def _copy_t(self) -> None:
+        """The second $2006 write's t -> v copy."""
+        self.v = self.t
+        if self._watch and not self.rendering_now:
+            self._ale(self.v & 0x3FFF)
+
+    def _write_2007(self, v: int, value: int) -> None:
+        if v >= 0x3F00:
+            self.palette[self.palette_index(v)] = value & 0x3F
+        else:
+            self.bus_write(v, value)
 
     def oam_dma_write(self, value: int) -> None:
         """A DMA write to $2004."""

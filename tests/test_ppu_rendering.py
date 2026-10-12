@@ -181,3 +181,38 @@ def test_empty_sprite_slots_fetch_tile_ff() -> None:
     sprite_reads = [a for a in reads if a & 0x1000]
     assert sprite_reads[:2] == [0x1010 | (line - 50), 0x1018 | (line - 50)]
     assert {a >> 4 & 0xFF for a in sprite_reads[2:16]} == {0xFF}
+
+
+def test_register_effects_land_dots_after_the_access() -> None:
+    # Measured on PPUSim (ppu.DELAYS, docs/validation.md milestone 2), with
+    # rendering off so each dot shows palette[v]: a $2007 write reaches palette
+    # RAM 3 dots after the access and v increments a dot later; the second
+    # $2006 write's copy lands 2 dots after; greyscale and emphasis reach the
+    # pixel already looked up.
+    _, ppu = _system(mask=0x00)
+    ppu.palette[1:3] = bytes((0x11, 0x12))
+    ppu.palette[5] = 0x15
+
+    def access_at(line: int, dot: int) -> int:
+        while (ppu.line, ppu.dot) != (line, dot):
+            ppu.run_to(ppu.time + 1)
+        return dot + 1 - 2  # the pixel of the first dot after the access
+
+    ppu.v = 0x3F01
+    x = access_at(100, 100)
+    ppu.write_register(7, 0x16)
+    x2 = access_at(101, 100)
+    ppu.write_register(6, 0x3F)
+    ppu.write_register(6, 0x05)
+    x3 = access_at(102, 100)
+    ppu.write_register(1, 0x21)  # greyscale and red emphasis
+    access_at(103, 0)
+    ppu.write_register(1, 0x00)
+    ppu.v = 0x3F01
+    x4 = access_at(104, 100)
+    ppu.read_register(7)  # a read increments v just as late
+    access_at(105, 0)
+    assert _row(ppu, 100, x - 1, 7) == [0x11, 0x11, 0x11, 0x11, 0x16, 0x12, 0x12]
+    assert _row(ppu, 101, x2, 4) == [0x12, 0x12, 0x15, 0x15]
+    assert _row(ppu, 102, x3 - 2, 3) == [0x15, 0x50, 0x50]  # $15 & $30, emphasis bit 6
+    assert _row(ppu, 104, x4, 6) == [0x16, 0x16, 0x16, 0x16, 0x12, 0x12]
