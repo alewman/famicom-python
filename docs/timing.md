@@ -169,9 +169,11 @@ H an implicit stop on the reload's APU cycle schedules an extra reload
 - The halted 6502 **repeats its stalled read** on every DMA cycle that is not a
   DMA access, visibly on the bus. A stalled `LDA $2007` therefore increments v
   2–3 extra times (blargg `dma_2007_read`; since milestone 2 each increment
-  lands 4 dots after its read, so a read one CPU cycle after another still
-  sees the old v: milestone 3 checks this against `dma_2007_read` and
-  `double_2007_read`); a stalled $4015 read clears the
+  lands 4 dots after its read, with the buffer refill, and a read in those 4
+  dots is ignored: so of the CPU's reads on consecutive cycles only every
+  other one counts, and `dma_2007_read` shows two extra reads, as PPUSim
+  does at the board's skew; undocumented-behavior.md C22); a stalled $4015
+  read clears the
   frame IRQ flag (AccuracyCoin "DMA + $4015 Read"); a stalled $2002 read clears
   VBL.
 - $4016/$4017: pads are clocked by /OE, not by the address, so on the NES-001 a
@@ -200,6 +202,18 @@ cycle count excludes stolen cycles (the board's own clock is the truth), and
 stall cycles are visible only in a board-level trace. This is exact only once
 the core polls interrupts as above (otherwise `4-irq_and_dma` returns 7 where
 hardware returns 8).
+
+As built (milestone 3, `board.py` "DMA"): one loop serves both units. Its
+first cycle is the halt; a DMC fetch reads on the first get at least two
+cycles after its halt cycle (halt, dummy, then alignment if needed), and a
+fetch requested while the CPU is already halted counts the cycle it appears
+in as its halt; OAM DMA reads on a get the DMC does not take and writes on
+the next put; every other cycle repeats the CPU's read. The APU raises the
+request (`APU.dmc_request`): a load on the get of the second APU cycle after
+the enabling `$4015` write, a reload on the put of the APU cycle whose output
+clock emptied the buffer. Not yet modelled: the address-composition quirk
+(the halted CPU's `$4000–$401F` read combined with the DMC address) and the
+two DMC bugs, both AccuracyCoin's (milestone 4).
 
 The one place DMA changes the CPU's own result: SHA/SHX/SHY/TAS drop their
 "AND (high byte + 1)" when RDY was low before the write cycle (AccuracyCoin
@@ -337,8 +351,10 @@ Those are the table + 2 at blargg's alignment. Further facts:
   clocks after.
 - **Write delay**: a $4017 write takes effect 3 CPU cycles later if written
   during an APU cycle, 4 if between (`APU_Frame_Counter.wiki` l.18–20; Mesen2
-  3 on even, 4 on odd). Bit 7 set clocks quarter + half immediately (at that
-  delayed point) (`apu_test/1-len_ctr` #4/#5).
+  3 on even, 4 on odd). "During" is a write on a **put** (board, milestone 3:
+  the other reading fails `cpu_interrupts_v2/4-irq_and_dma`'s "8 +526";
+  undocumented-behavior.md C6). Bit 7 set clocks quarter + half immediately
+  (at that delayed point) (`apu_test/1-len_ctr` #4/#5).
 - **Jitter**: mode changes take effect on even APU clocks only
   (`apu_test/4-jitter`).
 - **IRQ flag**: set on 29828 and 29829 *even with inhibit set*, not on 29830 if

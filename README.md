@@ -7,16 +7,19 @@ around it: the 2A03's sound unit, DMA and joypad ports, the 2C02 picture
 processor dot by dot, the cartridge connector and the mappers behind it, and
 the clock that ties them together.
 
-**Status (2026-10-11): milestones 1 and 2 of 8 pass**: the CPU on the board,
-and the PPU dot by dot. One master-clock timeline with the PPU and APU advanced
-inside each CPU bus cycle, the memory map and open bus, both controller
-clocking models, OAM DMA inside the stalled read, the cartridge connector
+**Status (2026-10-12): milestones 1, 2 and 3 of 8 pass**: the CPU on the
+board, the PPU dot by dot, and the APU, DMA and interrupts. One master-clock
+timeline with the PPU and APU advanced inside each CPU bus cycle, the memory
+map and open bus, both controller clocking models, OAM and DMC DMA inside the
+stalled read (get/put cycles, DMC precedence), the cartridge connector
 (every PPU fetch on it, dot by dot), the iNES/NES 2.0 loader with nes20db, and
 mappers 0, 1, 2 and 3. The PPU renders: background and sprite fetches,
 per-dot sprite evaluation with the overflow bug, sprite-0 hit, the odd-frame
 skip, the VBL/NMI races, the decaying I/O latch; frames come out as 9-bit
-palette values, or PNG through a `.pal` file. The APU keeps time and answers
-its registers but does not yet sound (milestone 3).
+palette values, or PNG through a `.pal` file. The APU sounds: two pulses,
+triangle, noise and DMC, the frame counter and its races, mixed with blargg's
+formula at the CPU rate, box-filtered to the host rate and through a fitted
+analogue stage per console (`--wav`).
 
 - **nestest**: 8,991 of 8,991 lines of `nestest.log` (PC, A, X, Y, P, SP, CYC
   and the PPU columns).
@@ -38,6 +41,17 @@ its registers but does not yet sound (milestone 3).
 - **Mesen2, pixel for pixel** (a detector): identical frames for the 240p test
   suite, demos and scrolling tests; where it differs, PPUSim sides with the
   board or the case is open (docs/validation.md, milestone 2).
+- **38 APU, DMA and interrupt ROMs**, all passing on PyPy and CPython:
+  `apu_test` (8), `apu_reset` (6), blargg's 2005 APU tests (11),
+  `cpu_interrupts_v2` (5), `dmc_dma_during_read4` (5, with the CRCs of the
+  board's synchronization, which PPUSim prints too), `sprdma_and_dmc_dma`
+  (2), `read_joy3/thorough_test`.
+- **Sound against hardware**: the channels' relative levels in
+  `volume_tests` match an NES-001 recording within 0.3 dB for the pulses;
+  the triangle and DMC read about 1 dB loud (open). Against Mesen2 (a
+  detector), `apu_mixer`'s tones agree in timing, pitch and level.
+- **APUSim, the gate-level 2A03**, runs here but is not yet a judge: 3 of 8
+  `apu_test`, for a cause found in its simulation order.
 - Pins: 6502-python `1ae3610` (main after its PRs #5 and #6), `nes-test-roms` `95d8f62`.
   The record, with SHA-256s, cycle and instruction counts, wall times and
   the seeded faults each gate catches, is in
@@ -50,10 +64,12 @@ is the plan.
 ```sh
 python -m pip install -e '.[dev]'
 python scripts/fetch_references.py            # the test ROMs and references
-python -m pytest                              # quick: nestest, board, PPU, loader
-python -m pytest -m slow                      # the CPU and PPU test ROMs
+python -m pytest                              # quick: nestest, board, PPU, APU, loader
+python -m pytest -m slow                      # the CPU, PPU and APU test ROMs
 python scripts/run_test_roms.py --suite cpu   # the same, as a certification table
 python scripts/run_test_roms.py --suite ppu
+python scripts/run_test_roms.py --suite apu
+python -m famicom_python ROM --frames 600 --png out.png --wav out.wav
 ```
 
 ## Scope
@@ -97,6 +113,10 @@ reported and kept; everything else must match its hash.
 | `scripts/build_ppusim.py`, `scripts/ppusim/` | Breaknes PPUSim (gate-level 2C02G) built with our shim, which records its pins |
 | `scripts/ppusim_board.py` | a test ROM on the board with PPUSim in place of the PPU |
 | `scripts/ppusim_compare.py` | the board's PPU and PPUSim fed the same register accesses, compared pin for pin, or a whole frame (`frame ROM N`) |
+| `scripts/mesen_audio.py` | the board's sound against Mesen2's recording, window by window (aligned, gain-fitted, residual) |
+| `scripts/volume_levels.py` | the channels' relative levels in `volume_tests` against its NES-001 recording |
+| `scripts/build_apusim.py`, `scripts/apusim/` | Breaknes APUSim (gate-level 2A03) built with our shim: a stub board around the whole chip |
+| `scripts/apusim_board.py` | a test ROM on APUSim, `$6000` result and per-cycle channel outputs |
 | `scripts/count_mappers.py` | mapper coverage over the local No-Intro sets, read in place ([docs/cartridge.md](docs/cartridge.md)) |
 
 ## Licence

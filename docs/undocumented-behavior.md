@@ -188,7 +188,12 @@ before the board takes a side.
   cleared".
 - **C6. $4017 write delay.** `APU.wiki`: "2 or 3 cycles after the write";
   `APU_Frame_Counter.wiki`: "3 or 4 CPU clock cycles after the write cycle".
-  Probably counted from different origins.
+  Probably counted from different origins. *Settled in milestone 3* (the
+  board counts from the write cycle): 3 cycles when the write lands on an APU
+  put, 4 on a get. The other reading moves the frame IRQ one cycle against
+  OAM DMA's get/put alignment and `cpu_interrupts_v2/4-irq_and_dma` prints
+  "9 +526" where hardware prints "8 +526"; every other APU test passes either
+  way (hardware-corrected).
 - **C7. Frame IRQ flag while inhibited.** The wiki table: set only if inhibit is
   clear. AccuracyCoin J/K: set for two cycles even when inhibited.
 - **C8. Noise LFSR at power.** Wiki and blargg: 1. `CPU_power_up_state.wiki`:
@@ -204,7 +209,10 @@ before the board takes a side.
   "fitted" assumptions, cited, not facts.
 - **C11. DMC DMA cost.** blargg 2010: "4 normally, 3 on a write"; the wiki:
   "load 3, reload 4". The wiki's get/put model reproduces blargg's table:
-  a difference of framing, document the wiki's model.
+  a difference of framing, document the wiki's model. *Board (milestone 3)*:
+  the wiki's model, cycle by cycle (`board.py` "DMA"); `sprdma_and_dmc_dma`
+  (both) and `dmc_dma_during_read4` pass with it. The two DMC bugs (aborted
+  DMA, unexpected reload) are not modelled yet: AccuracyCoin (milestone 4).
 - **C12. Rendering-enable latency.** Wiki: 3–4 dots. Mesen2: 1 dot.
   AccuracyCoin: 2–5 dots depending on the PPU revision and the CPU/PPU
   alignment. *Settled in part on PPUSim (milestone 2)*: greyscale and
@@ -256,7 +264,19 @@ before the board takes a side.
   dots after the board's access point and v increments a dot later, after a
   read too, on either bus model; the override shows the old entry for 3 dots
   and the written one for 1. The board does that (`ppu.DELAYS`), so it now
-  differs from Mesen2 the other way (validation.md, milestone 2).
+  differs from Mesen2 the other way (validation.md, milestone 2). *Milestone
+  3*, accesses one CPU cycle apart: a `$2007` read refills the buffer when its
+  increment lands (4 dots on), and a second read before then returns the
+  buffer and starts nothing; a write takes v as it lands, so after a read one
+  cycle earlier it goes to the incremented address. PPUSim at the board's
+  skew prints blargg's hardware results for both (`double_2007_read`
+  F018C287, `dma_2007_read` 159A7A8F; `read_write_2007` passes), and the
+  board matches.
+- **C24. Does a `$4015` read drive the external bus?** `APU.wiki` l.204–205
+  and the board: no, and open bus keeps its value. APUSim drives the data
+  pads while `$4015` is read (`dma.cpp`: WR = NAND3(/R4015, /DBGRD, RW)), so
+  open bus would take the status. AccuracyCoin's open-bus page should decide
+  it (milestone 4).
 - **C23. PPUSim's `$2002` bit 7.** Breaknes PPUSim `fb7de61` drives it as the
   complement of the VBL flag (`fsm.cpp`, `db_latch.nget()`); its own wiki
   drawing, its author's Verilog and the Visual2C02 netlist all show the true
@@ -274,10 +294,19 @@ before the board takes a side.
    disable (C12), whether the board's CPU-side bus timing (M2 duty, C3; the
    early-write value) is right, every PPU revision but 2C02G, and PPUSim's
    backdrop at the frame's first pixel (0, 0) (validation.md, milestone 2).
-2. **Check APUSim (die-derived) against `apu_test`, `apu_reset`, the 2005 suite
-   and AccuracyCoin pages 13–14** before using it as a per-cycle APU judge. It
-   stores a revision but branches on none: effectively 2A03G only. Its DAC is
-   fitted to one voltage, so it cannot judge the mixer.
+2. **APUSim (die-derived) as a per-cycle APU judge**: *checked in milestone 3,
+   not usable at `fb7de61`*. On a stub board around the whole simulated chip
+   (`scripts/apusim_board.py`) it passes 3 of 8 `apu_test` singles, the three
+   frame-IRQ tests. The length tests fail because bits 0–3 of `$4015` never
+   reach its 6502: the length counters drive them from `sim_SoundGenerators`,
+   which runs only on PHI0 edges and after the core in each step, while the
+   core samples the bus at that edge; bits 4 and 6, updated every half cycle,
+   arrive (shown with a six-instruction program; the counters themselves
+   load). `7-dmc_basics` #19 and `8-dmc_rates` #2 fail undiagnosed: the stub
+   board may be the cause. Worth reporting upstream once checked further, with
+   the user's agreement. It stores a revision but branches on none:
+   effectively 2A03G only. Its DAC is fitted to one voltage, so it cannot
+   judge the mixer.
 3. AV Famicom and NES-101 reset wiring (does the button reset the PPU?).
 4. The $4016 output latch after reset; exactly when OUT0–2 update.
 5. Which SHA/SHS behaviour and which ANE/LXA magic an RP2A03G shows.
@@ -304,3 +333,16 @@ before the board takes a side.
     apart, and the per-event sub-dot phases that would are not pinned by any
     oracle we have. Tests that pass on hardware in only some alignments
     (`oam_stress`, `double_2007_read`, ...) judge the board only in that one.
+16. **Pulse edges against `$4011` writes.** `apu_mixer/dmc.nes` cancels pulse 1
+    with `$4011` writes blargg timed on hardware; the board leaves a
+    1-CPU-cycle step at every pulse edge (2 at the other APU power-on parity,
+    and 2 if pulse timers clock on puts), while the triangle test, whose timer
+    counts CPU cycles, cancels on the cycle. The test does not synchronise to
+    the APU, so hardware may show the step too; Mesen2 cancels about 6 dB
+    deeper. A pulse timer phase or output latency the tests cannot see:
+    APUSim's question, once it works (open item 2).
+17. **Triangle and DMC loudness.** Against the NES-001 recording of
+    `volume_tests`, pulse levels agree within 0.3 dB but the triangle reads
+    0.8 dB loud and the DMC tone 0.4–1.5 dB loud (validation.md, milestone 3).
+    The recording's analogue path is uncharacterised, so this is evidence, not
+    a verdict on blargg's formula.
