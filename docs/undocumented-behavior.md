@@ -316,6 +316,28 @@ before the board takes a side.
   drawing, its author's Verilog and the Visual2C02 netlist all show the true
   flag. Reported as emu-russia/breaknes#529 (with the netlist trace);
   `scripts/ppusim_board.py` corrects it until a fixed pin.
+- **C27. The PPU address bus at dot 0.** `PPU_rendering.wiki` "Cycle 0": the
+  idle dot's address "appears to be" the CHR address of dot 5's low pattern
+  fetch, "possibly calculated during the two unused NT fetches"; the board
+  put nothing on the bus there. With BG at `$1000` that matters to an MMC3:
+  A12 is otherwise low from the dot-337 nametable fetch to dot 5, 9 dots,
+  exactly three M2 falls, so every line clocked twice and blargg's
+  `4-scanline_timing` #12 failed. *Settled on PPUSim* (`fb7de61`, skew 3,
+  rendering with `$2000=$10`): after a rendering line, dot 0 carries the
+  pattern address (A12 high at (N, 0)); after the last vblank line it does
+  not (A12 stays low to (261, 5)); and on odd frames, whose skip takes dot
+  340, (0, 0) has no address either, so A12 is low for 8 dots and the MMC3
+  may count twice: the wiki's "pre-render scanline will decrement the counter
+  twice every other vertical redraw". *Board*: the address phase at dot 0 only
+  when dot 340's nametable fetch was the previous dot.
+- **C28. rainwarrior's expected results vs his ROMs.** `3_test.txt` says
+  "PRG RAM: NO" and `34_test.txt` "CHR RAM: NO" for 34.1, but the ROMs in the
+  same archives print YES on any board: each loads the result, then
+  `PPU_LATCH_AT` loads A with the screen address's low byte (`$FA`, `$1A`)
+  before `yes_no` tests A. `34_test`'s "BNROM BUS CONFLICTS" line is printed
+  the same way, so BNROM's conflicts have no judge (a seeded fault removing
+  them passed every one). The .txt cannot have come from these builds (or
+  the source changed after); the harness claims only the other values.
 
 ## Open items
 
@@ -359,8 +381,9 @@ before the board takes a side.
     fetcher; download by hand if wanted, and its licence is unstated. The
     licence of the Visual 2C02/2A03 netlist data is also unstated.
 13. The letterless 2A03's noise period table in text (Breaks has it as an image).
-14. MMC6 IRQ behaviour (C18), MMC3 Sharp vs NEC per licensed game (nes20db
-    assigns 4.0 to all), MMC2 latch timing (no test ROM), MMC5's in-frame exit
+14. MMC6 IRQ behaviour (C18; the board gives MMC6 Sharp's, as the NES 2.0
+    page says, and runs blargg's `6-MMC6` on 4.4), MC-ACC's prescaler phase,
+    MMC3 Sharp vs NEC per licensed game (nes20db assigns 4.0 to all), MMC2 latch timing (no test ROM), MMC5's in-frame exit
     on $2001 and its $4014 snooping ("believed but not tested").
 15. The other three CPU/PPU synchronizations. The board models blargg's third
     only (timing.md): accesses at whole-dot positions cannot tell the four

@@ -7,7 +7,8 @@ Read in this order.
 | [start-here.md](start-here.md) | The Famicom and NES models as data, clocks, the CPU memory map, open bus, controllers, power-up; the PPU programming model, memory map and output format; the APU registers and mixer; expansion audio; a suggested module shape |
 | [timing.md](timing.md) | The master-clock timeline and CPU/PPU alignment; interrupt polling (hardware vs 6502-python today); OAM and DMC DMA cycle diagrams and the DMA-inside-`read_byte` design; the PPU dot schedule, frame events and the $2002/NMI races; the APU frame counter and tables |
 | [cartridge.md](cartridge.md) | Why mappers live here; the connector and the proposed signal protocol; iNES/NES 2.0; board identification by nes20db; mapper coverage measured over the local No-Intro sets; per-mapper table and judges |
-| [undocumented-behavior.md](undocumented-behavior.md) | 2A03 vs 6502, PPU and APU quirks, revision tables, expansion-audio mix levels, contradictions C1–C21, open items |
+| [undocumented-behavior.md](undocumented-behavior.md) | 2A03 vs 6502, PPU and APU quirks, revision tables, expansion-audio mix levels, contradictions C1–C28, open items |
+| [claims.md](claims.md) | Per mapper and board variant: which judge passed, its tier, and what is not claimed (milestone 5) |
 | [validation.md](validation.md) | Every oracle by tier with pins and licences; blargg's and AccuracyCoin's result protocols; die-level models; emulator detectors; Mesen2 built and driven headless; what is not available; local romsets |
 | [mame-oracle.md](mame-oracle.md) | The verified MAME 0.285 trace recipe, its measured output (nestest matches on all 8,991 lines) and fifteen traps |
 | [handoff-brief.md](handoff-brief.md) | The task for the session that builds the board: decisions, the 6502-python pull requests, eight milestones with acceptance tests, constraints, size and speed |
