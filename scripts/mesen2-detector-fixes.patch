@@ -1,0 +1,78 @@
+diff --git a/Core/NES/APU/DeltaModulationChannel.cpp b/Core/NES/APU/DeltaModulationChannel.cpp
+index 27cf6f6..3337726 100644
+--- a/Core/NES/APU/DeltaModulationChannel.cpp
++++ b/Core/NES/APU/DeltaModulationChannel.cpp
+@@ -195,7 +195,15 @@ void DeltaModulationChannel::WriteRam(uint16_t addr, uint8_t value)
+ 
+ 			//"The rate determines for how many CPU cycles happen between changes in the output level during automatic delta-encoded sample playback."
+ 			//Because BaseApuChannel does not decrement when setting _timer, we need to actually set the value to 1 less than the lookup table
+-			_timer.SetPeriod((NesApu::GetApuRegion(_console) == ConsoleRegion::Ntsc ? _dmcPeriodLookupTableNtsc : _dmcPeriodLookupTablePal)[value & 0x0F] - 1);
++			{
++				//famicom-python patch: a rate written in the cycle the timer reloads is the one
++				//it reloads with (AccuracyCoin "DMC Reload Timing", its hardware answer key)
++				bool justReloaded = _timer.GetTimer() == _timer.GetPeriod();
++				_timer.SetPeriod((NesApu::GetApuRegion(_console) == ConsoleRegion::Ntsc ? _dmcPeriodLookupTableNtsc : _dmcPeriodLookupTablePal)[value & 0x0F] - 1);
++				if(justReloaded) {
++					_timer.SetTimer(_timer.GetPeriod());
++				}
++			}
+ 
+ 			if(!_irqEnabled) {
+ 				_console->GetCpu()->ClearIrqSource(IRQSource::DMC);
+diff --git a/Core/NES/NesCpu.h b/Core/NES/NesCpu.h
+index 6c0da75..061b455 100644
+--- a/Core/NES/NesCpu.h
++++ b/Core/NES/NesCpu.h
+@@ -437,10 +437,15 @@ private:
+ 			if(_runIrq && !_prevRunIrq) {
+ 				_runIrq = false;
+ 			}
++			//famicom-python patch: the same for an NMI edge seen in the operand cycle
++			//(perfect6502: a taken same-page branch delays NMI as it does IRQ)
++			bool holdNmi = _needNmi && !_prevNeedNmi;
+ 			DummyRead();
+ 
+ 			if(CheckPageCrossed(PC(), offset)) {
+ 				DummyRead();
++			} else if(holdNmi) {
++				_prevNeedNmi = false;
+ 			}
+ 
+ 			SetPC(PC() + offset);
+diff --git a/Core/NES/NesMemoryManager.cpp b/Core/NES/NesMemoryManager.cpp
+index be51ad7..2086fe9 100644
+--- a/Core/NES/NesMemoryManager.cpp
++++ b/Core/NES/NesMemoryManager.cpp
+@@ -130,7 +130,11 @@ uint8_t NesMemoryManager::Read(uint16_t addr, MemoryOperationType operationType)
+ 	}
+ 	_emu->ProcessMemoryRead<CpuType::Nes>(addr, value, operationType);
+ 
+-	_openBusHandler.SetOpenBus(value, addr == 0x4015);
++	if(operationType == MemoryOperationType::DmaRead) {
++		_openBusHandler.SetExternalOpenBus(value);
++	} else {
++		_openBusHandler.SetOpenBus(value, addr == 0x4015);
++	}
+ 
+ 	return value;
+ }
+diff --git a/Core/NES/OpenBusHandler.h b/Core/NES/OpenBusHandler.h
+index e016897..d3cf38e 100644
+--- a/Core/NES/OpenBusHandler.h
++++ b/Core/NES/OpenBusHandler.h
+@@ -31,7 +31,14 @@ public:
+ 
+ 	__forceinline uint8_t GetInternalOpenBus()
+ 	{
+-		return _externalOpenBus;
++		//famicom-python patch: the internal bus, not the external one (AccuracyCoin "Internal Data Bus")
++		return _internalOpenBus;
++	}
++
++	__forceinline void SetExternalOpenBus(uint8_t value)
++	{
++		//famicom-python patch: a DMA read drives the external bus only
++		_externalOpenBus = value;
+ 	}
+ 
+ 	__forceinline void SetOpenBus(uint8_t value, bool setInternalOnly)

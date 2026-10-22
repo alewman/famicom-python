@@ -338,6 +338,25 @@ before the board takes a side.
   the same way, so BNROM's conflicts have no judge (a seeded fault removing
   them passed every one). The .txt cannot have come from these builds (or
   the source changed after); the harness claims only the other values.
+- **C29. Does a taken branch delay an NMI, or only an IRQ?**
+  `CPU_interrupts.wiki` says interrupts: a taken same-page branch "ignores
+  IRQ/NMI during its last clock". Mesen2 (`b9fa69d`, `NesCpu.h`
+  `BranchRelative`) says NMI too in its comment but delays only the IRQ in its
+  code. *Settled on perfect6502* (`scripts/perfect6502_nmi_branch.c`): with
+  /NMI falling 1-2 half-cycles after the opcode fetch, a JMP takes it after
+  itself and a taken BEQ only after the next instruction. The board
+  (6502-python's branch poll points) delays both. Found in lockstep: Mega Man
+  2, Kirby's Adventure and Battletoads wait for VBL in `LDA; BEQ`/`BPL` loops.
+- **C30. An interrupt raised while DMA halts the CPU.** No document says. The
+  board ran DMA inside the read callback, so 6502-python saw a request raised
+  during the stall only after the read, as if late. *Settled on perfect6502*
+  with RDY held low for four cycles (`scripts/perfect6502_nmi_dma.c`): the
+  halted chip repeats the read and keeps sampling, so an NMI falling during
+  the halt is polled at the end of the read it stretched, whichever cycle: a
+  JMP's penultimate or last read, a taken BEQ's operand or next-opcode read.
+  *Board*: `Board.read_byte` calls 6502-python's `note_stall()` after a DMA
+  (its PR #7). Found in lockstep: Kirby's Adventure, VBL's NMI during a DMC
+  DMA inside its wait-loop `BEQ`.
 
 ## Open items
 

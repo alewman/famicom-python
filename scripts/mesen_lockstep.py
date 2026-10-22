@@ -18,11 +18,15 @@ entries (6502-python steps them separately) are dropped: a step that pushed
 three bytes, set I and landed on the NMI or IRQ vector's target without
 executing BRK. P is compared without bits 5 and 4 (not flags).
 
-The board runs with Mesen2's power-on (``MACHINE``); Mesen2 runs with
-``configure_for_comparison`` (RAM zeroed, the first frame's
-PPU writes ignored) and its trace goes to ``--trace-dir`` (gitignored
-``tests/mame_traces/lockstep`` by default; about 80 bytes an instruction,
-1.7 GB a minute).
+Mesen2 must be built with ``scripts/mesen2-detector-fixes.patch`` applied,
+where a higher tier shows it wrong: it delays only IRQs after a taken same-
+page branch, and perfect6502 shows NMIs wait too (C29); and it ignores a DMC
+rate written in the timer's reload cycle, which AccuracyCoin's hardware answer
+key applies (validation.md, milestone 6). The board runs with Mesen2's power-
+on (``MACHINE``); Mesen2 runs with ``configure_for_comparison`` (RAM zeroed,
+the first frame's PPU writes ignored) and its trace goes to ``--trace-dir``
+(gitignored ``tests/mame_traces/lockstep`` by default; about 80 bytes an
+instruction, 1.7 GB a minute).
 """
 
 from __future__ import annotations
@@ -30,6 +34,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import tempfile
 import time
 import zipfile
 from dataclasses import replace
@@ -41,7 +46,8 @@ from famicom_python.machine import NES_001
 from famicom_python.system import System
 
 MESEN_LINE = re.compile(
-    rb"^[0-9A-F]{4} +([0-9A-F]{4}) A:([0-9A-F]{2}) X:([0-9A-F]{2}) Y:([0-9A-F]{2}) S:([0-9A-F]{2}) "
+    rb"^([0-9A-F]{4}) +[0-9A-F]{2,4} +"
+    rb"A:([0-9A-F]{2}) X:([0-9A-F]{2}) Y:([0-9A-F]{2}) S:([0-9A-F]{2}) "
     rb"P:([0-9A-F]{2}) CYC:(\d+) SL:(-?\d+) DOT:(\d+) FR:(\d+)"
 )
 P_MASK = 0xCF
@@ -52,7 +58,13 @@ P_MASK = 0xCF
 # the PPU runs 1 tick behind it). Found by sweeping ppu_dot over a trace: only
 # 4 stays in lockstep. The board passes every PPU and APU judge at 4, with the
 # same synchronization CRCs (validation.md, milestone 6).
-MACHINE = replace(NES_001, power_on=replace(NES_001.power_on, ppustatus=0x00, ppu_dot=4))
+# The DMC's rate timer starts at a full period (DeltaModulationChannel::Reset:
+# 427 CPU cycles, the board's 213 APU cycles): the only start, of 0 and
+# 211-214 on either APU parity, that keeps Kirby's Adventure in step past its
+# first sample.
+MACHINE = replace(
+    NES_001, power_on=replace(NES_001.power_on, ppustatus=0x00, ppu_dot=4, dmc_timer=213)
+)
 DOTS, LINES = 341, 262
 
 STOP_AFTER_FRAMES = """
@@ -65,7 +77,11 @@ end, emu.eventType.endFrame)
 
 
 def mesen_rows(path: Path):
-    """(pc, a, x, y, s, p, cycles, line, dot, frame) for each line of Mesen2's trace."""
+    """(pc, a, x, y, s, p, cycles, line, dot, frame) for each line of Mesen2's trace.
+
+    Mesen2's ``[PC,4h]`` drops leading zeros in zero page ("0029  29   A:"): its
+    own address prefix carries all four digits, so that one is read.
+    """
     with path.open("rb") as stream:
         for text in stream:
             m = MESEN_LINE.match(text)
@@ -185,7 +201,9 @@ def main() -> int:
             mesen_path(args.rom),
             lua=lua,
             seconds=3600,
-            home=args.trace_dir / "mesen-home",
+            # A fresh home each run: Mesen2 keeps battery saves there, and a
+            # save from an earlier run would be the cartridge's RAM at power.
+            home=Path(tempfile.mkdtemp(prefix="mesen-home-", dir=args.trace_dir)),
             trace=trace,
             for_comparison=True,
         )

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from conftest import nrom_system
+from conftest import nrom_image, nrom_system
 
 from famicom_python.joypad import RIGHT, START, A
 from famicom_python.machine import FAMICOM, NES_001, PowerOn
@@ -139,3 +139,20 @@ def test_frame_irq_arrives_about_29830_cycles_after_4017() -> None:
     system.board.read_byte(0x0000)
     system.board.read_byte(0x0000)
     assert not system.board.read_byte(0x4015) & 0x40
+
+
+def test_power_on_fields_that_no_source_pins_are_settable() -> None:
+    # PPUSTATUS bits 7-5, the PPU's dot as the CPU starts, the DMC rate timer:
+    # left open by hardware; the defaults are PPUSim's and the board's own,
+    # and scripts/mesen_lockstep.py sets Mesen2's (0, 4, 213).
+    from famicom_python.cartridge import load
+    from famicom_python.system import System
+
+    def powered(machine):
+        return System(load(nrom_image(b""), use_database=False).cartridge, machine).board
+
+    default = powered(NES_001)
+    assert (default.ppu.status & 0xE0, default.ppu.dot, default.apu.dmc.timer) == (0x20, 0, 0)
+    power = PowerOn(ppustatus=0x00, ppu_dot=4, dmc_timer=213)
+    board = powered(dataclasses.replace(NES_001, power_on=power))
+    assert (board.ppu.status & 0xE0, board.ppu.dot, board.apu.dmc.timer) == (0x00, 4, 213)

@@ -65,6 +65,10 @@ class PowerOn:
     ``ppu_dot`` is the PPU's dot on line 0 as the CPU's first cycle begins:
     which CPU cycle the PPU's frame starts in is not pinned by any source here
     (0 by default; Mesen2 starts its PPU one CPU cycle, 3 dots, ahead).
+    ``dmc_timer`` is the DMC's rate timer at power, in APU cycles: the DMC's
+    output cycles run from power-on, silent, so it sets when the first fetch
+    after an enable comes; no source pins it (0 by default: it reloads on the
+    first APU cycle; Mesen2 starts it at a full period).
     """
 
     apu_put_first: bool = False
@@ -78,6 +82,7 @@ class PowerOn:
     )
     ppustatus: int = 0x20
     ppu_dot: int = 0
+    dmc_timer: int = 0
 
 
 @dataclass(frozen=True)

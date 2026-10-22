@@ -39,6 +39,7 @@ class TraceLoggerOptions(ctypes.Structure):
 # touches lie. run_mesen checks two known defaults before trusting them.
 NES_CONFIG_SIZE = 14184
 NES_CONFIG_SPRITES_ENABLED = 11932  # bool, default true
+NES_CONFIG_OAM_ROW_CORRUPTION = 11982  # bool: EnablePpuOamRowCorruption, default false
 NES_CONFIG_RESTRICT_FIRST_FRAME = 11989  # bool: RestrictPpuAccessOnFirstFrame
 NES_CONFIG_RAM_POWER_ON = 11996  # RamState: 0 random, 1 zeros, 2 ones
 NES_CONFIG_INPUT_SCANLINE = 12016  # int32, default 241
@@ -81,6 +82,10 @@ def configure_for_comparison(m: ctypes.CDLL) -> None:
       line, as hardware does (PPU_power_up_state.wiki); Mesen2 does not by default.
     - Work RAM powers on as zeros, the board's default ``PowerOn.ram_fill``;
       Mesen2's default is random.
+    - OAM row corruption on (rendering re-enabled with the secondary OAM
+      address frozen), which the board always models (C26, AccuracyCoin's
+      hardware answer key); off by default in Mesen2. Found by lockstep:
+      The Legend of Zelda turns rendering off mid-frame on its title screen.
     """
     config = m.GetNesConfig()
     raw = config.raw
@@ -94,6 +99,7 @@ def configure_for_comparison(m: ctypes.CDLL) -> None:
         raise SystemExit("NesConfig layout does not match Mesen2 2.1.1; re-measure the offsets")
     raw[NES_CONFIG_RESTRICT_FIRST_FRAME] = 1
     raw[NES_CONFIG_RAM_POWER_ON] = 1
+    raw[NES_CONFIG_OAM_ROW_CORRUPTION] = 1
     raw[NES_CONFIG_FULL_COLOR_PALETTE] = 1
     for i in range(512):
         at = NES_CONFIG_USER_PALETTE + 4 * i
