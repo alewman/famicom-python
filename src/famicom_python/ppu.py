@@ -98,6 +98,7 @@ class PPU:
         self.time = 0
         self.line = 0
         self.dot = 0
+        self._nt_340_time = -1  # when the last dot-340 nametable fetch happened
         self.frame = 0
         self._watch = cartridge.watches_ppu_address
         # The I/O latch's bits decay to 0 when not driven for this long
@@ -292,6 +293,13 @@ class PPU:
         visible = line < HEIGHT
         if dot <= WIDTH + 1:
             if dot == 0:
+                # Idle, but after the dot-340 fetch the bus already carries the
+                # CHR address of dot 5's pattern fetch (PPU_rendering.wiki
+                # "Cycle 0"). Settled on PPUSim: not after a vblank line, nor
+                # when the odd-frame skip took dot 340, so with BG at $1000 an
+                # MMC3 sees A12 low for 8 dots there and may count twice.
+                if self._watch and self.time - self._nt_340_time == self.dot_ticks:
+                    self._ale(self._bg_pattern(self.v))
                 return
             if dot >= 2:
                 if visible:
@@ -333,6 +341,8 @@ class PPU:
             address = 0x2000 | (self.v & 0x0FFF)
             if not dot & 1:
                 self.nt_latch = self._fetch(address)
+                if dot == 340:
+                    self._nt_340_time = self.time
             elif self._watch:
                 self._ale(address)
 

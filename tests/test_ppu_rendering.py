@@ -153,8 +153,12 @@ def test_every_pattern_fetch_reaches_the_cartridge_and_a12_rises_once_per_line()
     _one_frame_of_dots(ppu)
     # 34 tiles x 2 planes + 8 sprite slots x 2 planes on each of 241 lines.
     assert len(reads) == 241 * (34 * 2 + 8 * 2)
-    # Four addresses per tile and per sprite slot, plus 337 and 339.
-    assert len(addresses) == 241 * (34 * 4 + 8 * 4 + 2)
+    # Four addresses per tile and per sprite slot, plus 337 and 339; and dot
+    # 0's after a rendering line (C27): lines 1-239 of the frame (the window
+    # starts after line 0's dot 0), not the next line 0, as the frame was odd
+    # and its skip took the dot-340 fetch.
+    assert (ppu.frame - 1) & 1
+    assert len(addresses) == 241 * (34 * 4 + 8 * 4 + 2) + 239
     a12 = [address >> 12 & 1 for address in addresses]
     rises = [i for i, (a, b) in enumerate(pairwise(a12), 1) if b and not a]
     # A12 rises at each sprite slot's pattern fetch (8 per line); only the
