@@ -50,6 +50,8 @@ class Board:
         self.ram = bytearray([power.ram_fill]) * 0x800
         self.ppu = PPU(timing, cartridge, machine.ppu_latch_decay_seconds)
         self.ppu.palette[:] = power.palette
+        self.ppu.status = power.ppustatus & 0xE0
+        self.ppu.dot = power.ppu_dot
         self.apu = APU(power.apu_put_first)
         self.apu.set_cpu_rate(timing.master_hz / timing.cpu_divider)
         self.analogue = AnalogueStage(

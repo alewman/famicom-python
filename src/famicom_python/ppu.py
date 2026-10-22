@@ -121,7 +121,7 @@ class PPU:
     def power(self) -> None:
         # PPUSTATUS at power is "+0+x xxxx", + often set (PPU_power_up_state.wiki);
         # PPUSim powers on with the overflow bit set and VBL clear, and so does
-        # the board, so the two run in lockstep from the first $2002 read.
+        # the board by default (PowerOn.ppustatus, which the board applies).
         self.status = OVERFLOW
         self.oam_addr = 0
         self.v = 0

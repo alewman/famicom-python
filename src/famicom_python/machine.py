@@ -59,7 +59,12 @@ class PowerOn:
     (PPU_power_up_state.wiki), "unique and consistent" per console
     (AccuracyCoin); the default is the one console's table that was published,
     blargg's (``blargg_ppu_tests_2005.09.15b/source/power_up_palette.asm``,
-    hardware-captured, "probably unique to my NES").
+    hardware-captured, "probably unique to my NES"). ``ppustatus`` is PPUSTATUS's
+    bits 7-5 at power, "+0+x xxxx" with + "often set" (PPU_power_up_state.wiki):
+    the overflow bit set and VBL clear, as PPUSim powers on, by default.
+    ``ppu_dot`` is the PPU's dot on line 0 as the CPU's first cycle begins:
+    which CPU cycle the PPU's frame starts in is not pinned by any source here
+    (0 by default; Mesen2 starts its PPU one CPU cycle, 3 dots, ahead).
     """
 
     apu_put_first: bool = False
@@ -71,6 +76,8 @@ class PowerOn:
         "09 01 00 01 00 02 02 0D 08 10 08 24 00 00 04 2C"
         "09 01 34 03 00 04 00 14 08 3A 00 02 00 20 2C 08"
     )
+    ppustatus: int = 0x20
+    ppu_dot: int = 0
 
 
 @dataclass(frozen=True)
