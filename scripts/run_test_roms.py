@@ -17,11 +17,20 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-from famicom_python.testrom import APU_ROMS, CPU_ROMS, PPU_ROMS, RomCase, RomOutcome, run_case
+from famicom_python.testrom import (
+    APU_ROMS,
+    CPU_ROMS,
+    MAPPER_ROMS,
+    PPU_ROMS,
+    RomCase,
+    RomOutcome,
+    rom_bytes,
+    run_case,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 ROMS = ROOT / "tests" / "test_roms" / "nes-test-roms"
-SUITES = {"cpu": CPU_ROMS, "ppu": PPU_ROMS, "apu": APU_ROMS}
+SUITES = {"cpu": CPU_ROMS, "ppu": PPU_ROMS, "apu": APU_ROMS, "mappers": MAPPER_ROMS}
 
 
 def _run(case: RomCase) -> tuple[RomOutcome, float]:
@@ -46,11 +55,11 @@ def main() -> int:
     with ProcessPoolExecutor(max_workers=min(args.jobs, 16)) as pool:
         for outcome, wall in pool.map(_run, cases):
             case = outcome.case
-            digest = hashlib.sha256((ROMS / case.path).read_bytes()).hexdigest()[:12]
+            digest = hashlib.sha256(rom_bytes(ROMS, case.path)).hexdigest()[:12]
             verdict = {True: "pass", False: "FAIL", None: "no verdict"}[outcome.passed]
             failures += outcome.passed is not True
             print(
-                f"| `{case.path}` | `{digest}` | {verdict} | {outcome.cycles:,} | "
+                f"| `{case.label}` | `{digest}` | {verdict} | {outcome.cycles:,} | "
                 f"{outcome.instructions:,} | {wall:.1f} |"
             )
             if outcome.passed is not True:

@@ -15,7 +15,7 @@ from pathlib import Path
 from sixfiveohtwo import RP2A03
 
 from .board import Board
-from .cartridge import Loaded, load
+from .cartridge import BoardInfo, Loaded, load
 from .cartridge.connector import Cartridge
 from .machine import NES_001, Machine
 
@@ -41,8 +41,15 @@ class System:
         self.power()
 
     @classmethod
-    def from_rom(cls, rom: str | Path | bytes, machine: Machine = NES_001) -> System:
-        loaded = load(rom, cpu_cycle_ticks=machine.timing.cpu_divider)
+    def from_rom(
+        cls,
+        rom: str | Path | bytes,
+        machine: Machine = NES_001,
+        *,
+        override: BoardInfo | None = None,
+    ) -> System:
+        """Load ``rom`` (identified as :func:`.cartridge.load` does, or as ``override``)."""
+        loaded = load(rom, cpu_cycle_ticks=machine.timing.cpu_divider, override=override)
         system = cls(loaded.cartridge, machine)
         system.loaded = loaded
         return system

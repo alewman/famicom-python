@@ -17,8 +17,12 @@ side effect.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import subprocess
+import zipfile
+from dataclasses import dataclass, replace
+from pathlib import Path
 
+from .cartridge import load
 from .system import System
 
 SIGNATURE = bytes((0xDE, 0xB0, 0x61))
@@ -52,6 +56,64 @@ def screen_text(system: System, nametable: int = 0) -> str:
         tiles = (ppu.bus_read(base + row * 32 + column) for column in range(32))
         rows.append("".join(chr(t) if 0x20 <= t < 0x7F else " " for t in tiles).rstrip())
     return "\n".join(rows).strip("\n")
+
+
+def holy_mapperel_text(system: System) -> str:
+    """Holy Mapperel's screen: its font puts ' '-'?' at their ASCII codes and
+    letters at ``code & $3F`` (``src/main.s``: ``'A' & $3F``)."""
+    ppu = system.board.ppu
+    rows = []
+    for row in range(30):
+        tiles = (ppu.bus_read(0x2000 + row * 32 + column) for column in range(32))
+        rows.append(
+            "".join(
+                chr(t) if 0x20 <= t < 0x40 else chr(t | 0x40) if 0 < t < 0x20 else " "
+                for t in tiles
+            ).rstrip()
+        )
+    return "\n".join(rows).strip("\n")
+
+
+def _nametable_text(system: System, tile_char) -> str:
+    ppu = system.board.ppu
+    rows = []
+    for row in range(30):
+        tiles = (ppu.bus_read(0x2000 + row * 32 + column) for column in range(32))
+        rows.append("".join(tile_char(t) for t in tiles).rstrip())
+    return "\n".join(rows).strip("\n")
+
+
+def _rainwarrior_char(t: int) -> str:
+    # ASCII, with the hex digits of printed values at $A0-$AF.
+    if 0x20 <= t < 0x7F:
+        return chr(t)
+    return "0123456789ABCDEF"[t & 15] if 0xA0 <= t < 0xB0 else " "
+
+
+def _tall_char(t: int) -> str:
+    # tepples's 8x16 font: the top half of character c is tile 2c, the bottom 2c+1.
+    return chr(t >> 1) if t and not t & 1 and 0x20 <= t >> 1 < 0x7F else " "
+
+
+def _mmc1atest_char(t: int) -> str:
+    # Digits at $10-$1F; a byte's two digits share tiles $20+high and $30+low.
+    if 0x10 <= t < 0x40:
+        return "0123456789ABCDEF"[t & 15]
+    return ":" if t == 0x06 else " "
+
+
+#: Screen decoders by font, for the "values" protocol.
+FONTS = {
+    "ascii": lambda t: chr(t) if 0x20 <= t < 0x7F else " ",
+    "rainwarrior": _rainwarrior_char,
+    "tall": _tall_char,
+    "mmc1atest": _mmc1atest_char,
+}
+
+
+def font_text(system: System, font: str) -> str:
+    """Nametable 0 as text in one of the test ROMs' fonts (:data:`FONTS`)."""
+    return _nametable_text(system, FONTS[font])
 
 
 @dataclass
@@ -127,12 +189,23 @@ def run_screen(
 class RomCase:
     """One test ROM, how it reports, and how long it may take (emulated seconds)."""
 
-    path: str  # under tests/test_roms/nes-test-roms
-    protocol: str  # "6000" or "screen"
+    path: str  # under tests/test_roms/nes-test-roms; "x.7z/member" reads inside an archive
+    protocol: str  # "6000", "screen" or "holy" (Holy Mapperel)
     seconds: float = 60.0
     buttons: int = 0  # held on pad 1 from power-on
     passed: str = "Passed"
     failed: str = "Failed"
+    # BoardInfo fields to run with, changed from the identified board: the
+    # other submapper of a chip, or RAM a test ROM's board lacks.
+    board: tuple[tuple[str, int], ...] = ()
+    # "values": blocks of whole lines that must be on screen (in ``font``) after ``seconds``.
+    expect: tuple[str, ...] = ()
+    font: str = "ascii"
+
+    @property
+    def label(self) -> str:
+        changes = ", ".join(f"{field} {value}" for field, value in self.board)
+        return self.path + (f" ({changes})" if changes else "")
 
 
 #: Milestone 1's judges (docs/handoff-brief.md): the CPU on the board.
@@ -295,6 +368,192 @@ APU_ROMS = (
 )
 
 
+def _mmc3(path: str, submapper: int) -> RomCase:
+    return RomCase(path, "6000", 30, board=(("submapper", submapper),))
+
+
+HOLY_MAPPEREL = "../holy-mapperel/holy-mapperel-bin-0.02.7z/testroms"
+
+
+def _values(path: str, font: str, *expect: str, board: tuple[tuple[str, int], ...] = ()) -> RomCase:
+    return RomCase(f"../nesdev-forum/{path}", "values", 5, board=board, expect=expect, font=font)
+
+
+def _rainwarrior(mapper: int, submapper: int, *lines: str) -> RomCase:
+    """rainwarrior's bus-conflict test: the values of its .txt (forum posts, pinned)."""
+    return _values(f"{mapper}_test_src.zip/{mapper}_test_{submapper}.nes", "rainwarrior", *lines)
+
+
+def _bus_conflict_test(mapper: int, submapper: int, count: str, high: str) -> RomCase:
+    """``{mapper}_test_{submapper}``: the bank count, and for submappers 1 and 2 the
+    four "high VS low" rows (the AND of the two with conflicts, else high)."""
+    label = "CHR BANKS" if mapper == 3 else "PRG BANKS"
+    lines = [f"{label}: {count}"]
+    if submapper:
+        conflicts = submapper == 2
+        for a, b in ((high, "00"), ("00", "FF"), (high, "01"), (high, "02")):
+            value = int(a, 16) & int(b, 16) if conflicts else int(a, 16)
+            lines.append(f"{a} VS {b}: {value:02X}")
+        lines.append(f"BUS CONFLICTS: {'AND' if conflicts else 'NONE'}")
+        lines.append(f"SUBMAPPER DETECTED: {submapper:02X}")
+    return _rainwarrior(mapper, submapper, *lines)
+
+
+#: rainwarrior's 2/3/7/34 tests against their .txt files. Submapper 0 is
+#: "(unknown)" there: only the bank count is claimed (the board treats 0 as
+#: 1, docs/cartridge.md). "PRG RAM" in 3_test and "CHR RAM"/"PRG RAM" in
+#: 34_test always print YES on any board: the source loads the result, then
+#: PPU_LATCH_AT overwrites A with the screen address before yes/no is chosen
+#: (docs/validation.md, milestone 5), so the .txt's NO cannot come from these
+#: builds and is not claimed.
+_RAINWARRIOR = (
+    *(
+        _bus_conflict_test(mapper, submapper, count, high)
+        for mapper, count, high in ((2, "10", "0F"), (3, "04", "03"), (7, "08", "07"))
+        for submapper in (0, 1, 2)
+    ),
+    _rainwarrior(
+        34,
+        1,
+        "NINA-001   PRG BANKS: 02",
+        "NINA-001   CHR BANKS: 10",
+        "BNROM VALID: NO",
+        "NINA-001 VALID: YES",
+        "SUBMAPPER DETECTED: 01",
+    ),
+    _rainwarrior(
+        34,
+        2,
+        "BNROM      PRG BANKS: 08",
+        "NINA-001   CHR BANKS: 01",
+        "BNROM VALID: YES",
+        "NINA-001 VALID: NO",
+        "SUBMAPPER DETECTED: 02",
+    ),
+)
+
+
+def _mmc1atest_table(mmc1a: bool) -> tuple[str, ...]:
+    """``mmc1atest``'s README: the banks at $8000/$C000 for $8000 = 08 and 0C, by $E000.
+
+    MMC1A's rows 10 and 18 differ (D4 passes D3 to PRG A17); on MMC1B they
+    repeat rows 00 and 08.
+    """
+    first = ("0001020304050607", "08090A0B0C0D0E0F")
+    last = ("0F1F2F3F4F5F6F7F", "8F9FAFBFCFDFEFFF")
+    first_d4 = ("0001020304050607", "88898A8B8C8D8E8F") if mmc1a else first
+    last_d4 = ("0717273747576777", "8F9FAFBFCFDFEFFF") if mmc1a else last
+
+    def block(head: str, low: tuple[str, str], high: tuple[str, str]) -> str:
+        rows = (f"00 {low[0]}", f"08 {low[1]}", f"10 {high[0]}", f"18 {high[1]}")
+        return "\n".join((head, *rows))
+
+    return block("80:08", first, first_d4), block("80:0C", last, last_d4)
+
+
+def _holy(name: str, *board: tuple[str, int]) -> RomCase:
+    return RomCase(f"{HOLY_MAPPEREL}/{name}.nes", "holy", 15, board=board)
+
+
+#: Milestone 5's blargg judges (docs/handoff-brief.md): the MMC3 and its IRQ.
+#: ``mmc3_test_2`` 1-4 must pass on both IRQ behaviours (Sharp 4.0, NEC 4.4),
+#: 5 on Sharp and 6 on NEC. ``mmc3_test``'s 6-MMC6 expects NEC's IRQ although
+#: MMC6 is Sharp's (contradiction C18): it runs on 4.4 and the claim is NEC's.
+#: ``mmc3_irq_tests`` (the 2005 shell) report on screen; its 5 is NEC's
+#: ("rev A") and 6 Sharp's ("rev B").
+MAPPER_ROMS = (
+    *(
+        _mmc3(f"mmc3_test_2/rom_singles/{name}.nes", submapper)
+        for submapper in (0, 4)
+        for name in ("1-clocking", "2-details", "3-A12_clocking", "4-scanline_timing")
+    ),
+    _mmc3("mmc3_test_2/rom_singles/5-MMC3.nes", 0),
+    _mmc3("mmc3_test_2/rom_singles/6-MMC3_alt.nes", 4),
+    *(
+        _mmc3(f"mmc3_test/{name}.nes", 0)
+        for name in ("1-clocking", "2-details", "3-A12_clocking", "4-scanline_timing", "5-MMC3")
+    ),
+    _mmc3("mmc3_test/6-MMC6.nes", 4),
+    *(
+        RomCase(
+            f"mmc3_irq_tests/{name}.nes",
+            "screen",
+            20,
+            0,
+            "PASSED",
+            "FAILED",
+            (("submapper", submapper),),
+        )
+        for name, submapper in (
+            ("1.Clocking", 0),
+            ("2.Details", 0),
+            ("3.A12_clocking", 0),
+            ("4.Scanline_timing", 0),
+            ("5.MMC3_rev_A", 4),
+            ("6.MMC3_rev_B", 0),
+        )
+    ),
+    # Holy Mapperel 0.02: every build for mappers 0-4 and 7. None of its MMC3
+    # builds has PRG-RAM, so one runs with 8 KiB to reach the $A001 tests, and
+    # none of its MMC1 builds is SNROM (8 KiB CHR-RAM and PRG-RAM, the $A000
+    # D4 disable), so one runs as that. HM banks MMC1 WRAM as SXROM does, so
+    # it cannot judge SOROM; and it expects the D4 disable on every CHR-RAM
+    # board of 256 KiB or less, which MMC1.wiki limits to SNROM.
+    *(
+        _holy(name)
+        for name in (
+            "M0_P32K_C8K_V",
+            "M0_P32K_CR32K_V",
+            "M0_P32K_CR8K_V",
+            "M1_P128K",
+            "M1_P128K_C128K",
+            "M1_P128K_C128K_S8K",
+            "M1_P128K_C128K_W8K",
+            "M1_P128K_C32K",
+            "M1_P128K_C32K_S8K",
+            "M1_P128K_C32K_W8K",
+            "M1_P128K_CR8K",
+            "M1_P512K_CR8K_S32K",
+            "M1_P512K_CR8K_S8K",
+            "M1_P512K_S32K",
+            "M1_P512K_S8K",
+            "M2_P128K_CR8K_V",
+            "M2_P128K_V",
+            "M3_P32K_C32K_H",
+            "M4_P128K",
+            "M4_P128K_CR32K",
+            "M4_P128K_CR8K",
+            "M4_P256K_C256K",
+            "M7_P128K",
+            "M7_P128K_CR8K",
+        )
+    ),
+    _holy("M4_P256K_C256K", ("prg_ram", 0x2000)),
+    _holy("M1_P128K", ("prg_ram", 0x2000)),
+    *_RAINWARRIOR,
+    *(
+        _values("bntest.zip/" + name, "tall", "0123456789ABCDEF", nametables)
+        for name, nametables in (
+            ("bntest_h.nes", "01010101"),
+            ("bntest_v.nes", "00220022"),
+            ("bntest_aorom.nes", "00004444"),
+        )
+    ),
+    _values("serom.zip/serom.nes", "ascii", "All tests passed"),
+    *(
+        _values(f"mmc1atest-0.01.zip/{name}", "mmc1atest", *_mmc1atest_table(mmc1a=True))
+        for name in ("mmc1atest.nes", "mmc1atest-sn.nes")
+    ),
+    # The same ROM on MMC1B (mapper 1): rows 10 and 18 repeat 00 and 08.
+    _values(
+        "mmc1atest-0.01.zip/mmc1atest.nes",
+        "mmc1atest",
+        *_mmc1atest_table(mmc1a=False),
+        board=(("mapper", 1),),
+    ),
+)
+
+
 @dataclass
 class RomOutcome:
     case: RomCase
@@ -304,14 +563,81 @@ class RomOutcome:
     instructions: int
 
 
-def run_case(case: RomCase, root) -> RomOutcome:
-    """Power on with ``case``'s buttons held and read its verdict."""
-    system = System.from_rom(root / case.path)
+def rom_bytes(root: Path, path: str) -> bytes:
+    """A test ROM's bytes; a path through a ``.7z`` or ``.zip`` reads the member in place."""
+    parts = Path(path).parts
+    for i, part in enumerate(parts):
+        archive = root.joinpath(*parts[: i + 1])
+        if part.endswith((".7z", ".zip")) and archive.is_file():
+            member = "/".join(parts[i + 1 :])
+            if part.endswith(".zip"):
+                with zipfile.ZipFile(archive) as z:
+                    return z.read(member)
+            result = subprocess.run(
+                ["7z", "e", "-so", str(archive), member], capture_output=True, check=True
+            )
+            return result.stdout
+    return (root / path).read_bytes()
+
+
+def holy_mapperel_verdict(system: System) -> tuple[bool | None, str]:
+    """Holy Mapperel's screen against the board it ran on (README "Displayed result").
+
+    Passed: the mapper number, the PRG-ROM size, PRG-RAM present (with its
+    size) or missing as the board has it, CHR ROM or RAM as the board has it,
+    nothing marked PROBLEM, and the detailed code (WRAM, PRG, IRQ, CHR) 0000.
+    None until the detailed code is on screen.
+    """
+    text = holy_mapperel_text(system)
+    if "DETAILED TEST RESULT:" not in text:
+        return None, text
+    board = system.loaded.image.board if system.loaded else None
+    image = system.loaded.image if system.loaded else None
+    assert board is not None and image is not None
+    ram = board.prg_ram + board.prg_nvram
+    expected = [
+        f"{board.mapper:03d} ",
+        f"{len(image.prg) // 1024}K PRG ROM",
+        f"{ram // 1024}K PRG RAM OK" if ram else "PRG RAM MISSING",
+        "CHR ROM OK" if image.chr else "CHR RAM OK",
+        "DETAILED TEST RESULT: 0000",
+    ]
+    passed = "PROBLEM" not in text and all(line in text for line in expected)
+    return passed, text
+
+
+def run_case(case: RomCase, root: Path) -> RomOutcome:
+    """Power on with ``case``'s buttons held and read its verdict.
+
+    A ``$6000`` ROM gets 8 KiB of PRG-RAM if its board has none: nes20db lists
+    blargg's MMC3 tests on TxROM boards without RAM, where the text output
+    goes nowhere, but the harness reads its verdict there.
+    """
+    data = rom_bytes(root, case.path)
+    board = load(data).image.board
+    if case.protocol == "6000" and not board.prg_ram + board.prg_nvram:
+        board = replace(board, prg_ram=0x2000)
+    board = replace(board, **dict(case.board))
+    system = System.from_rom(data, override=board)
     system.board.pads[0].buttons = case.buttons
     if case.protocol == "6000":
         result = run_blargg(system, max_seconds=case.seconds)
         passed = None if result.status is None else result.status == 0
         detail = f"status {result.status}: {result.text.strip()}"
+    elif case.protocol == "values":
+        system.run_frames(int(case.seconds * 60))
+        text = font_text(system, case.font)
+        # Each expectation is whole lines, contiguous (a block may span several).
+        lines = "\n" + "\n".join(line.strip() for line in text.splitlines()) + "\n"
+        missing = [block for block in case.expect if f"\n{block}\n" not in lines]
+        passed, detail = not missing, f"missing {missing}:\n{text}"
+    elif case.protocol == "holy":
+        passed, detail = None, ""
+        for _ in range(int(case.seconds)):
+            system.run_frames(60)
+            passed, detail = holy_mapperel_verdict(system)
+            if passed is not None:
+                break
     else:
         passed, detail = run_screen(
             system, passed=case.passed, failed=case.failed, max_seconds=case.seconds
