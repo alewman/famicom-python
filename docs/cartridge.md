@@ -116,7 +116,11 @@ write or a $2007 access gives watchers an address phase too.
 Milestone 1 implements mappers 0 (NROM), 1 (MMC1) and 3 (CNROM), because the
 CPU test ROMs need them (`all_instrs`, `instr_timing` and `instr_misc` are MMC1
 boards; `cpu_dummy_reads` is CNROM); milestone 2 adds 2 (UxROM) for the 240p
-Test Suite. Their judges are milestone 5's.
+Test Suite. Milestone 5 adds 4 (MMC3 with MMC6, MC-ACC and both IRQs), 7
+(AxROM), 34 (BNROM, NINA-001) and 155 (MMC1A), the MMC1 board wirings
+(SUROM, SOROM, SXROM, SZROM, SNROM, SEROM), and judges for all of them:
+[claims.md](claims.md). Milestone 5 also put the PPU's dot-0 address on the
+connector (C27): an MMC3 counting with BG at `$1000` needs it.
 
 ### Which mappers stress which part
 

@@ -825,3 +825,153 @@ comparisons are milestone 2's (`scanline` 2, `colorwin` 6).
 **Speed** (240p Test Suite menu, as before): PyPy 40 frames/s (0.67x real
 time) and CPython 8.2 under today's load; milestone 3's code measures 41 on
 PyPy in the same A/B, so milestone 4 costs about 3 %.
+
+### Milestone 5: the big six mappers and their judges (2026-10-21)
+
+**Pins.** famicom-python at the commit that adds this record; 6502-python
+`fdef250` (PR #7 still open); `nes-test-roms` `95d8f62`; Holy Mapperel 0.02
+binaries (`holy-mapperel-bin-0.02.7z`, source `4e48b594`); the forum's
+mapper tests as pinned in `scripts/pinned_files.json`; Breaknes PPUSim
+`fb7de61` at skew 3. Machine NES-001, `PowerOn()` defaults. PyPy 7.3.20
+(Python 3.11.13) and CPython 3.14.4.
+
+**What was built.** Mapper 4 (MMC3: Sharp and NEC IRQs, MMC6, MC-ACC, the
+hard-wired 4.2, four-screen), 7 (AxROM), 34 (BNROM, NINA-001) and 155
+(MMC1A); MMC1's board wirings (SUROM, SOROM, SXROM, SZROM, SNROM, SEROM) and
+MMC1B's RAM disable; `Banked` gained a PRG-RAM bank offset, a mirroring mask
+and write-protect. The A12 filter counts M2 falls from the connector's
+timestamps (`mmc3.py`): no per-cycle `m2` call. Per mapper, which judge passed
+and what is not claimed: [claims.md](claims.md).
+
+**The harness.** `MAPPER_ROMS` (66 cases; `scripts/run_test_roms.py --suite
+mappers`, `pytest -m slow tests/test_mapper_test_roms.py`). Holy Mapperel and
+the forum tests are read inside their `.7z`/`.zip` in place
+(`testrom.rom_bytes`). Cases may change the identified board
+(`RomCase.board`): blargg's MMC3 ROMs run on 4.0 and on 4.4; nes20db lists
+them on boards without PRG-RAM, so a `$6000`-protocol ROM gets 8 KiB (its
+text has nowhere to go otherwise); HM runs once on an MMC3 with 8 KiB RAM
+(none of its MMC3 builds has RAM, so `$A001` was untested) and once as SNROM
+(none of its MMC1 builds is). Three screen fonts are decoded (`FONTS`):
+rainwarrior's hex digits at `$A0`, tepples's 8×16 font, `mmc1atest`'s
+two-tile bytes; Holy Mapperel's verdict is the mapper number, sizes, RAM and
+CHR "OK" and the detailed code 0000 against the board it ran on.
+
+**First run**: every judge but `4-scanline_timing` #12 ("Scanline 239 IRQ
+should occur later when `$2000=$10`", on both IRQs and in both suites). The
+board's MMC3 was clocked twice a line with BG at `$1000`: A12 was low from
+the dot-337 nametable fetch to dot 5, 9 dots, three M2 falls. PPUSim showed
+the address bus at dot 0 carrying dot 5's pattern address after a rendering
+line, but not after vblank nor when the odd-frame skip took dot 340 (C27). With
+that, all pass.
+
+**Findings.** rainwarrior's `3_test` and `34_test` print YES for their RAM
+lines and BNROM's bus conflicts on any board (C28): those lines are not
+claimed, and BNROM's conflicts rest on the wiki and a unit test. Holy
+Mapperel's MMC1 driver banks WRAM as SXROM does, so a SOROM board reads as "24K
+PRG RAM PROBLEM", and it expects `$A000` D4 to disable RAM on any CHR-RAM
+board of 256 KiB or less (MMC1.wiki: only SNROM); neither is claimed. N-K's
+`mmc3irqtest` shows the consecutive-`$C001` pathology, which is not modelled.
+
+**Certification record** (66 of 66 on both interpreters, identical counts;
+`../nesdev-forum/` dropped from paths, "HM" = Holy Mapperel's `testroms/`;
+wall times under a load of about 16 jobs):
+
+| ROM (board changes) | SHA-256 (first 12) | CPU cycles | Instructions | PyPy s | CPython s |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `mmc3_test_2/rom_singles/1-clocking.nes (submapper 0)` | `b06d8a97f0ca` | 780,005 | 274,000 | 5.7 | 6.3 |
+| `mmc3_test_2/rom_singles/2-details.nes (submapper 0)` | `e7af16c764b1` | 866,261 | 302,000 | 9.9 | 7.3 |
+| `mmc3_test_2/rom_singles/3-A12_clocking.nes (submapper 0)` | `b375f15b9f9d` | 779,826 | 274,000 | 10.3 | 7.4 |
+| `mmc3_test_2/rom_singles/4-scanline_timing.nes (submapper 0)` | `14a220b9d127` | 9,502,259 | 3,792,000 | 25.3 | 57.1 |
+| `mmc3_test_2/rom_singles/1-clocking.nes (submapper 4)` | `b06d8a97f0ca` | 780,005 | 274,000 | 10.5 | 6.4 |
+| `mmc3_test_2/rom_singles/2-details.nes (submapper 4)` | `e7af16c764b1` | 866,261 | 302,000 | 6.9 | 8.3 |
+| `mmc3_test_2/rom_singles/3-A12_clocking.nes (submapper 4)` | `b375f15b9f9d` | 779,826 | 274,000 | 10.2 | 6.1 |
+| `mmc3_test_2/rom_singles/4-scanline_timing.nes (submapper 4)` | `14a220b9d127` | 9,502,259 | 3,792,000 | 28.0 | 52.2 |
+| `mmc3_test_2/rom_singles/5-MMC3.nes (submapper 0)` | `e0824123d60b` | 808,512 | 282,000 | 5.8 | 6.8 |
+| `mmc3_test_2/rom_singles/6-MMC3_alt.nes (submapper 4)` | `56698b691845` | 808,477 | 282,000 | 10.5 | 8.5 |
+| `mmc3_test/1-clocking.nes (submapper 0)` | `57c77c66edde` | 745,057 | 260,000 | 10.3 | 6.4 |
+| `mmc3_test/2-details.nes (submapper 0)` | `89e1f16514aa` | 774,020 | 272,000 | 8.9 | 6.4 |
+| `mmc3_test/3-A12_clocking.nes (submapper 0)` | `dc6779b3d64e` | 744,893 | 260,000 | 10.0 | 3.0 |
+| `mmc3_test/4-scanline_timing.nes (submapper 0)` | `0474550dbf81` | 9,380,624 | 3,746,000 | 31.1 | 54.6 |
+| `mmc3_test/5-MMC3.nes (submapper 0)` | `f714089b5d05` | 683,107 | 242,000 | 5.9 | 4.0 |
+| `mmc3_test/6-MMC6.nes (submapper 4)` | `e6bdbadf46cc` | 683,162 | 242,000 | 10.1 | 3.7 |
+| `mmc3_irq_tests/1.Clocking.nes (submapper 0)` | `699d0644bd2b` | 893,419 | 361,884 | 2.3 | 6.7 |
+| `mmc3_irq_tests/2.Details.nes (submapper 0)` | `0af95238b698` | 893,419 | 348,047 | 2.8 | 4.2 |
+| `mmc3_irq_tests/3.A12_clocking.nes (submapper 0)` | `3b936e1079f1` | 893,418 | 361,931 | 2.4 | 5.6 |
+| `mmc3_irq_tests/4.Scanline_timing.nes (submapper 0)` | `3369e8f73a96` | 2,680,258 | 1,052,362 | 7.3 | 14.0 |
+| `mmc3_irq_tests/5.MMC3_rev_A.nes (submapper 4)` | `6b662c2d08ee` | 893,420 | 361,933 | 1.9 | 5.7 |
+| `mmc3_irq_tests/6.MMC3_rev_B.nes (submapper 0)` | `d8a2af42cdaf` | 893,418 | 361,905 | 2.0 | 6.3 |
+| `HM M0_P32K_C8K_V.nes` | `16ad27600799` | 1,786,833 | 591,533 | 4.5 | 15.4 |
+| `HM M0_P32K_CR32K_V.nes` | `de10f742a93d` | 3,573,673 | 1,296,138 | 12.0 | 27.4 |
+| `HM M0_P32K_CR8K_V.nes` | `1a33ba05af3e` | 3,573,673 | 1,296,138 | 9.8 | 24.5 |
+| `HM M1_P128K.nes` | `d02b15ed43c8` | 3,573,675 | 1,296,390 | 9.5 | 34.9 |
+| `HM M1_P128K_C128K.nes` | `a3f520601c1c` | 1,786,831 | 591,578 | 4.8 | 28.8 |
+| `HM M1_P128K_C128K_S8K.nes` | `2263d212fe9c` | 3,573,676 | 1,230,198 | 11.4 | 23.8 |
+| `HM M1_P128K_C128K_W8K.nes` | `f1d76578b706` | 3,573,676 | 1,230,198 | 10.9 | 29.3 |
+| `HM M1_P128K_C32K.nes` | `77f77f779720` | 1,786,831 | 591,528 | 5.9 | 18.1 |
+| `HM M1_P128K_C32K_S8K.nes` | `c6101b411ee9` | 3,573,673 | 1,230,146 | 11.6 | 28.4 |
+| `HM M1_P128K_C32K_W8K.nes` | `3d330d32bb45` | 3,573,673 | 1,230,146 | 11.6 | 27.9 |
+| `HM M1_P128K_CR8K.nes` | `0595f0896d71` | 3,573,675 | 1,296,385 | 11.4 | 35.4 |
+| `HM M1_P512K_CR8K_S32K.nes` | `7db5b5191ce8` | 12,507,873 | 4,446,945 | 37.1 | 65.2 |
+| `HM M1_P512K_CR8K_S8K.nes` | `c3f239ea8f2f` | 5,360,517 | 1,935,513 | 14.2 | 38.5 |
+| `HM M1_P512K_S32K.nes` | `0d86aa1a48ce` | 12,507,873 | 4,446,949 | 31.3 | 83.2 |
+| `HM M1_P512K_S8K.nes` | `d9ae34427b0c` | 5,360,516 | 1,935,519 | 12.5 | 37.1 |
+| `HM M2_P128K_CR8K_V.nes` | `c7e83755bd9a` | 3,573,674 | 1,296,130 | 9.1 | 32.1 |
+| `HM M2_P128K_V.nes` | `81bd36f2a0aa` | 3,573,674 | 1,296,135 | 8.3 | 33.6 |
+| `HM M3_P32K_C32K_H.nes` | `499891c6d8c7` | 1,786,832 | 591,547 | 4.1 | 27.9 |
+| `HM M4_P128K.nes` | `b145558f6d30` | 3,573,675 | 1,296,356 | 11.9 | 29.2 |
+| `HM M4_P128K_CR32K.nes` | `428387f3178e` | 8,934,197 | 3,409,322 | 28.4 | 62.0 |
+| `HM M4_P128K_CR8K.nes` | `edb301630dae` | 3,573,675 | 1,296,351 | 12.1 | 29.9 |
+| `HM M4_P256K_C256K.nes` | `278041824af3` | 1,786,834 | 593,062 | 4.9 | 20.3 |
+| `HM M7_P128K.nes` | `e4a63a3e290e` | 3,573,675 | 1,296,174 | 12.3 | 27.1 |
+| `HM M7_P128K_CR8K.nes` | `4aa0050f36ae` | 3,573,673 | 1,296,173 | 9.5 | 29.3 |
+| `HM M4_P256K_C256K.nes (prg_ram 8192)` | `278041824af3` | 3,573,676 | 1,231,549 | 11.1 | 24.1 |
+| `HM M1_P128K.nes (prg_ram 8192)` | `d02b15ed43c8` | 5,360,517 | 1,935,004 | 15.9 | 39.5 |
+| `2_test_src.zip/2_test_0.nes` | `8ba85a6150cc` | 8,934,160 | 2,964,856 | 22.1 | 124.2 |
+| `2_test_src.zip/2_test_1.nes` | `e2cd2f477720` | 8,934,160 | 2,964,856 | 20.8 | 113.5 |
+| `2_test_src.zip/2_test_2.nes` | `b069513cee90` | 8,934,160 | 2,964,857 | 21.2 | 124.3 |
+| `3_test_src.zip/3_test_0.nes` | `badd1427300d` | 8,934,159 | 2,972,704 | 18.6 | 119.8 |
+| `3_test_src.zip/3_test_1.nes` | `84f4542c387e` | 8,934,159 | 2,972,704 | 17.5 | 131.4 |
+| `3_test_src.zip/3_test_2.nes` | `e1387b5f42cb` | 8,934,158 | 2,972,705 | 18.9 | 116.3 |
+| `7_test_src.zip/7_test_0.nes` | `d969b4222b13` | 8,934,160 | 2,964,960 | 23.2 | 113.9 |
+| `7_test_src.zip/7_test_1.nes` | `23658ffa3b1a` | 8,934,160 | 2,964,960 | 19.5 | 107.7 |
+| `7_test_src.zip/7_test_2.nes` | `5fb4b7f4b15e` | 8,934,160 | 2,964,960 | 19.2 | 108.7 |
+| `34_test_src.zip/34_test_1.nes` | `451ae4434c1f` | 8,934,161 | 2,971,809 | 22.4 | 101.1 |
+| `34_test_src.zip/34_test_2.nes` | `889ff02395c1` | 8,934,162 | 2,965,667 | 22.5 | 106.7 |
+| `bntest.zip/bntest_h.nes` | `1acbf7daf113` | 8,934,153 | 2,552,704 | 20.7 | 122.6 |
+| `bntest.zip/bntest_v.nes` | `654bfa355ed7` | 8,934,153 | 2,552,704 | 14.5 | 74.6 |
+| `bntest.zip/bntest_aorom.nes` | `efb4503a052b` | 8,934,153 | 2,552,704 | 12.1 | 65.9 |
+| `serom.zip/serom.nes` | `f19917262de1` | 8,934,154 | 2,970,405 | 11.9 | 66.7 |
+| `mmc1atest-0.01.zip/mmc1atest.nes` | `6539e05ef163` | 8,934,153 | 2,974,084 | 11.6 | 70.7 |
+| `mmc1atest-0.01.zip/mmc1atest-sn.nes` | `43ac5a33667f` | 8,934,153 | 2,974,084 | 10.7 | 76.7 |
+| `mmc1atest-0.01.zip/mmc1atest.nes (mapper 1)` | `6539e05ef163` | 8,934,153 | 2,974,084 | 10.3 | 66.6 |
+
+**The gates can fail.** 21 of 23 seeded faults (each in a copy of `src/`) fail
+at least one judge: the A12 filter at 2 falls; NEC's IRQ ignoring the reload
+flag; NEC behaving as Sharp; `$E000` leaving the IRQ asserted; no CHR
+inversion; no PRG mode swap; `$A001` write-protect ignored; `$C001` without
+the reload flag; no dot-0 address, or one on every rendering line's dot 0;
+AxROM's screen bit ignored; AxROM conflicts on 7.1; UxROM without conflicts on
+2.2; conflicts as OR; SXROM's RAM bank from D3-D4; SUROM's outer bank ignored;
+MMC1A's bypass missing; MMC1B's D4 keeping RAM; SNROM's E bit ignored; SEROM
+banking PRG; NINA-001's CHR registers swapped. **Not caught**: the A12 filter
+at 4 falls (the judges pass 4, 6, 8 and 16; 32 fails `3-A12_clocking` and
+`4-scanline_timing`), and BNROM without conflicts (C28). Both are stated in
+claims.md.
+
+**Everything else again**: the CPU (10), PPU (41) and APU (38) ROMs pass on
+PyPy, 80 with the recorded counts; `read_joy3/thorough_test` has milestone 4's
+604 more instructions, and eight of the 2005 `sprite_hit_tests` stop one
+instruction (and at most one cycle) from their milestone 2 counts, as
+`01.basics` does at milestone 4's commit `668bc2e`: a milestone 4 change the
+record did not show. AccuracyCoin: 136 of 146, the same 123,410,909 cycles.
+The quick suite passes (58), including `tests/test_mappers.py` (7) and the
+rendering test's address count, now 239 more per frame (C27). Smoke check,
+not a judge: the title or attract frames of *Super Mario Bros. 3*, *Mega Man
+3*, *Kirby's Adventure* (its split status bar), *StarTropics* (MMC6) and
+*Battletoads* (AxROM) look right.
+
+**Speed** (the 240p Test Suite's menu, 300 frames after 120 of warm-up; A/B
+under the same load): PyPy 73.2 and 72.8 frames/s against milestone 4's 75.1
+and 74.7 (about 2 % slower, near the noise); CPython 8.3. MMC3 games: *Kirby's
+Adventure* attract 111 frames/s, *Super Mario Bros. 3* title 129 (1.9-2.1x
+real time) on PyPy.

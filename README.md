@@ -7,14 +7,16 @@ around it: the 2A03's sound unit, DMA and joypad ports, the 2C02 picture
 processor dot by dot, the cartridge connector and the mappers behind it, and
 the clock that ties them together.
 
-**Status (2026-10-12): milestones 1-4 of 8 done**: the CPU on the board, the
-PPU dot by dot, the APU, DMA and interrupts, and AccuracyCoin run in full
-(136 of 146, every failure with its cause). One master-clock
+**Status (2026-10-21): milestones 1-5 of 8 done**: the CPU on the board, the
+PPU dot by dot, the APU, DMA and interrupts, AccuracyCoin run in full
+(136 of 146, every failure with its cause), and the big six mappers with
+their judges. One master-clock
 timeline with the PPU and APU advanced inside each CPU bus cycle, the memory
 map and open bus, both controller clocking models, OAM and DMC DMA inside the
 stalled read (get/put cycles, DMC precedence), the cartridge connector
 (every PPU fetch on it, dot by dot), the iNES/NES 2.0 loader with nes20db, and
-mappers 0, 1, 2 and 3. The PPU renders: background and sprite fetches,
+mappers 0, 1 (with its board wirings), 2, 3, 4 (MMC3 with both IRQs, MMC6,
+MC-ACC), 7, 34 and 155. The PPU renders: background and sprite fetches,
 per-dot sprite evaluation with the overflow bug, sprite-0 hit, the odd-frame
 skip, the VBL/NMI races, the decaying I/O latch; frames come out as 9-bit
 palette values, or PNG through a `.pal` file. The APU sounds: two pulses,
@@ -60,6 +62,12 @@ analogue stage per console (`--wav`).
   after a DMA (6502-python PR #7), OAM evaluation, corruption and `$2004`,
   sprites from the pre-render line. Of the ten left, PPUSim passes eight (mid-line
   rendering toggles, mostly): open, with a judge.
+- **Mappers, 66 judges** on PyPy and CPython ([docs/claims.md](docs/claims.md)
+  per mapper): blargg's `mmc3_test_2`, `mmc3_test` and `mmc3_irq_tests` on
+  the Sharp and NEC IRQs, every Holy Mapperel build for mappers 0-4 and 7,
+  rainwarrior's bus-conflict tests (2, 3, 7, 34), `bntest`, `serom`, and
+  `mmc1atest`'s MMC1A table. PPUSim settled what the MMC3 needed from the PPU:
+  the address on the bus at dot 0.
 - Pins: 6502-python `fdef250` (its PR #7 on main `1ae3610`; repin once merged),
   `nes-test-roms` `95d8f62`, AccuracyCoin `6bee919`.
   The record, with SHA-256s, cycle and instruction counts, wall times and
@@ -92,8 +100,8 @@ python -m famicom_python ROM --frames 600 --png out.png --wav out.wav
 | Famicom Disk System, Vs. System, PlayChoice-10 | later |
 
 Mappers live in this repository behind a signal-level cartridge connector
-([docs/cartridge.md](docs/cartridge.md)); the first six (0, 1, 2, 3, 4, 7)
-cover 83 % of licensed cartridges, 26 cover 95 %.
+([docs/cartridge.md](docs/cartridge.md)); the first six (0, 1, 2, 3, 4, 7),
+done, cover 83 % of licensed cartridges, 26 cover 95 %.
 
 ## What is fetched
 
