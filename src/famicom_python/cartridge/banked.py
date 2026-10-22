@@ -32,6 +32,11 @@ class Banked(Cartridge):
         ram_size = board.prg_ram + board.prg_nvram
         self.prg_ram = bytearray(ram_size)
         self.prg_ram_enabled = ram_size > 0
+        self.prg_ram_writable = True  # a write-protect bit (MMC3 $A001 D6) clears it
+        # The 8 KiB window at $6000: a bank offset for boards with more RAM
+        # (SOROM, SXROM), a mask that mirrors smaller chips (2 KiB) through it.
+        self.prg_ram_offset = 0
+        self.prg_ram_mask = min(ram_size, 0x2000) - 1
         self.battery = board.battery or board.prg_nvram > 0
         self.prg_offsets = [0, 0, 0, 0]
         self.chr_offsets = [0] * 8
@@ -62,12 +67,16 @@ class Banked(Cartridge):
         if address >= 0x8000:
             return self.prg[self.prg_offsets[(address >> 13) & 3] + (address & 0x1FFF)]
         if address >= 0x6000 and self.prg_ram_enabled:
-            return self.prg_ram[address & (len(self.prg_ram) - 1)]
+            return self.prg_ram[self.prg_ram_offset + (address & self.prg_ram_mask)]
         return None
 
     def cpu_write(self, address: int, value: int, t: int) -> None:
-        if 0x6000 <= address < 0x8000 and self.prg_ram_enabled:
-            self.prg_ram[address & (len(self.prg_ram) - 1)] = value
+        if 0x6000 <= address < 0x8000 and self.prg_ram_enabled and self.prg_ram_writable:
+            self.prg_ram[self.prg_ram_offset + (address & self.prg_ram_mask)] = value
+
+    def bus_conflict(self, address: int, value: int) -> int:
+        """An AND-type bus conflict: the ROM drives the byte at ``address`` as the CPU writes."""
+        return value & self.prg[self.prg_offsets[(address >> 13) & 3] + (address & 0x1FFF)]
 
     def ciram_a10(self, address: int) -> int | None:
         mode = self.mirroring

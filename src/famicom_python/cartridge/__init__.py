@@ -13,17 +13,30 @@ source below the winner disagrees is logged in :attr:`Loaded.disagreements`.
 from __future__ import annotations
 
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass, fields
 from pathlib import Path
 
 from .banked import Banked
 from .connector import Cartridge
 from .database import load_mame_features, load_nes20db, lookup_mame, lookup_nes20db
-from .discrete import CNROM, NROM, UxROM
+from .discrete import CNROM, NROM, AxROM, UxROM, mapper_34
 from .ines import BoardInfo, RomImage, parse
-from .mmc1 import MMC1
+from .mmc1 import MMC1, MMC1A
+from .mmc3 import mmc3_for
 
-MAPPERS: dict[int, type[Banked]] = {0: NROM, 1: MMC1, 2: UxROM, 3: CNROM}
+#: Each implemented iNES mapper's board, built from the image and the CPU cycle
+#: length in master ticks (a class, or a function choosing one by submapper).
+MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
+    0: NROM,
+    1: MMC1,
+    2: UxROM,
+    3: CNROM,
+    4: mmc3_for,
+    7: AxROM,
+    34: mapper_34,
+    155: MMC1A,
+}
 
 __all__ = ["MAPPERS", "BoardInfo", "Cartridge", "Loaded", "RomImage", "load", "read_rom_file"]
 
