@@ -4210,5 +4210,14 @@
   "kind": "test-rom",
   "license": "Author-distributed test ROM (forum attachment); freely distributable test program, no explicit license",
   "note": "Mapper test ROM from NESdev forum attachment, listed on wiki Emulator_tests"
+ },
+ {
+  "path": "reference/docs/furrtek/MMC3C_schematics.pdf",
+  "url": "https://raw.githubusercontent.com/furrtek/VGChips/c926ce92fdebd7613c8712b42c45a059d63548e0/Nintendo/MMC3C/MMC3C_schematics.PDF",
+  "sha256": "cebced72569edce51203ee71a2bf70d0f198c6228ad1f9e9674a2476b5bd8204",
+  "size": 79140,
+  "kind": "die",
+  "license": "Furrtek's VGChips repository (reverse-engineered schematics, Sean Gonsalves 2020); no explicit license file",
+  "note": "MMC3C reverse-engineered schematic: page 4 has the A12 filter (three M2-clocked DFFs reset by A12) and the asynchronous IRQ path (milestone 6)"
  }
 ]
