@@ -7,10 +7,11 @@ around it: the 2A03's sound unit, DMA and joypad ports, the 2C02 picture
 processor dot by dot, the cartridge connector and the mappers behind it, and
 the clock that ties them together.
 
-**Status (2026-10-21): milestones 1-5 of 8 done**: the CPU on the board, the
+**Status (2026-10-22): milestones 1-6 of 8 done**: the CPU on the board, the
 PPU dot by dot, the APU, DMA and interrupts, AccuracyCoin run in full
-(136 of 146, every failure with its cause), and the big six mappers with
-their judges. One master-clock
+(136 of 146, every failure with its cause), the big six mappers with
+their judges, and lockstep with Mesen2: five games identical instruction by
+instruction for a minute each. One master-clock
 timeline with the PPU and APU advanced inside each CPU bus cycle, the memory
 map and open bus, both controller clocking models, OAM and DMC DMA inside the
 stalled read (get/put cycles, DMC precedence), the cartridge connector
@@ -68,7 +69,16 @@ analogue stage per console (`--wav`).
   rainwarrior's bus-conflict tests (2, 3, 7, 34), `bntest`, `serom`, and
   `mmc1atest`'s MMC1A table. PPUSim settled what the MMC3 needed from the PPU:
   the address on the bus at dot 0.
-- Pins: 6502-python `fdef250` (its PR #7 on main `1ae3610`; repin once merged),
+- **Lockstep with Mesen2** (a detector, `scripts/mesen_lockstep.py`): *Super
+  Mario Bros.*, *The Legend of Zelda*, *Mega Man 2*, *Kirby's Adventure* and
+  *Battletoads* identical for 60 seconds from power-on (33.7-34.8 million
+  instructions each). Every divergence on the way was settled by a higher
+  tier: three were Mesen2's (patched for the comparison), one the board's (an
+  interrupt during a DMA stall, settled on perfect6502 and fixed in
+  6502-python). *Super Mario Bros. 3* stops at a `$2007` read during
+  rendering where PPUSim disagrees with the board: open.
+- Pins: 6502-python `080fc80` (its PR #7, `dma_stalled` and `note_stall`, on main
+  `1ae3610`; repin once merged),
   `nes-test-roms` `95d8f62`, AccuracyCoin `6bee919`.
   The record, with SHA-256s, cycle and instruction counts, wall times and
   the seeded faults each gate catches, is in

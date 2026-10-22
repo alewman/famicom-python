@@ -207,6 +207,8 @@ trace logger writes one line per instruction with the real PPU scanline and dot
 nestest in 0.8 s. The Lua API also offers per-access memory callbacks;
 logging them to a file needs `ScriptAllowIoOsAccess` set through
 `SetDebugConfig` (not done yet). MesenCE should build the same way (not tried).
+For lockstep (milestone 6) apply `scripts/mesen2-detector-fixes.patch` first:
+three corrections where a higher tier shows `b9fa69d` wrong.
 
 ## What is *not* available
 
@@ -975,3 +977,82 @@ under the same load): PyPy 73.2 and 72.8 frames/s against milestone 4's 75.1
 and 74.7 (about 2 % slower, near the noise); CPython 8.3. MMC3 games: *Kirby's
 Adventure* attract 111 frames/s, *Super Mario Bros. 3* title 129 (1.9-2.1x
 real time) on PyPy.
+
+### Milestone 6: lockstep against Mesen2 (2026-10-22)
+
+**Pins.** famicom-python at the commit that adds this record; 6502-python
+`080fc80` (PR #7: `dma_stalled` and `note_stall`); Mesen2 `b9fa69d` built as
+"Mesen2 as a second detector" says, with `scripts/mesen2-detector-fixes.patch`
+applied (below); perfect6502 as pinned. Games from the local No-Intro
+`Nintendo - Nintendo Entertainment System (Headered)` set, read in place.
+PyPy 7.3.20.
+
+**The tool.** `scripts/mesen_lockstep.py ROM --frames 3600` runs Mesen2
+headless for 3,600 frames (60 s) with its trace logger (registers, CPU cycle,
+scanline, dot: about 2.4 GB a game) and compares the board at every
+instruction boundary from power-on, no input: A, X, Y, S, P (bits 5 and 4
+aside), PC, the CPU cycle count and the PPU position, the two offsets fixed on
+the first instruction and required constant (cycle 0; dot -1, the two
+reading their position at different points of the cycle). The board's row is
+taken at the opcode fetch's read, after any DMA that stalled it, as Mesen2
+logs; its interrupt entries, which Mesen2 does not log, are dropped.
+
+**Result: five games identical for 60 seconds.**
+
+| Game (mapper) | Instructions identical | Frames |
+| --- | ---: | ---: |
+| *Super Mario Bros.* (World) (0) | 34,713,997 | 3,600 |
+| *The Legend of Zelda* (USA) (Rev 1) (1) | 34,800,765 | 3,600 |
+| *Mega Man 2* (USA) (1) | 34,643,339 | 3,600 |
+| *Kirby's Adventure* (USA) (4) | 33,718,135 | 3,600 |
+| *Battletoads* (USA) (7) | 33,934,780 | 3,600 |
+| *Super Mario Bros. 3* (USA) (4) | 120,171 | 12 |
+
+**Every divergence, in the order met, with its source.** Each was diagnosed
+before a run was extended.
+
+| Divergence | Source | Resolved by |
+| --- | --- | --- |
+| SMB1's first `$2002` read: `$30` vs `$10` | power-on PPUSTATUS ("+0+x xxxx"): the board sets the overflow bit (PPUSim), Mesen2 does not | `PowerOn.ppustatus` (new; default unchanged); the lockstep machine uses Mesen2's |
+| OAM DMA's 513 cycles in a different row | attribution: the board stalls the next opcode fetch, Mesen2 logs after the stall | rows taken at the opcode fetch's read |
+| VBL's NMI one instruction apart | power-on phase: Mesen2's PPU starts a CPU cycle and a dot ahead (`NesCpu::Reset`) | `PowerOn.ppu_dot` (new; default 0); only 4, of 0-9, keeps SMB1's first 120 frames in step, and the board passes all 79 PPU and APU judges at 4 with the same synchronization CRCs |
+| NMI after a taken same-page branch (MM2, Kirby, Battletoads) | **Mesen2**: delays only IRQs there; perfect6502 delays NMIs too (C29) | Mesen2 patch 1 |
+| Zelda and Kirby read different SRAM | Mesen2 keeps battery saves in its home: a second run powered on with the first's | a fresh Mesen2 home per run |
+| Kirby: a DMC fetch 4 cycles apart | power-on DMC rate timer: Mesen2 starts it at a full period | `PowerOn.dmc_timer` (new; default 0); only 213 APU cycles of 0 and 211-214, either APU parity, holds |
+| Kirby: a DMC fetch 17 cycles apart | **Mesen2**: ignores a rate written in the timer's reload cycle, which AccuracyCoin's hardware answer key ("DMC Reload Timing") applies; Kirby's write lands there | Mesen2 patch 2 |
+| Kirby: VBL's NMI during a DMC DMA inside its wait-loop `BEQ` | **the board**: 6502-python saw a request raised during a stall as late; perfect6502 with RDY held low polls it (C30) | 6502-python `note_stall` (PR #7); the board reports each stall boundary |
+| AccuracyCoin "Interrupt flag latency" test A regressed (136 to 135) with the first `note_stall` | a taken branch's next-opcode read ignores a request raised in the stall's last cycle (perfect6502 too) | the refined `note_stall` (080fc80): 136 again, milestone 5's cycles |
+| Kirby: rows lost after its IRQ | **the tool**: Mesen2 prints a zero-page PC with two digits ("0029  29"); the parser skipped those lines | parser |
+| Kirby: `LDA $4015` bit 5 after a DMC DMA | **Mesen2**: `GetInternalOpenBus` returns the external bus, and DMA reads set the internal one; AccuracyCoin's key ("Internal Data Bus", C24) says neither | Mesen2 patch 3 |
+| Zelda: `$2002` overflow bit | **Mesen2 setting**: OAM row corruption (C26, AccuracyCoin's key) is off by default; Zelda turns rendering off mid-frame on its title | `configure_for_comparison` turns it on |
+| **SMB3: its status-bar IRQ's dummy `LDA $2007` (line 193)** | **the board, open**: a `$2007` read during rendering. Replayed on PPUSim (`ppusim_compare.py`'s harness, the game's access sequence), PPUSim loads its buffer from the first fetch at least 5 dots after the access (a garbage nametable fetch, still the old v), the board one fetch later with v already incremented; PPUSim also changes the fetch stream itself (a hybrid pattern address, an extra address phase). The family of AccuracyCoin's failing "ALE + Read", "Hybrid Addresses" and "$2007 Stress Test" (milestone 4) | not yet: next |
+
+**The Mesen2 patches** (`scripts/mesen2-detector-fixes.patch`, against
+`b9fa69d`; each where a higher tier shows Mesen2 wrong, and each checked
+against blargg's `cpu_interrupts_v2`, `ppu_vbl_nmi`, `instr_test-v5` and
+`apu_test`, all still passing): 1. a taken same-page branch holds an NMI edge
+seen in its operand cycle, as it holds an IRQ (perfect6502); 2. a DMC rate
+written in the timer's reload cycle is the one it reloads with (AccuracyCoin);
+3. `$4015`'s bit 5 from the internal bus, which DMA reads do not drive
+(AccuracyCoin). Reporting them upstream needs the user's agreement.
+
+**The die experiments** (`scripts/perfect6502_nmi_branch.c`,
+`scripts/perfect6502_nmi_dma.c`, against the pinned perfect6502): /NMI pulled
+low at each half-cycle around a `LDA zp; BEQ` (taken, same page) and a `LDA
+zp; JMP` loop, with RDY held low for 4 cycles on the BEQ's or JMP's operand
+or next read. Free: an NMI falling 1-2 half-cycles after the opcode fetch is
+taken after a JMP but only after the next instruction for the BEQ (C29). Held:
+an NMI falling in the halt is taken after the instruction for every read held,
+except in the last halted cycle of the branch's next-opcode read (C30).
+
+**Everything else again**, with 6502-python `080fc80` and the board's stall
+reporting: the CPU (10), PPU (41), APU (38) and mapper (66) ROMs pass on PyPy
+with milestone 5's cycle and instruction counts, every one; AccuracyCoin 136
+of 146, the same 123,410,909 cycles and the same ten failures; the quick
+suite (59) passes. 6502-python: 1,950 passed; three seeded faults, one in
+each rule of the stall (the confirm, the operand read, the next-opcode read's
+last cycle), each fail its stall cases.
+
+**Speed of the tool**: Mesen2 traces a minute in about a minute; the board
+compares 20,000-35,000 instructions a second on PyPy (17-45 minutes a game,
+six at once on this machine).

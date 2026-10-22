@@ -53,6 +53,7 @@ class Board:
         self.ppu.status = power.ppustatus & 0xE0
         self.ppu.dot = power.ppu_dot
         self.apu = APU(power.apu_put_first)
+        self.apu.dmc.timer = power.dmc_timer
         self.apu.set_cpu_rate(timing.master_hz / timing.cpu_divider)
         self.analogue = AnalogueStage(
             self.apu.sample_rate, machine.audio_high_pass_hz, machine.audio_low_pass_hz
@@ -156,14 +157,18 @@ class Board:
 
     def read_byte(self, address: int) -> int:
         stalled = False
+        cpu = self.cpu
         if self.apu.dmc_abort:  # an aborted DMC DMA: its halt cycle only
             self.apu.dmc_abort = False
+            if cpu is not None:
+                cpu.note_stall()
             self._repeat_read(address)
             stalled = True
         if self._oam_dma_page is not None or self.apu.dmc_request:
+            if cpu is not None and not stalled:
+                cpu.note_stall()
             self._dma(address)
             stalled = True
-        cpu = self.cpu
         if cpu is not None and cpu.dma_stalled != stalled:
             cpu.dma_stalled = stalled
         t = self._begin_cycle(address, True)
@@ -288,12 +293,14 @@ class Board:
                 value = self._dma_read(dmc_address, address, t)
                 apu.dmc_fill(value)
                 self._end_cycle()
+                self._halted_cycle_done()
                 dmc_age = None
             elif get and oam_value is None and oam_next < 256:
                 source = page << 8 | oam_next  # type: ignore[operator]
                 t = self._begin_cycle(_decoded(source, address), True)
                 oam_value = self._dma_read(source, address, t)
                 self._end_cycle()
+                self._halted_cycle_done()
                 oam_next += 1
             elif not get and oam_value is not None:
                 t = self._begin_cycle(0x2004, False)
@@ -303,6 +310,7 @@ class Board:
                 self.ppu.run_to(t)
                 self.cartridge.cpu_write(0x2004, oam_value, t)
                 self._end_cycle()
+                self._halted_cycle_done()
                 oam_value = None
             else:
                 self._repeat_read(address)
@@ -344,6 +352,14 @@ class Board:
         t = self._begin_cycle(address, True)
         self.internal_bus = self._read(address, t)
         self._end_cycle()
+        self._halted_cycle_done()
+
+    def _halted_cycle_done(self) -> None:
+        """A cycle of a stall ended: the halted CPU kept sampling /IRQ and /NMI,
+        so it is told the requests at each boundary of the stall (6502-python's
+        ``note_stall``; perfect6502 with RDY low; C30)."""
+        if self.cpu is not None:
+            self.cpu.note_stall()
 
 
 def _decoded(address: int, halted: int) -> int:
