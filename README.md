@@ -77,8 +77,8 @@ analogue stage per console (`--wav`).
   interrupt during a DMA stall, settled on perfect6502 and fixed in
   6502-python). *Super Mario Bros. 3* stops at a `$2007` read during
   rendering where PPUSim disagrees with the board: open.
-- Pins: 6502-python `080fc80` (its PR #7, `dma_stalled` and `note_stall`, on main
-  `1ae3610`; repin once merged),
+- Pins: 6502-python `9dc34bd` (main, with PR #7's `dma_stalled` and
+  `note_stall`),
   `nes-test-roms` `95d8f62`, AccuracyCoin `6bee919`.
   The record, with SHA-256s, cycle and instruction counts, wall times and
   the seeded faults each gate catches, is in
