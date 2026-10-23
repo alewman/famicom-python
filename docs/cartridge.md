@@ -67,7 +67,13 @@ what milestone 1 decided:
    lost. A mapper whose counter must raise /IRQ on an exact cycle (VRC4, FME-7,
    N163, Bandai) sets `counts_m2` and gets `m2(t)` every cycle.
 3. **"Not driven" is a value**: a read returns `None` and the board supplies
-   open bus (the CPU data latch, or the PPU address's low byte).
+   open bus (the CPU data latch, or the PPU address's low byte). *Changed in
+   milestone 7*: a CPU read may drive only some lines, returned as `driven |
+   undriven << 8` with the undriven lines taken from the data latch. Bandai's
+   $6000 read drives D4 (the EEPROM) and, on the Datach, D3 (the barcode),
+   and nothing else (`INES_Mapper_016.wiki`, `_157.wiki`). It costs one
+   comparison per cartridge read; the alternative, a whole-byte guess at the
+   open bus, is wrong for any game that reads the port with an indexed mode.
 4. **Nametables.** Proposed: `nametable(address) -> (CIRAM /CE, CIRAM A10)`.
    *Decided*: `ciram_a10(address) -> int | None`, `None` meaning CIRAM is
    disabled and the cartridge answers through `ppu_read`/`ppu_write` (four-screen

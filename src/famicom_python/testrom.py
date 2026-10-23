@@ -493,7 +493,7 @@ MAPPER_ROMS = (
             ("6.MMC3_rev_B", 0),
         )
     ),
-    # Holy Mapperel 0.02: every build for mappers 0-4 and 7. None of its MMC3
+    # Holy Mapperel 0.02: every build for mappers 0-4, 7, 9, 10, 66 and 118. None of its MMC3
     # builds has PRG-RAM, so one runs with 8 KiB to reach the $A001 tests, and
     # none of its MMC1 builds is SNROM (8 KiB CHR-RAM and PRG-RAM, the $A000
     # D4 disable), so one runs as that. HM banks MMC1 WRAM as SXROM does, so
@@ -526,6 +526,12 @@ MAPPER_ROMS = (
             "M4_P256K_C256K",
             "M7_P128K",
             "M7_P128K_CR8K",
+            # Milestone 7's mappers with a build.
+            "M9_P128K_C64K",
+            "M10_P128K_C64K_S8K",
+            "M10_P128K_C64K_W8K",
+            "M66_P64K_C16K_V",
+            "M118_P128K_C64K",
         )
     ),
     _holy("M4_P256K_C256K", ("prg_ram", 0x2000)),

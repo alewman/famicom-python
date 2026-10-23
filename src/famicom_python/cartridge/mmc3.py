@@ -205,6 +205,31 @@ class MMC6(MMC3):
         return bytes(self.prg_ram) if self.battery else None
 
 
+class TxSROM(MMC3):
+    """Mapper 118 (TKSROM, TLSROM): CHR A17 drives CIRAM A10, so CHR banking picks the nametables.
+
+    INES_Mapper_118.wiki: the MMC3's CHR bank circuit ignores PPU A13, so a
+    nametable fetch at $2000-$2FFF selects the bank register of the matching
+    1 KiB slot of $0000-$0FFF, and that register's D7 is CIRAM A10. With CHR
+    A12 inversion off, $0000-$0FFF is the two 2 KiB registers R0 and R1; with
+    it on, the four 1 KiB registers R2-R5. $A000 does nothing.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.nametable_a10 = [0, 0, 0, 0]
+        super().__init__(image, cpu_cycle_ticks)
+        self.fixed_mirroring = True
+
+    def _update(self) -> None:
+        super()._update()
+        r = self.registers
+        banks = r[2:6] if self.bank_select & 0x80 else [r[0], r[0], r[1], r[1]]
+        self.nametable_a10 = [bank >> 7 for bank in banks]
+
+    def ciram_a10(self, address: int) -> int | None:
+        return self.nametable_a10[(address >> 10) & 3]
+
+
 def mmc3_for(image: RomImage, cpu_cycle_ticks: int) -> MMC3:
     """Mapper 4's board by submapper."""
     submapper = image.board.submapper

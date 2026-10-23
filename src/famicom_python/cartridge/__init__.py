@@ -17,13 +17,20 @@ from collections.abc import Callable
 from dataclasses import dataclass, fields
 from pathlib import Path
 
+from .bandai import BandaiFCG, BandaiX24C01, Datach
 from .banked import Banked
 from .connector import Cartridge
 from .database import load_mame_features, load_nes20db, lookup_mame, lookup_nes20db
-from .discrete import CNROM, NROM, AxROM, UxROM, mapper_34
+from .discrete import CNROM, J87, NROM, AxROM, CNROMProtected, GxROM, UxROM, mapper_34
 from .ines import BoardInfo, RomImage, parse
+from .irem import G101
+from .jaleco import SS88006
+from .konami import VRC1
 from .mmc1 import MMC1, MMC1A
-from .mmc3 import mmc3_for
+from .mmc2 import MMC2, MMC4
+from .mmc3 import TxSROM, mmc3_for
+from .namco import Namco108, Namco163, Namco175
+from .taito import TC0190
 
 #: Each implemented iNES mapper's board, built from the image and the CPU cycle
 #: length in master ticks (a class, or a function choosing one by submapper).
@@ -34,8 +41,24 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     3: CNROM,
     4: mmc3_for,
     7: AxROM,
+    9: MMC2,
+    10: MMC4,
+    16: BandaiFCG,
+    18: SS88006,
+    19: Namco163,
+    32: G101,
+    33: TC0190,
     34: mapper_34,
+    66: GxROM,
+    75: VRC1,
+    87: J87,
+    118: TxSROM,
     155: MMC1A,
+    157: Datach,
+    159: BandaiX24C01,
+    185: CNROMProtected,
+    206: Namco108,
+    210: Namco175,
 }
 
 __all__ = ["MAPPERS", "BoardInfo", "Cartridge", "Loaded", "RomImage", "load", "read_rom_file"]
