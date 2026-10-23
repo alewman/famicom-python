@@ -51,6 +51,7 @@ MESEN_LINE = re.compile(
     rb"P:([0-9A-F]{2}) CYC:(\d+) SL:(-?\d+) DOT:(\d+) FR:(\d+)"
 )
 P_MASK = 0xCF
+PASSED_OVER = "rows after a rendering-time $2007 read passed over"
 # Mesen2's power-on where hardware leaves it open and the board's default
 # differs: PPUSTATUS bits 7-5 clear (the board's default sets the overflow bit,
 # as PPUSim does; "+0+x xxxx" allows both), and the PPU 4 dots into line 0 as
@@ -105,13 +106,17 @@ def board_rows(system: System):
     cartridge = system.cartridge
     nmi_vector = irq_vector = None
     fetch: list[tuple[int, int, int, int]] = []
+    read_2007 = [False]  # this step read $2007 while the PPU was rendering
 
     def observe(kind: str, address: int, value: int, t: int) -> None:
         if not fetch:
             fetch.append((board.cycles, ppu.line, ppu.dot, ppu.frame))
+        elif kind == "read" and 0x2000 <= address < 0x4000 and address & 7 == 7:
+            read_2007[0] = read_2007[0] or ppu.rendering_now
 
     system.step()  # the reset sequence
     board.bus_observers.append(observe)
+    after_2007 = False  # the step that led to this row read $2007 while rendering
     while True:
         regs = (cpu.pc, cpu.a, cpu.x, cpu.y, cpu.s, cpu.p)
         s, opcode_pc = cpu.s, cpu.pc
@@ -128,7 +133,8 @@ def board_rows(system: System):
                 opcode = read(opcode_pc & 0x7FF)
             if cpu.pc in (nmi_vector, irq_vector) and opcode != 0x00:
                 continue  # an interrupt entry: Mesen2 logs none
-        yield regs + fetch[0]
+        yield regs + fetch[0] + (after_2007,)
+        after_2007, read_2007[0] = read_2007[0], False
 
 
 def mesen_path(rom: Path) -> Path:
@@ -144,12 +150,22 @@ def position(line: int, dot: int) -> int:
     return line * DOTS + dot
 
 
-def compare(rom: Path, trace: Path, context: int = 6) -> tuple[int, str]:
-    """Rows that agree before the first divergence, and a report."""
+def compare(
+    rom: Path, trace: Path, context: int = 6, tolerate_2007: bool = False
+) -> tuple[int, str]:
+    """Rows that agree before the first divergence, and a report.
+
+    ``tolerate_2007``: a row whose A, X, Y or P alone differs, right after an
+    instruction that read $2007 while the PPU was rendering, is counted and
+    passed over: Mesen2 does not model what the PPU bus does then, and the
+    board follows PPUSim (C31). Everything else on the row must agree, and so
+    must the next row.
+    """
     system = System.from_rom(rom, MACHINE)
     history: list[tuple[tuple, tuple]] = []
     cycle_offset = dot_offset = None
     count = 0
+    tolerated: list[int] = []
     for ours, theirs in zip(board_rows(system), mesen_rows(trace), strict=False):
         if cycle_offset is None:
             cycle_offset = theirs[6] - ours[6]
@@ -161,10 +177,24 @@ def compare(rom: Path, trace: Path, context: int = 6) -> tuple[int, str]:
         same_cycle = theirs[6] - ours[6] == cycle_offset
         gap = (position(theirs[7], theirs[8]) - position(ours[7], ours[8])) % (LINES * DOTS)
         same_dot = gap == dot_offset
+        if (
+            tolerate_2007
+            and not same_cpu
+            and same_cycle
+            and same_dot
+            and ours[10]
+            and (ours[0], ours[4]) == (theirs[0], theirs[4])
+            and (not tolerated or tolerated[-1] != count - 1)
+        ):
+            tolerated.append(count)
+            count += 1
+            continue
         if not (same_cpu and same_cycle and same_dot):
             checks = (("CPU", same_cpu), ("cycle", same_cycle), ("dot", same_dot))
             what = [name for name, ok in checks if not ok]
             lines = [f"first divergence after {count:,} instructions ({', '.join(what)}):"]
+            if tolerated:
+                lines.append(f"  ({len(tolerated)} {PASSED_OVER})")
             lines.append(f"  offsets: cycle {cycle_offset}, dot {dot_offset} (this row: {gap})")
             for a, b in history:
                 lines.append("  board " + _format(a))
@@ -172,14 +202,15 @@ def compare(rom: Path, trace: Path, context: int = 6) -> tuple[int, str]:
             return count, "\n".join(lines)
         count += 1
     frame = ours[9] if count else 0
+    passed = f"; {len(tolerated)} {PASSED_OVER}" if tolerated else ""
     return count, (
         f"identical for all {count:,} instructions (board frame {frame}); "
-        f"offsets: cycle {cycle_offset}, dot {dot_offset}"
+        f"offsets: cycle {cycle_offset}, dot {dot_offset}{passed}"
     )
 
 
 def _format(row: tuple) -> str:
-    pc, a, x, y, s, p, cycles, line, dot, frame = row
+    pc, a, x, y, s, p, cycles, line, dot, frame = row[:10]
     return (
         f"{pc:04X} A:{a:02X} X:{x:02X} Y:{y:02X} S:{s:02X} P:{p:02X} "
         f"CYC:{cycles} L:{line} D:{dot} F:{frame}"
@@ -192,6 +223,11 @@ def main() -> int:
     parser.add_argument("--frames", type=int, default=3600, help="Mesen2 frames (60 s = 3600)")
     parser.add_argument("--trace-dir", type=Path, default=ROOT / "tests/mame_traces/lockstep")
     parser.add_argument("--reuse", action="store_true", help="compare an existing trace again")
+    parser.add_argument(
+        "--tolerate-2007",
+        action="store_true",
+        help="pass over a register differing only after a rendering-time $2007 read (C31)",
+    )
     args = parser.parse_args()
     args.trace_dir.mkdir(parents=True, exist_ok=True)
     trace = args.trace_dir / f"{args.rom.stem}.{args.frames}.trace"
@@ -209,7 +245,7 @@ def main() -> int:
         )
         print(f"Mesen2: stop code {code}, {wall:.0f} s, {trace.stat().st_size:,} bytes of trace")
     start = time.perf_counter()
-    _, report = compare(args.rom, trace)
+    _, report = compare(args.rom, trace, tolerate_2007=args.tolerate_2007)
     print(report)
     print(f"compared in {time.perf_counter() - start:.0f} s")
     return 0 if report.startswith("identical") else 1
