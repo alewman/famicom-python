@@ -38,6 +38,10 @@ class TraceLoggerOptions(ctypes.Structure):
 # offsetof() against that header: its size, and where the fields this script
 # touches lie. run_mesen checks two known defaults before trusting them.
 NES_CONFIG_SIZE = 14184
+NES_CONFIG_PORT1_TYPE = 988  # ControllerType (int32) of Port1
+NES_CONFIG_PORT2_TYPE = 1980
+NES_CONTROLLER = 6  # ControllerType::NesController
+NES_CONFIG_AUTO_CONFIGURE_INPUT = 11908  # bool, default true
 NES_CONFIG_REGION = 11912  # ConsoleRegion (int32): 0 auto, 1 NTSC
 NES_CONFIG_SPRITES_ENABLED = 11932  # bool, default true
 NES_CONFIG_OAM_ROW_CORRUPTION = 11982  # bool: EnablePpuOamRowCorruption, default false
@@ -83,6 +87,10 @@ def configure_for_comparison(m: ctypes.CDLL) -> None:
       line, as hardware does (PPU_power_up_state.wiki); Mesen2 does not by default.
     - Work RAM powers on as zeros, the board's default ``PowerOn.ram_fill``;
       Mesen2's default is random.
+    - A standard controller in each port, as the board has, and no input
+      configured from Mesen2's game database (which plugs a Zapper into
+      port 2 for The Adventures of Bayou Billy, and the Zapper's light
+      sense reads 1 on $4017 D3); headless, the ports are otherwise empty.
     - NTSC whatever the dump's region: the board runs one machine (NES-001,
       NTSC), and Mesen2 would otherwise run a PAL dump on a PAL console.
     - OAM row corruption on (rendering re-enabled with the secondary OAM
@@ -101,6 +109,9 @@ def configure_for_comparison(m: ctypes.CDLL) -> None:
     ):
         raise SystemExit("NesConfig layout does not match Mesen2 2.1.1; re-measure the offsets")
     raw[NES_CONFIG_REGION : NES_CONFIG_REGION + 4] = [1, 0, 0, 0]
+    raw[NES_CONFIG_AUTO_CONFIGURE_INPUT] = 0
+    for port in (NES_CONFIG_PORT1_TYPE, NES_CONFIG_PORT2_TYPE):
+        raw[port : port + 4] = [NES_CONTROLLER, 0, 0, 0]
     raw[NES_CONFIG_RESTRICT_FIRST_FRAME] = 1
     raw[NES_CONFIG_RAM_POWER_ON] = 1
     raw[NES_CONFIG_OAM_ROW_CORRUPTION] = 1
