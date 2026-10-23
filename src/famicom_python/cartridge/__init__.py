@@ -29,6 +29,7 @@ from .konami import VRC1, VRC24
 from .mmc1 import MMC1, MMC1A
 from .mmc2 import MMC2, MMC4
 from .mmc3 import TxSROM, mmc3_for
+from .mmc5 import MMC5
 from .namco import Namco108, Namco163, Namco175
 from .sunsoft import FME7
 from .taito import TC0190
@@ -41,6 +42,7 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     2: UxROM,
     3: CNROM,
     4: mmc3_for,
+    5: MMC5,
     7: AxROM,
     9: MMC2,
     10: MMC4,
