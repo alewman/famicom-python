@@ -102,18 +102,38 @@ def _mmc1atest_char(t: int) -> str:
     return ":" if t == 0x06 else " "
 
 
+def _vrctest_char(t: int) -> str:
+    """AWJ's ``vrctest``: digits at 0, letters at $0A, then ``-!?.,;:()/=`` (``vrctest.inc``)."""
+    return "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-!?.,;:()/= "[t] if t < 0x30 else " "
+
+
 #: Screen decoders by font, for the "values" protocol.
 FONTS = {
     "ascii": lambda t: chr(t) if 0x20 <= t < 0x7F else " ",
     "rainwarrior": _rainwarrior_char,
     "tall": _tall_char,
     "mmc1atest": _mmc1atest_char,
+    "vrctest": _vrctest_char,
 }
 
 
-def font_text(system: System, font: str) -> str:
-    """Nametable 0 as text in one of the test ROMs' fonts (:data:`FONTS`)."""
-    return _nametable_text(system, FONTS[font])
+def font_text(system: System, font: str, sprites: bool = False) -> str:
+    """Nametable 0 as text in one of the test ROMs' fonts (:data:`FONTS`); with
+    ``sprites``, the sprites' tiles too, each in the cell its top-left lies in
+    once the background's vertical scroll (from t) is undone (OAM Y is one
+    line above the sprite's first row)."""
+    text = _nametable_text(system, FONTS[font])
+    if not sprites:
+        return text
+    grid = [list(line.ljust(32)) for line in text.splitlines()]
+    grid += [[" "] * 32 for _ in range(30 - len(grid))]
+    ppu = system.board.ppu
+    scroll = ((ppu.t >> 5) & 31) * 8 + ((ppu.t >> 12) & 7)
+    for i in range(0, 256, 4):
+        y, tile, x = ppu.oam[i] + 1, ppu.oam[i + 1], ppu.oam[i + 3]
+        if y < 240 and FONTS[font](tile) != " ":
+            grid[(y + scroll) // 8 % 30][x // 8] = FONTS[font](tile)
+    return "\n".join("".join(row).rstrip() for row in grid).strip("\n")
 
 
 @dataclass
@@ -190,7 +210,7 @@ class RomCase:
     """One test ROM, how it reports, and how long it may take (emulated seconds)."""
 
     path: str  # under tests/test_roms/nes-test-roms; "x.7z/member" reads inside an archive
-    protocol: str  # "6000", "screen" or "holy" (Holy Mapperel)
+    protocol: str  # "6000", "screen", "holy" (Holy Mapperel), "values" or "ram"
     seconds: float = 60.0
     buttons: int = 0  # held on pad 1 from power-on
     passed: str = "Passed"
@@ -198,9 +218,11 @@ class RomCase:
     # BoardInfo fields to run with, changed from the identified board: the
     # other submapper of a chip, or RAM a test ROM's board lacks.
     board: tuple[tuple[str, int], ...] = ()
-    # "values": blocks of whole lines that must be on screen (in ``font``) after ``seconds``.
+    # "values": blocks of whole lines that must be on screen (in ``font``) after ``seconds``;
+    # "ram": "ADDR=VALUE" hex bytes that work RAM must hold then.
     expect: tuple[str, ...] = ()
     font: str = "ascii"
+    sprites: bool = False  # "values": read sprite tiles as text too
 
     @property
     def label(self) -> str:
@@ -384,6 +406,37 @@ def _rainwarrior(mapper: int, submapper: int, *lines: str) -> RomCase:
     return _values(f"{mapper}_test_src.zip/{mapper}_test_{submapper}.nes", "rainwarrior", *lines)
 
 
+def _vrctest(build: str, asic: str, pcb: str, mapper: int, submapper: int | None) -> RomCase:
+    """AWJ's ``vrctest`` for one board: it probes the wiring and features and names
+    the board it found, which must be the build's own (code.s "Identification"),
+    with both VRC4 IRQs on time ("YES", not "EARLY" or "LATE") or absent (VRC2)."""
+    feature = "YES" if asic == "VRC4" else "NO"
+
+    def row(label: str, value: str, start: int, end: int) -> str:
+        return label + " " * (end - start - len(label) - len(value)) + value
+
+    features = [
+        row(label, feature, 3, 29)
+        for label in (
+            "ONE-SCREEN MIRRORING:",
+            "FIX 8000,SWITCH C000:",
+            "PSEUDO-SCANLINE IRQ:",
+            "CYCLE COUNTER IRQ:",
+        )
+    ]
+    ident = [row("ASIC:", asic, 7, 25), row("PCB:", pcb, 7, 25), row("MAPPER:", str(mapper), 7, 25)]
+    if submapper is not None:
+        ident.append(row("SUBMAPPER:", str(submapper), 7, 25))
+    return RomCase(
+        f"../nesdev-forum/vrctest.zip/vrctest{build}.nes",
+        "values",
+        5,
+        expect=("\n".join(features), "\n".join(ident)),
+        font="vrctest",
+        sprites=True,
+    )
+
+
 def _bus_conflict_test(mapper: int, submapper: int, count: str, high: str) -> RomCase:
     """``{mapper}_test_{submapper}``: the bank count, and for submappers 1 and 2 the
     four "high VS low" rows (the AND of the two with conflicts, else high)."""
@@ -493,7 +546,7 @@ MAPPER_ROMS = (
             ("6.MMC3_rev_B", 0),
         )
     ),
-    # Holy Mapperel 0.02: every build for mappers 0-4, 7, 9, 10, 66 and 118. None of its MMC3
+    # Holy Mapperel 0.02: every build for mappers 0-4, 7, 9, 10, 66, 69 and 118. None of its MMC3
     # builds has PRG-RAM, so one runs with 8 KiB to reach the $A001 tests, and
     # none of its MMC1 builds is SNROM (8 KiB CHR-RAM and PRG-RAM, the $A000
     # D4 disable), so one runs as that. HM banks MMC1 WRAM as SXROM does, so
@@ -531,10 +584,30 @@ MAPPER_ROMS = (
             "M10_P128K_C64K_S8K",
             "M10_P128K_C64K_W8K",
             "M66_P64K_C16K_V",
+            "M69_P128K_C64K_S8K",
+            "M69_P128K_C64K_W8K",
             "M118_P128K_C64K",
         )
     ),
     _holy("M4_P256K_C256K", ("prg_ram", 0x2000)),
+    # tepples's fme7acktest: IRQs at all, then each acknowledge attempt (1 =
+    # acknowledged, 2 = still asserted): every $0D write acknowledges, $0E
+    # and $0F writes do not (Sunsoft_FME-7.wiki, Oliveira's 2015 hardware run).
+    RomCase(
+        "../nesdev-forum/fme7acktest-r1.zip/fme7acktest.nes",
+        "ram",
+        3,
+        expect=("0019=02", "001B=01", "001C=01", "001D=01", "001E=01", "001F=02", "0020=02"),
+    ),
+    _vrctest("21s1", "VRC4", "352398", 21, 1),
+    _vrctest("21s2", "VRC4", "352889", 21, 2),
+    _vrctest("22", "VRC2", "351618", 22, None),
+    _vrctest("23s1", "VRC4", "WORLD HERO", 23, 1),
+    _vrctest("23s2", "VRC4", "352396", 23, 2),
+    _vrctest("23s3", "VRC2", "350926,ETC.", 23, 3),
+    _vrctest("25s1", "VRC4", "351406", 25, 1),
+    _vrctest("25s2", "VRC4", "352400", 25, 2),
+    _vrctest("25s3", "VRC2", "351948", 25, 3),
     _holy("M1_P128K", ("prg_ram", 0x2000)),
     *_RAINWARRIOR,
     *(
@@ -632,11 +705,16 @@ def run_case(case: RomCase, root: Path) -> RomOutcome:
         detail = f"status {result.status}: {result.text.strip()}"
     elif case.protocol == "values":
         system.run_frames(int(case.seconds * 60))
-        text = font_text(system, case.font)
+        text = font_text(system, case.font, case.sprites)
         # Each expectation is whole lines, contiguous (a block may span several).
         lines = "\n" + "\n".join(line.strip() for line in text.splitlines()) + "\n"
         missing = [block for block in case.expect if f"\n{block}\n" not in lines]
         passed, detail = not missing, f"missing {missing}:\n{text}"
+    elif case.protocol == "ram":
+        system.run_frames(int(case.seconds * 60))
+        ram = system.board.ram
+        wrong = [e for e in case.expect if ram[int(e[:4], 16)] != int(e[5:], 16)]
+        passed, detail = not wrong, f"wrong {wrong}: " + bytes(ram[:0x100]).hex(" ")
     elif case.protocol == "holy":
         passed, detail = None, ""
         for _ in range(int(case.seconds)):

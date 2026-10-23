@@ -25,11 +25,12 @@ from .discrete import CNROM, J87, NROM, AxROM, CNROMProtected, GxROM, UxROM, map
 from .ines import BoardInfo, RomImage, parse
 from .irem import G101
 from .jaleco import SS88006
-from .konami import VRC1
+from .konami import VRC1, VRC24
 from .mmc1 import MMC1, MMC1A
 from .mmc2 import MMC2, MMC4
 from .mmc3 import TxSROM, mmc3_for
 from .namco import Namco108, Namco163, Namco175
+from .sunsoft import FME7
 from .taito import TC0190
 
 #: Each implemented iNES mapper's board, built from the image and the CPU cycle
@@ -46,10 +47,15 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     16: BandaiFCG,
     18: SS88006,
     19: Namco163,
+    21: VRC24,
+    22: VRC24,
+    23: VRC24,
+    25: VRC24,
     32: G101,
     33: TC0190,
     34: mapper_34,
     66: GxROM,
+    69: FME7,
     75: VRC1,
     87: J87,
     118: TxSROM,
