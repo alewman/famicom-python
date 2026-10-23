@@ -38,6 +38,7 @@ class TraceLoggerOptions(ctypes.Structure):
 # offsetof() against that header: its size, and where the fields this script
 # touches lie. run_mesen checks two known defaults before trusting them.
 NES_CONFIG_SIZE = 14184
+NES_CONFIG_REGION = 11912  # ConsoleRegion (int32): 0 auto, 1 NTSC
 NES_CONFIG_SPRITES_ENABLED = 11932  # bool, default true
 NES_CONFIG_OAM_ROW_CORRUPTION = 11982  # bool: EnablePpuOamRowCorruption, default false
 NES_CONFIG_RESTRICT_FIRST_FRAME = 11989  # bool: RestrictPpuAccessOnFirstFrame
@@ -82,6 +83,8 @@ def configure_for_comparison(m: ctypes.CDLL) -> None:
       line, as hardware does (PPU_power_up_state.wiki); Mesen2 does not by default.
     - Work RAM powers on as zeros, the board's default ``PowerOn.ram_fill``;
       Mesen2's default is random.
+    - NTSC whatever the dump's region: the board runs one machine (NES-001,
+      NTSC), and Mesen2 would otherwise run a PAL dump on a PAL console.
     - OAM row corruption on (rendering re-enabled with the secondary OAM
       address frozen), which the board always models (C26, AccuracyCoin's
       hardware answer key); off by default in Mesen2. Found by lockstep:
@@ -97,6 +100,7 @@ def configure_for_comparison(m: ctypes.CDLL) -> None:
         != 241
     ):
         raise SystemExit("NesConfig layout does not match Mesen2 2.1.1; re-measure the offsets")
+    raw[NES_CONFIG_REGION : NES_CONFIG_REGION + 4] = [1, 0, 0, 0]
     raw[NES_CONFIG_RESTRICT_FIRST_FRAME] = 1
     raw[NES_CONFIG_RAM_POWER_ON] = 1
     raw[NES_CONFIG_OAM_ROW_CORRUPTION] = 1
