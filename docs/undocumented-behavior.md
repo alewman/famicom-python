@@ -357,6 +357,26 @@ before the board takes a side.
   *Board*: `Board.read_byte` calls 6502-python's `note_stall()` after a DMA
   (its PR #7). Found in lockstep: Kirby's Adventure, VBL's NMI during a DMC
   DMA inside its wait-loop `BEQ`.
+- **C31. A $2007 read during rendering, on the PPU bus.** The wiki says the
+  read "will cause" both increments and that the buffer gets "the value read";
+  AccuracyCoin's notes ("ALE + Read", "Hybrid Addresses", "$2007 Stress Test",
+  hardware answer keys) describe the octal latch: PA0-7 are latched on ALE,
+  PA8-13 follow the address register every cycle. *Settled on PPUSim*
+  (`fb7de61`, `vram_ctrl.cpp` and half-cycle pin traces): a $2007 read's own
+  ALE comes 2 dots after the access (`tmp_2`) and its /RD 2 dots later
+  (`PD_RB`, which also increments v). Rendering's ALE wins over the read's;
+  ALE and /RD on the same dot feed the latch back on itself once per master
+  half-cycle they overlap: the read's ALE on a fetch's /RD dot for the whole
+  dot (7 steps from the fetch's low byte; the fetch reads at the result), its
+  /RD on a fetch's ALE dot for half of it (3 steps from the byte on the bus;
+  the buffer and the next fetch read at the result). On a fetch's /RD dot the
+  buffer takes that fetch, whose low byte its ALE latched before the
+  increment. A $2006 copy landing between a fetch's ALE and /RD gives the
+  same hybrid address. *Board*: `PPU._octal`, `_read_2007_ale`,
+  `_complete_2007_read`, `_copy_t`; 16 of 16 read phases leave PPUSim's
+  buffer; the three AccuracyCoin tests pass. The feedback is analogue on
+  hardware, PPUSim's step counts are its model of it. Not modelled: a $2007
+  *write* during rendering (open item 8).
 
 ## Open items
 
