@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""Milestone 7's compatibility sweep: every licensed dump, frames against Mesen2's (a detector).
+
+For each licensed No-Intro dump whose mapper the board implements, read in
+place from its zip (never extracted), Mesen2 and the board both run from power
+with no input, and the board's frames are compared with Mesen2's, pixel value
+for pixel value (``mesen_run.configure_for_comparison`` gives Mesen2 an
+identity palette). The board runs on Mesen2's power-on
+(``mesen_lockstep.MACHINE``), which keeps the two in lockstep instruction for
+instruction; Mesen2 counts frames ended and the board frames begun, so
+Mesen2's frame N is the board's N - 1 (measured on SMB1 and Zelda). The
+board's frame either side is tried as well and reported if it is closer.
+
+    nice pypy3 scripts/compat_sweep.py --jobs 12 [--only REGEX] [--frames 60,300,600]
+
+One line of JSON per dump in ``--out`` (appended; dumps already there are
+skipped, so an interrupted sweep resumes), and Mesen2's first differing frame
+as a PNG, differing pixels magenta, beside it. Nothing it writes is committed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import multiprocessing
+import os
+import re
+import sys
+import tempfile
+import time
+import zipfile
+from pathlib import Path
+
+from count_mappers import BASE, classify
+from mesen_lockstep import MACHINE, mesen_path
+from mesen_run import ROOT, run_mesen
+
+from famicom_python.cartridge import MAPPERS
+from famicom_python.ppu import HEIGHT
+from famicom_python.system import System
+from famicom_python.video import load_palette, write_png
+
+SETS = [
+    "Nintendo - Nintendo Entertainment System (Headered)",
+    "2024 - Nintendo - Nintendo Entertainment System (Headered)",
+]
+OUT = ROOT / "tests" / "mame_traces" / "sweep"
+WIDTH, PIXELS = 256, 256 * HEIGHT
+
+# One log line per wanted frame: Mesen2 keeps only a script's last 500 log
+# lines (Core/Debugger/ScriptingContext.cpp), too few for a frame's rows.
+FRAMES_LUA = """
+local wanted, frame, last = {%s}, 0, %d
+emu.addEventCallback(function()
+  frame = frame + 1
+  if wanted[frame] then
+    local buffer = emu.getScreenBuffer()
+    local parts = {}
+    for i = 1, #buffer do parts[i] = string.format("%%03x", buffer[i]) end
+    emu.log("F" .. frame .. " " .. table.concat(parts))
+  end
+  if frame == last then emu.log("DONE") end
+end, emu.eventType.endFrame)
+"""
+
+
+def licensed_dumps(only: str | None, mappers: set[int] | None = None) -> list[Path]:
+    """Every licensed dump of ``SETS`` whose header names an implemented mapper (of ``mappers``).
+
+    The 2024 set renames many of the other's dumps; a dump whose .nes CRC (from
+    the zip's directory) an earlier set already gave is skipped.
+    """
+    found, seen = [], set()
+    for name in SETS:
+        for path in sorted((BASE / name).glob("*.zip")):
+            if classify(path.stem) != "licensed" or (only and not re.search(only, path.stem)):
+                continue
+            with zipfile.ZipFile(path) as archive:
+                members = [n for n in archive.namelist() if n.lower().endswith(".nes")]
+                if len(members) != 1:
+                    continue
+                crc = archive.getinfo(members[0]).CRC
+                header = archive.open(members[0]).read(16)
+            if crc in seen:
+                continue
+            seen.add(crc)
+            mapper = (header[6] >> 4) | (header[7] & 0xF0) | ((header[8] & 0x0F) << 8)
+            if mapper in MAPPERS and (mappers is None or mapper in mappers):
+                found.append(path)
+    return found
+
+
+def mesen_frames(rom: Path, frames: list[int], home: Path) -> dict[int, list[int]]:
+    lua = FRAMES_LUA % (", ".join(f"[{f}]=true" for f in frames), max(frames))
+    _, log, _ = run_mesen(
+        mesen_path(rom),
+        lua=lua.encode(),
+        lua_name="frames.lua",
+        seconds=600,
+        home=home,
+        until="DONE",
+        for_comparison=True,
+    )
+    pictures = {}
+    for line in log.splitlines():
+        if line.startswith("F"):
+            number, data = line[1:].split(" ", 1)
+            pictures[int(number)] = [int(data[i : i + 3], 16) for i in range(0, len(data), 3)]
+    return pictures
+
+
+def finished_picture(system: System) -> list[int]:
+    """The frame just begun, once its 240 rows are drawn (as scripts/mesen_frames.py)."""
+    ppu = system.board.ppu
+    while not HEIGHT <= ppu.line < ppu.prerender_line:
+        system.step()
+    return list(ppu.picture)
+
+
+def check(rom: Path, frames: list[int]) -> dict:
+    result: dict = {"rom": rom.name, "set": rom.parent.name}
+    began = time.monotonic()
+    with tempfile.TemporaryDirectory(prefix="mesen-home-") as home:
+        # A fresh home each run: Mesen2 keeps battery saves there. Its own log
+        # (every uninitialized RAM read) goes to the process's output: drop it.
+        saved = os.dup(1), os.dup(2)
+        null = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(null, 1), os.dup2(null, 2)
+        try:
+            theirs = mesen_frames(rom, frames, Path(home))
+        finally:
+            os.dup2(saved[0], 1), os.dup2(saved[1], 2)
+    result["mesen_seconds"] = round(time.monotonic() - began, 1)
+    try:
+        system = System.from_rom(rom, MACHINE)
+    except NotImplementedError as error:
+        return result | {"status": "unsupported", "error": str(error)}
+    board = system.loaded.image.board
+    result["mapper"] = f"{board.mapper}.{board.submapper}"
+    began = time.monotonic()
+    ours: dict[int, list[int]] = {}
+    report = []
+    try:
+        for frame in frames:
+            same = frame - 1  # the board's number for Mesen2's frame
+            candidates = (same - 1, same, same + 1)
+            for candidate in candidates:
+                if candidate not in ours:
+                    system.run_frames(candidate - system.board.ppu.frame)
+                    ours[candidate] = finished_picture(system)
+            if frame not in theirs or len(theirs[frame]) != PIXELS:
+                report.append({"frame": frame, "error": "Mesen2 gave no 256x240 frame"})
+                continue
+            want = theirs[frame]
+            counts = {
+                c: sum(a != b for a, b in zip(ours[c], want, strict=True)) for c in candidates
+            }
+            best = min(counts, key=lambda c: (counts[c], c != same))
+            entry = {"frame": frame, "diff": counts[same]}
+            if counts[best] < counts[same]:
+                entry |= {"closest": best - same, "closest_diff": counts[best]}
+            report.append(entry)
+    except Exception as error:  # a board crash is a finding, not a sweep failure
+        result |= {"status": "crash", "error": f"{type(error).__name__}: {error}"}
+    result["board_seconds"] = round(time.monotonic() - began, 1)
+    result["frames"] = report
+    result["instructions"] = system.instructions
+    if "status" not in result:
+        differing = [e for e in report if e.get("diff", 1)]
+        result["status"] = "differs" if differing else "identical"
+        if differing and "diff" in differing[0]:
+            frame = differing[0]["frame"]
+            save_diff(OUT / f"{rom.stem}.f{frame}.png", ours[frame - 1], theirs[frame])
+    return result
+
+
+def save_diff(path: Path, ours: list[int], theirs: list[int]) -> None:
+    colours = load_palette()
+    write_png(
+        path,
+        b"".join(
+            b"\xff\x00\xff" if a != b else colours[b & 0x1FF]
+            for a, b in zip(ours, theirs, strict=True)
+        ),
+    )
+
+
+def worker(job: tuple[str, list[int]]) -> str:
+    rom, frames = job
+    try:
+        return json.dumps(check(Path(rom), frames))
+    except BaseException as error:  # recorded; the sweep goes on
+        return json.dumps({"rom": Path(rom).name, "status": "error", "error": repr(error)})
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--frames", default="60,300,600", help="Mesen2's frame counts")
+    parser.add_argument("--jobs", type=int, default=8)
+    parser.add_argument("--only", help="regular expression on the dump's name")
+    parser.add_argument("--mappers", help="comma-separated iNES mapper numbers")
+    parser.add_argument("--out", type=Path, default=OUT / "results.jsonl")
+    args = parser.parse_args()
+    frames = sorted(int(f) for f in args.frames.split(","))
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    done = set()
+    if args.out.exists():
+        done = {json.loads(line)["rom"] for line in args.out.read_text().splitlines() if line}
+    mappers = {int(m) for m in args.mappers.split(",")} if args.mappers else None
+    roms = [r for r in licensed_dumps(args.only, mappers) if r.name not in done]
+    print(f"{len(roms)} dumps to run ({len(done)} already in {args.out})", flush=True)
+    # One process per dump: MesenCore keeps global state between loads.
+    context = multiprocessing.get_context("spawn")
+    with context.Pool(args.jobs, maxtasksperchild=1) as pool, args.out.open("a") as out:
+        jobs = [(str(r), frames) for r in roms]
+        for count, line in enumerate(pool.imap_unordered(worker, jobs), 1):
+            out.write(line + "\n")
+            out.flush()
+            entry = json.loads(line)
+            print(f"[{count}/{len(roms)}] {entry['status']:10} {entry['rom']}", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

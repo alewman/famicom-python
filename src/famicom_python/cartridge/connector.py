@@ -25,6 +25,9 @@ else of the board (``tests/test_cartridge_boundary.py`` enforces it).
   rendering fetches are about 4 million address phases a second.
 - **"Not driven" is a value**: a read returns ``None`` and the board supplies
   open bus (the CPU data latch, or on the PPU side the address's low byte).
+  A CPU read that drives only some data lines returns ``driven | undriven <<
+  8``, the high byte the mask of lines left to open bus (Bandai's EEPROM
+  port drives D4 alone; added in milestone 7, docs/cartridge.md).
 - **Nametables**: the cartridge drives CIRAM /CE and CIRAM A10.
   :meth:`Cartridge.ciram_a10` returns A10 for a PPU address in $2000-$3EFF, or
   ``None`` when the cartridge disables CIRAM and answers itself through

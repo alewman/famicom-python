@@ -1,8 +1,10 @@
-"""Discrete-logic boards: NROM (0), UxROM (2), CNROM (3), AxROM (7), BNROM and NINA-001 (34).
+"""Discrete-logic boards: NROM (0), UxROM (2), CNROM (3), AxROM (7), BNROM and NINA-001 (34),
+GxROM (66), J87 (87) and CNROM with copy-protection diodes (185).
 
 Judged in milestone 5 by Holy Mapperel, rainwarrior's ``2_test``,
 ``3_test``, ``7_test`` and ``34_test``, and tepples's ``bntest``
-(docs/claims.md).
+(docs/claims.md); 66 by Holy Mapperel; 87 and 185 have no judge (milestone 7's
+sweep against Mesen2, a detector).
 """
 
 from __future__ import annotations
@@ -138,6 +140,70 @@ class NINA001(Banked):
             self.map_chr(0, 4, value)
         elif address == 0x7FFF:
             self.map_chr(4, 4, value)
+
+
+class GxROM(Banked):
+    """Mapper 66: a write to $8000-$FFFF selects the 32 KiB PRG bank (D5-D4) and 8 KiB CHR (D1-D0).
+
+    GxROM.wiki: a 74HC161 latch, always with AND-type bus conflicts. Power-on
+    banks unspecified: 0 here.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.map_prg(0, 32, 0)
+        self.map_chr(0, 8, 0)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+            return
+        value = self.bus_conflict(address, value)
+        self.map_prg(0, 32, (value >> 4) & 3)
+        self.map_chr(0, 8, value & 3)
+
+
+class J87(NROM):
+    """Mapper 87: a write to $6000-$7FFF selects the 8 KiB CHR bank, its two bits swapped.
+
+    INES_Mapper_087.wiki: D0 is CHR A14 and D1 CHR A13; no bus conflicts (the
+    register is not in ROM space). Power-on bank unspecified: 0 here.
+    """
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if 0x6000 <= address < 0x8000:
+            self.map_chr(0, 8, ((value & 1) << 1) | ((value >> 1) & 1))
+
+
+class CNROMProtected(NROM):
+    """Mapper 185: CNROM with 8 KiB of CHR, enabled only by the right chip-select bits.
+
+    CNROM.wiki "Mapper 185": a write to $8000-$FFFF (always AND-type bus
+    conflicts) sets CS1/CS2 from D1-D0; submappers 4-7 name the value (0-3)
+    that enables CHR-ROM. Every licensed dump has one; submapper 0 (value
+    unknown) is left unprotected. A disabled CHR-ROM leaves the PPU bus
+    undriven: the address's low byte, with D0 pulled up (the wiki: Mighty
+    Bomb Jack's 10k pull-up, which its first revision needs to boot). The
+    latch powers on enabled, as Mesen2 has it (Mappers/Nintendo/CnromProtect.h).
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        submapper = image.board.submapper
+        self.enabling = submapper - 4 if 4 <= submapper <= 7 else None
+        self.chr_enabled = True
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+            return
+        if self.enabling is not None:
+            self.chr_enabled = self.bus_conflict(address, value) & 3 == self.enabling
+
+    def ppu_read(self, address: int, t: int) -> int | None:
+        if address < 0x2000 and not self.chr_enabled:
+            return (address & 0xFF) | 1
+        return super().ppu_read(address, t)
 
 
 def mapper_34(image: RomImage, cpu_cycle_ticks: int) -> Banked:

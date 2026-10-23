@@ -221,6 +221,8 @@ class Board:
             if value is None:
                 self._undriven = True
                 return self.data_bus
+            if value > 0xFF:  # some lines undriven: they keep the bus's charge
+                value = (value & 0xFF) | (self.data_bus & (value >> 8))
             self.data_bus = value
             return value
         if self._snoop_reads:
