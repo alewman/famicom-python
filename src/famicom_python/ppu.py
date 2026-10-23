@@ -166,8 +166,9 @@ class PPU:
     def reset(self) -> None:
         """The reset line: PPUCTRL, PPUMASK, t, x, w and the buffer clear; v does not.
 
-        Writes to $2000, $2001, $2005 and $2006 are ignored until the reset flag
-        clears at the next pre-render line (PPU_power_up_state.wiki; blargg 2008).
+        Writes to $2000, $2001, $2005 and $2006 are ignored, and the $2007 read
+        buffer held clear, until the reset flag clears at the next pre-render
+        line (PPU_power_up_state.wiki; blargg 2008).
         """
         self.ctrl = 0
         self.mask = 0
@@ -820,7 +821,14 @@ class PPU:
                 self._refill_from_fetch = True
         else:
             v = self.v & 0x3FFF
-            self.buffer = self.bus_read(v - 0x1000 if v >= 0x3F00 else v)
+            value = self.bus_read(v - 0x1000 if v >= 0x3F00 else v)
+            # The reset signal holds the buffer clear until it ends at the
+            # pre-render line (PPU_power_up_state.wiki): a read before then
+            # still reads the bus and increments v, but the buffer stays 0.
+            # Argus and Family Stadium '87 check CHR-ROM in that window and
+            # need the 0 (milestone 7's sweep; Mesen2 returns 0 too).
+            if not self.resetting:
+                self.buffer = value
         self._increment_after_2007()
 
     def _increment_after_2007(self) -> None:
