@@ -1006,7 +1006,7 @@ logs; its interrupt entries, which Mesen2 does not log, are dropped.
 | *Mega Man 2* (USA) (1) | 34,643,339 | 3,600 |
 | *Kirby's Adventure* (USA) (4) | 33,718,135 | 3,600 |
 | *Battletoads* (USA) (7) | 33,934,780 | 3,600 |
-| *Super Mario Bros. 3* (USA) (4) | 120,171 | 12 |
+| *Super Mario Bros. 3* (USA) (4) | 34,580,919 (2,593 passed over, below) | 3,600 |
 
 **Every divergence, in the order met, with its source.** Each was diagnosed
 before a run was extended.
@@ -1025,7 +1025,7 @@ before a run was extended.
 | Kirby: rows lost after its IRQ | **the tool**: Mesen2 prints a zero-page PC with two digits ("0029  29"); the parser skipped those lines | parser |
 | Kirby: `LDA $4015` bit 5 after a DMC DMA | **Mesen2**: `GetInternalOpenBus` returns the external bus, and DMA reads set the internal one; AccuracyCoin's key ("Internal Data Bus", C24) says neither | Mesen2 patch 3 |
 | Zelda: `$2002` overflow bit | **Mesen2 setting**: OAM row corruption (C26, AccuracyCoin's key) is off by default; Zelda turns rendering off mid-frame on its title | `configure_for_comparison` turns it on |
-| **SMB3: its status-bar IRQ's dummy `LDA $2007` (line 193)** | **the board, open**: a `$2007` read during rendering. Replayed on PPUSim (`ppusim_compare.py`'s harness, the game's access sequence), PPUSim loads its buffer from the first fetch at least 5 dots after the access (a garbage nametable fetch, still the old v), the board one fetch later with v already incremented; PPUSim also changes the fetch stream itself (a hybrid pattern address, an extra address phase). The family of AccuracyCoin's failing "ALE + Read", "Hybrid Addresses" and "$2007 Stress Test" (milestone 4) | not yet: next |
+| **SMB3: its status-bar IRQ's dummy `LDA $2007` (line 193)** | **the board, open**: a `$2007` read during rendering. Replayed on PPUSim (`ppusim_compare.py`'s harness, the game's access sequence), PPUSim loads its buffer from the first fetch at least 5 dots after the access (a garbage nametable fetch, still the old v), the board one fetch later with v already incremented; PPUSim also changes the fetch stream itself (a hybrid pattern address, an extra address phase). The family of AccuracyCoin's failing "ALE + Read", "Hybrid Addresses" and "$2007 Stress Test" (milestone 4) | the board's octal latch (C31, 2026-10-23, below); then Mesen2's: it does not model the collision, and the board now matches PPUSim on SMB3's sequence |
 
 **The Mesen2 patches** (`scripts/mesen2-detector-fixes.patch`, against
 `b9fa69d`; each where a higher tier shows Mesen2 wrong, and each checked
@@ -1056,3 +1056,25 @@ last cycle), each fail its stall cases.
 **Speed of the tool**: Mesen2 traces a minute in about a minute; the board
 compares 20,000-35,000 instructions a second on PyPy (17-45 minutes a game,
 six at once on this machine).
+
+**Addendum (2026-10-23): the PPU's octal latch, SMB3, 6502-python main.**
+6502-python's PR #7 and #8 (CPUFrame) merged; the board is pinned to main
+`9dc34bd` and recertified on it (every ROM at milestone 5's counts,
+AccuracyCoin unchanged, Kirby's Adventure identical for 60 s). Then SMB3's
+divergence was fixed on the board's side (C31): rendering fetches read at
+their ALE's latched low byte, and a $2007 read's own ALE and /RD (2 and 4
+dots after the access, PPUSim's `tmp_2` and `PD_RB`) collide with the fetch
+cadence as PPUSim's half-cycle traces show. Every one of 16 read phases now
+leaves PPUSim's buffer (6 before), and SMB3's own access sequence, replayed
+on both, too. **AccuracyCoin: 139 of 146** ("$2007 Stress Test", "ALE +
+Read" and "Hybrid Addresses" pass); the CPU, PPU, APU and mapper ROMs keep
+their counts. Mesen2 does not model the collision: SMB3's status-bar IRQ
+reads $2007 mid-line every frame and discards the byte, so
+`mesen_lockstep.py --tolerate-2007` passes over a row that differs only in a
+register right after such a read (2,593 in the minute) and stops on
+anything else; with it SMB3 is identical for 60 seconds. Six games.
+
+Speed of the octal latch: not measured yet. A best-of-5 interleaved A/B on
+the 240p Test Suite menu gave 6.2 frames/s before and 5.6 after, but at a load
+average of 75 on this 32-core machine (other sessions' runs), where both are
+a twelfth of the quiet-machine figures; to repeat when it is quiet.
