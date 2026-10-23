@@ -60,6 +60,7 @@ DELAYS = {
     "2006_copy": 2,  # the second $2006 write's t -> v copy
     "2007_write": 3,  # a $2007 write reaches palette RAM or the bus
     "2007_increment": 4,  # ... and v increments (after a $2007 read too)
+    "2007_read_ale": 2,  # a $2007 read's ALE (PPUSim tmp_2), 2 dots before its /RD
 }
 # A $2007 read's buffer refill lands with its increment, and a second read
 # before then is ignored: it returns the buffer and starts nothing. PPUSim at
@@ -111,6 +112,11 @@ class PPU:
         self._read_in_flight_until = -1  # a $2007 read's refill and increment pending
         self._oam_corrupt: int | None = None  # the OAM row a frozen OAM2 address will corrupt
         self._refill_from_fetch = False  # a $2007 read's refill, waiting on a fetch
+        # The octal latch (PPU A0-7 between ALE and /RD) when it does not hold
+        # the next rendering fetch's own low byte: a $2006 copy or a $2007
+        # read landed between that fetch's ALE and its /RD (C31). None: it does.
+        self._octal: int | None = None
+        self._bus_data = 0  # the last byte a /RD put on AD0-7
         self._last_pixel = -1  # picture index of the last pixel computed
         self._last_value = 0  # its palette value, before greyscale and emphasis
         self._last_pixel_time = -1  # the dot (its time) that computed it
@@ -593,21 +599,61 @@ class PPU:
         self.cartridge.ppu_address(address, self.time)
 
     def _fetch(self, address: int) -> int:
-        """A rendering fetch (/RD), at this dot's time."""
+        """A rendering fetch (/RD), at this dot's time: PA8-13 from the address
+        now, PA0-7 from the octal latch (its ALE's, unless ``_octal`` says)."""
+        octal = self._octal
+        if octal is not None:
+            self._octal = None
+            address = (address & 0x3F00) | octal
         if address >= 0x2000:
             a10 = self.cartridge.ciram_a10(address)
             if a10 is not None:
                 value = self.ciram[(a10 << 10) | (address & 0x3FF)]
+                self._bus_data = value
                 if self._refill_from_fetch:
                     self._refill_from_fetch = False
                     self.buffer = value
                 return value
         value = self.cartridge.ppu_read(address, self.time)
         value = address & 0xFF if value is None else value
+        self._bus_data = value
         if self._refill_from_fetch:
             self._refill_from_fetch = False
             self.buffer = value
         return value
+
+    def _fetch_address(self, dot: int) -> int:
+        """The address the rendering fetch whose /RD is on even ``dot`` (2-340)
+        reads, from the state now (the fetch functions' own arithmetic)."""
+        v = self.v
+        if dot <= WIDTH or 321 <= dot <= 336:
+            phase = (dot - 1) & 7
+            if phase == 1:
+                return 0x2000 | (v & 0x0FFF)
+            if phase == 3:
+                return 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
+            return self._bg_pattern(v) | (8 if phase == 7 else 0)
+        if dot <= 320:
+            phase = (dot - 257) & 7
+            if phase == 1:
+                return self._garbage
+            if phase == 3:
+                return 0x2000 | (v & 0x0FFF)
+            line = self.line if self.line < HEIGHT else self.line & 0xFF
+            base = ((dot - 257) >> 3) << 2
+            return self._sprite_pattern(line, self.oam2[base]) | (8 if phase == 7 else 0)
+        return 0x2000 | (v & 0x0FFF)  # 338, 340
+
+    def _settle(self, high: int, low: int, steps: int) -> int:
+        """ALE and /RD at once: the octal latch takes the byte it makes the bus
+        read, once per master half-cycle that both last (AccuracyCoin "ALE +
+        Read"). PPUSim, half-cycle by half-cycle: a $2007 read's ALE on a
+        fetch's /RD dot lasts the dot (7 steps from the fetch's low byte), its
+        /RD on a fetch's ALE dot half of it (3 steps from the byte on the bus).
+        Analogue on hardware (AccuracyCoin leaves such bytes out of its key)."""
+        for _ in range(steps):
+            low = self.bus_read(high | low)
+        return low
 
     def bus_read(self, address: int) -> int:
         address &= 0x3FFF
@@ -703,6 +749,8 @@ class PPU:
             if self.time >= self._read_in_flight_until:
                 dots = DELAYS["2007_increment"]
                 self._read_in_flight_until = self.time + (dots + 1) * self.dot_ticks  # as _schedule
+                if self.rendering_now:
+                    self._schedule(DELAYS["2007_read_ale"], self._read_2007_ale)
                 self._schedule(dots, self._complete_2007_read)
             return value
         return self._decayed_latch()  # write-only registers read the I/O latch
@@ -739,14 +787,37 @@ class PPU:
             return (value & 0x9F) | (self.status & 0x60)
         return value
 
+    def _read_2007_ale(self) -> None:
+        """A $2007 read's ALE, 2 dots after the access (PPUSim ``vram_ctrl``:
+        ``tmp_2``). On a rendering ALE dot the fetch's address wins; on a
+        rendering /RD dot ALE and /RD meet and that fetch's address settles."""
+        dot = self.dot + 1
+        if self.rendering_now and not dot & 1 and 2 <= dot <= 340:
+            address = self._fetch_address(dot)
+            low = self._octal if self._octal is not None else address & 0xFF
+            self._octal = self._settle(address & 0x3F00, low, 7)
+
     def _complete_2007_read(self) -> None:
-        """The read's bus cycle: refill the buffer from v (the nametable under a
-        palette address), then increment. While rendering, the PPU's bus is
-        busy with fetches, and the buffer takes what the fetch reads (on a
-        fetch's read dot; on its address dot the outcome is analogue): the
-        next rendering fetch's byte (AccuracyCoin "$2007 Stress Test")."""
+        """The read's /RD, 4 dots after the access (PPUSim ``PD_RB``): the
+        buffer takes the bus, and v increments (``TSTEP``). Outside rendering
+        the bus reads v (the nametable under a palette address). While
+        rendering, on a fetch's /RD dot the buffer takes that fetch, whose low
+        byte its ALE latched before the increment (C31); on a fetch's ALE dot,
+        ALE and /RD meet, and the buffer and the next fetch take the settled
+        address."""
         if self.rendering_now:
-            self._refill_from_fetch = True
+            dot = self.dot + 1
+            if not dot & 1 and 2 <= dot <= 340:
+                if self._octal is None:
+                    self._octal = self._fetch_address(dot) & 0xFF
+                self._refill_from_fetch = True
+            elif dot & 1:
+                high = self._fetch_address(dot + 1) & 0x3F00
+                low = self._settle(high, self._bus_data, 3)
+                self.buffer = self.bus_read(high | low)
+                self._octal = low
+            else:  # dot 0, idle
+                self._refill_from_fetch = True
         else:
             v = self.v & 0x3FFF
             self.buffer = self.bus_read(v - 0x1000 if v >= 0x3F00 else v)
@@ -829,7 +900,13 @@ class PPU:
             self._schedule(DELAYS["2007_increment"], self._increment_after_2007)
 
     def _copy_t(self) -> None:
-        """The second $2006 write's t -> v copy."""
+        """The second $2006 write's t -> v copy. Landing on a rendering fetch's
+        /RD dot, it changes PA8-13 but not the low byte its ALE latched: a
+        hybrid address (AccuracyCoin "Hybrid Addresses"; C31)."""
+        if self.rendering_now:
+            dot = self.dot + 1
+            if not dot & 1 and 2 <= dot <= 340 and self._octal is None:
+                self._octal = self._fetch_address(dot) & 0xFF
         self.v = self.t
         if self._watch and not self.rendering_now:
             self._ale(self.v & 0x3FFF)
