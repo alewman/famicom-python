@@ -28,7 +28,7 @@ from .jaleco import SS88006
 from .konami import VRC1, VRC24
 from .mmc1 import MMC1, MMC1A
 from .mmc2 import MMC2, MMC4
-from .mmc3 import TxSROM, mmc3_for
+from .mmc3 import AA6023, TxSROM, mmc3_for
 from .mmc5 import MMC5
 from .namco import Namco108, Namco163, Namco175
 from .sunsoft import FME7
@@ -67,6 +67,7 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     185: CNROMProtected,
     206: Namco108,
     210: Namco175,
+    268: AA6023,
 }
 
 __all__ = ["MAPPERS", "BoardInfo", "Cartridge", "Loaded", "RomImage", "load", "read_rom_file"]

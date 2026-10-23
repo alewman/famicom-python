@@ -230,6 +230,76 @@ class TxSROM(MMC3):
         return self.nametable_a10[(address >> 10) & 3]
 
 
+class AA6023(MMC3):
+    """Mapper 268, submappers 0/1 and 8/9: the AA6023 (SMD132/133) MMC3 clone's outer banks.
+
+    NES_2.0_Mapper_268.wiki; the licensed dumps are modern reissues
+    (Retro-Bit, Limited Run Games, Pixel Heart). Six registers at $6000 (even
+    submapper) or $5000 (odd), mask $F007, alongside any PRG-RAM. The
+    0 register's D6 and the 1 register's D7-D5 choose, for PRG A17-A20, the
+    MMC3's bit or a fixed offset; the offsets come from D2-D0 of 0 and D4 of
+    1, with A21-A24 from 1's D3-D2 and 0's D5-D4 (submappers 0/1 only). 0's
+    D7 and D3 do the same for CHR A17. 3's D4 is GNROM mode: PRG A16-A14
+    from its D3-D1 (A14 from CPU A14 when 1's D1 asks for 32 KiB) and CHR
+    A16-A13 from 2's D3-D0. 3's D7 locks every register but 2 while in MMC3
+    mode. The IRQ is NEC's (the wiki's notes). Not modelled: the "weird"
+    modes (3's D6), mixed CHR-ROM/RAM (register 4), mega-UNROM (5), and the
+    other submappers' PCBs, which no licensed dump uses.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        submapper = image.board.submapper
+        self.outer_base = 0x5000 if submapper & 1 else 0x6000
+        self.wide = submapper < 8  # 0/1: PRG A21-A24 offsets
+        self.outer = [0] * 6
+        super().__init__(image, cpu_cycle_ticks)
+        self.nec_irq = True
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if self.outer_base <= address < self.outer_base + 0x1000:
+            register = address & 7
+            locked = self.outer[3] & 0x80 and not self.outer[3] & 0x10
+            if register < 6 and (not locked or register == 2):
+                if register == 2 and self.outer[2] & 0x80:
+                    value = (self.outer[2] & 0xF0) | (value & 0x0F)
+                self.outer[register] = value
+                self._update()
+        super().cpu_write(address, value, t)
+
+    def _prg_bank(self, bank: int) -> int:
+        o0, o1 = self.outer[0], self.outer[1]
+        mmc3 = 0x0F
+        mmc3 |= 0 if o0 & 0x40 else 0x10  # A17
+        mmc3 |= 0 if o1 & 0x80 else 0x20  # A18
+        mmc3 |= 0x40 if o1 & 0x40 else 0  # A19
+        mmc3 |= 0x80 if o1 & 0x20 else 0  # A20
+        offset = (o0 & 7) << 4 | (o1 & 0x10) << 3
+        if self.wide:
+            offset |= ((o1 >> 2) & 1) << 8 | ((o1 >> 3) & 1) << 9 | ((o0 >> 4) & 3) << 10
+        return (bank & mmc3) | (offset & ~mmc3)
+
+    def map_prg(self, window: int, size_kib: int, bank: int) -> None:
+        o1, o3 = self.outer[1], self.outer[3]
+        bank = self._prg_bank(bank)
+        if o3 & 0x10:  # GNROM mode: A16-A14 from register 3, A13 from the CPU
+            bank &= ~0x0F
+            if o1 & 0x02:  # 32 KiB
+                bank |= ((o3 >> 2) & 3) << 2 | (window & 3)
+            else:
+                bank |= ((o3 >> 1) & 7) << 1 | (window & 1)
+        super().map_prg(window, size_kib, bank)
+
+    def map_chr(self, window: int, size_kib: int, bank: int) -> None:
+        o0, o3 = self.outer[0], self.outer[3]
+        for i in range(size_kib):
+            one = bank * size_kib + i
+            if o0 & 0x80:
+                one = (one & ~0x80) | (o0 & 8) << 4
+            if o3 & 0x10:
+                one = (one & ~0x7F) | (self.outer[2] & 0x0F) << 3 | ((window + i) & 7)
+            super().map_chr(window + i, 1, one)
+
+
 def mmc3_for(image: RomImage, cpu_cycle_ticks: int) -> MMC3:
     """Mapper 4's board by submapper."""
     submapper = image.board.submapper

@@ -32,6 +32,26 @@ written against the NES 2.0 definition, not measured on hardware.
 | 7 AxROM | 7.1, 7.2; single screen | `7_test_1`, `7_test_2` (every value); `bntest_aorom` (16 banks, one-screen 00004444); HM ×2 | conformance; manufacturing test | 7.0 is treated as 7.1, as the wiki asks |
 | 34 BNROM | 34.2: 32 KiB banks, AND conflicts | `34_test_2` (valid BNROM, 8 banks); `bntest_h`, `bntest_v` (16 banks, H and V) | conformance | the bus conflicts: `34_test`'s line for them prints YES on any board (C28); specification and `tests/test_mappers.py` only |
 | 34 NINA-001 | 34.1: registers over RAM at `$7FFD-$7FFF` | `34_test_1` (valid NINA-001, 2 PRG, 16 CHR banks) | conformance | |
+| 9 MMC2 | PNROM: latch 0 on `$0FD8`/`$0FE8` alone, latch 1 on `$1FD8-$1FDF`/`$1FE8-$1FEF`, switching after the read | HM `M9_P128K_C64K` (fails with the latch frozen) | manufacturing test | the latch's timing within a fetch (no ROM measures it; the sweep against Mesen2 only) |
+| 10 MMC4 | FxROM: both latches over a range, 16 KiB PRG, 8 KiB RAM | HM `M10_*` ×2 | manufacturing test | as 9 |
+| 66 GxROM | GNROM/MHROM, AND conflicts | HM `M66_P64K_C16K_V` | manufacturing test | |
+| 69 FME-7 | commands 0-F, ROM/RAM/open bus at `$6000`, 16-bit cycle IRQ | HM `M69_*` ×2; tepples's `fme7acktest` (every `$0D` write acknowledges, `$0E`/`$0F` do not: Oliveira's 2015 hardware result) | manufacturing test; hardware-run | `fme7ramtest`'s 32 KiB RAM mod (no hardware result); the 5B's sound (milestone 8) |
+| 21/22/23/25 VRC2, VRC4 | all nine boards of the submapper table: wiring, VRC2's 1-bit latch, VRC4's one-screen, swap mode, RAM enable, VRC IRQ in both modes | AWJ's `vrctest` identifies each of the nine boards and finds both IRQ modes on time (fails with a 344-step prescaler) | community | VRC2's microwire (no game uses it) |
+| 118 TxSROM | CHR A17 to CIRAM A10 | HM `M118_P128K_C64K` (fails with the A10 from the arrangement) | manufacturing test | |
+| 5 MMC5 | PRG modes 0-3 with RAM in `$8000-$DFFF`, CHR modes 0-3 with the 10-bit registers, 8x16 A/B sets, ExRAM modes, fill, extended attributes, vertical split ("CL" wiring), scanline IRQ and in-frame flag, multiplier | none (the `mmc5test` ROMs are viewers) | detector only: the sweep | reset detection, MMC5A's `$5207-$520A` and `$5800`, the `$2002`/`$2005` snoops, the sound (milestone 8) |
+| 16 Bandai FCG/LZ93D50 | 16.4 (ports at `$6000`), 16.5 (at `$8000`, latch), 24C02 EEPROM | `tests/test_mappers_m7.py` (EEPROM protocol, counter order) | detector only: the sweep | the counter's test-then-decrement order is Mesen2's, not documented |
+| 157 Datach | 24C02 and Battle Rush's X24C01, CHR-RAM | `tests/test_mappers_m7.py` | detector only | the barcode reader (idle) |
+| 159 Bandai X24C01 | | `tests/test_mappers_m7.py` | detector only | |
+| 18 SS88006 | nibble registers, 4/8/12/16-bit counter | `tests/test_mappers_m7.py` | detector only | the µPD7755/56 speech chip |
+| 19 Namco 163 | CHR banks, CIRAM or CHR-ROM nametables, chip RAM port, 15-bit up counter | `tests/test_mappers_m7.py` | detector only | pattern tables in CIRAM; counting only while enabled (Mesen2's reading); the sound |
+| 210 Namco 175/340 | 175 RAM enable, 340 arrangements | none | detector only | |
+| 206 Namco 108 | 206.0, 206.1 (unbanked 32 KiB) | none | detector only | the Namco 108's spurious bank switch (games avoid it) |
+| 32 Irem G-101 | PRG mode, 32.1 one-screen | none | detector only | |
+| 33 Taito TC0190 | | none | detector only | |
+| 75 VRC1 | | none | detector only | |
+| 87 J87 | swapped CHR bits | none | detector only | |
+| 185 CNROM + diodes | 185.4-7 chip selects, D0 pulled up when disabled | `tests/test_mappers_m7.py` | detector only | 185.0 (no licensed dump) |
+| 268 AA6023 | 268.0/1 and 268.8/9: outer PRG/CHR banks, GNROM mode, lockout, NEC IRQ | none | detector only | the "weird" modes, mixed CHR-ROM/RAM, mega-UNROM, other PCBs |
 
 **The MMC3's A12 filter** ("after the line has remained low for three
 falling edges of M2", MMC3.wiki from Furrtek's MMC3C schematic) is three falls
@@ -42,5 +62,9 @@ the 8-dot A12 low after an odd frame's skip with BG at `$1000` (C27), no ROM
 here measures. `4-scanline_timing` did need the PPU's address at dot 0 (C27,
 settled on PPUSim): without it, `$2000=$10` counted every line twice.
 
-**Not yet**: mapper 118 (TxSROM) and 119 (TQROM), though HM tests 118; the
-coverage-order mappers of milestone 7; expansion audio (milestone 8).
+"Detector only" mappers have no judge ROM (docs/cartridge.md): their claim is
+milestone 7's sweep, every licensed dump's frames against Mesen2's
+(validation.md, milestone 7), plus the unit tests named.
+
+**Not yet**: mapper 119 (TQROM); the mappers past 95 % of licensed dumps;
+expansion audio (milestone 8).
