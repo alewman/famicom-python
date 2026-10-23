@@ -9,7 +9,7 @@ the clock that ties them together.
 
 **Status (2026-10-22): milestones 1-6 of 8 done**: the CPU on the board, the
 PPU dot by dot, the APU, DMA and interrupts, AccuracyCoin run in full
-(136 of 146, every failure with its cause), the big six mappers with
+(139 of 146, every failure with its cause), the big six mappers with
 their judges, and lockstep with Mesen2: five games identical instruction by
 instruction for a minute each. One master-clock
 timeline with the PPU and APU advanced inside each CPU bus cycle, the memory
@@ -56,13 +56,14 @@ analogue stage per console (`--wav`).
   detector), `apu_mixer`'s tones agree in timing, pitch and level.
 - **APUSim, the gate-level 2A03**, runs here but is not yet a judge: 3 of 8
   `apu_test`, for a cause found in its simulation order.
-- **AccuracyCoin** (`6bee919`, 146 tests): 136 pass, from 116 on the first
+- **AccuracyCoin** (`6bee919`, 146 tests): 139 pass, from 116 on the first
   run, fixed against its hardware answer keys: the frame IRQ's clear and
   inhibit, the controller strobe, the 2A03's internal data bus, its register
   decode during DMA, the DMC's reload timing, enable hold and abort bug, SHx
   after a DMA (6502-python PR #7), OAM evaluation, corruption and `$2004`,
-  sprites from the pre-render line. Of the ten left, PPUSim passes eight (mid-line
-  rendering toggles, mostly): open, with a judge.
+  sprites from the pre-render line, and the PPU's octal latch (`$2007` reads
+  and `$2006` writes during rendering). Of the seven left, PPUSim passes five
+  (mid-line rendering toggles, mostly): open, with a judge.
 - **Mappers, 66 judges** on PyPy and CPython ([docs/claims.md](docs/claims.md)
   per mapper): blargg's `mmc3_test_2`, `mmc3_test` and `mmc3_irq_tests` on
   the Sharp and NEC IRQs, every Holy Mapperel build for mappers 0-4 and 7,
@@ -75,8 +76,9 @@ analogue stage per console (`--wav`).
   instructions each). Every divergence on the way was settled by a higher
   tier: three were Mesen2's (patched for the comparison), one the board's (an
   interrupt during a DMA stall, settled on perfect6502 and fixed in
-  6502-python). *Super Mario Bros. 3* stops at a `$2007` read during
-  rendering where PPUSim disagrees with the board: open.
+  6502-python). *Super Mario Bros. 3* too, once the board modelled the PPU's
+  octal latch (a `$2007` read during rendering collides with the fetches,
+  as PPUSim shows; Mesen2 does not model it, so those rows are passed over).
 - Pins: 6502-python `9dc34bd` (main, with PR #7's `dma_stalled` and
   `note_stall`),
   `nes-test-roms` `95d8f62`, AccuracyCoin `6bee919`.

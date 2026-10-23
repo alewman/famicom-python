@@ -442,12 +442,12 @@ before the board takes a side.
     0.8 dB loud and the DMC tone 0.4–1.5 dB loud (validation.md, milestone 3).
     The recording's analogue path is uncharacterised, so this is evidence, not
     a verdict on blargg's formula.
-18. **AccuracyCoin's remaining ten** (milestone 4, docs/validation.md): each
-    with its cause as far as found. PPUSim passes eight of them, so those are
-    open board bugs with a judge: mid-line rendering toggles ("Stale BG Shift
-    Registers", "BG Serial In", "ALE + Read", "Hybrid Addresses", "Stale
-    Sprite Shift Regs", "Frozen OAM2 Increment"; C12), the sprite flags' set
-    timing ("$2002 flag timing" 2) and the read buffer against the fetch
-    cadence ("$2007 Stress Test" 2). PPUSim fails the other two as well:
+18. **AccuracyCoin's remaining seven** (milestone 4, docs/validation.md;
+    "ALE + Read", "Hybrid Addresses" and "$2007 Stress Test" pass since the
+    octal latch, C31): each with its cause as far as found. PPUSim passes
+    five of them, so those are open board bugs with a judge: mid-line
+    rendering toggles ("Stale BG Shift Registers", "BG Serial In", "Stale
+    Sprite Shift Regs", "Frozen OAM2 Increment"; C12) and the sprite flags'
+    set timing ("$2002 flag timing" 2). PPUSim fails the other two as well:
     "$2004 Stress Test" 3 (one byte, dot 199, the overflow scan's fourth
     copy read) and "Misaligned OAM2 Address" 4.
