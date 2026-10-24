@@ -377,6 +377,39 @@ before the board takes a side.
   buffer; the three AccuracyCoin tests pass. The feedback is analogue on
   hardware, PPUSim's step counts are its model of it. Not modelled: a $2007
   *write* during rendering (open item 8).
+- **C32. OAMADDR when rendering starts.** Errata.wiki: on 2C02C-H, an OAMADDR
+  of 8 or more when rendering starts copies the 8 bytes at OAMADDR & $F8 over
+  OAM[0-7]; Mesen2 does (`DisableOamAddrBug` off by default). PPUSim does not:
+  with OAMADDR left at $80 or $84 by $2004 writes (no $2003 write, which has
+  its own corruption) and a sprite only in row $80, it shows no sprite-0 hit,
+  as the board; the control, the sprite in row 0, hits in both
+  (`scripts/ppusim_compare.py oam_start`). PPUSim's OAM is logic, and the
+  Errata's effects are thought to be the DRAM's, so it may simply not model
+  this; no hardware-corrected test was found. *Board*: no copy. Open. Found
+  in milestone 7's sweep: *Tatakai no Banka* writes $2003 = $80 before its
+  OAM DMA, and on Mesen2 a sprite-0 hit follows.
+- **C33. Which M2 edge clocks a cycle-counting IRQ.** The VRC4's, the
+  LZ93D50's, the FME-7's counters count M2 cycles; no document says on which
+  edge, so whether /IRQ falls before or after the CPU samples it in that
+  cycle. *Board*: the cartridge's `m2()` runs at the cycle's end and /IRQ is
+  sampled at once (the APU's frame IRQ takes the same path, judged by
+  blargg's timing ROMs). Mesen2 takes the IRQ one instruction later in three
+  dumps' lockstep (*Racer Mini Yonku*, *TMNT 2* (J), *SD Gundam Gaiden 2*).
+  AWJ's `vrctest` times the IRQ on a 5-cycle slide and says itself its
+  adjustment may be one off on hardware: no judge. Open.
+- **C34. When the MMC5's in-frame flag starts the extended attributes.**
+  `MMC5.wiki`: the scanline is detected at three identical nametable reads.
+  *Board*: in-frame from the third read, the column-2 tile fetch of line 0,
+  so its attribute fetch is the extended one; Mesen2 starts one fetch later
+  (4-16 pixels of row 0 in seven Koei dumps). No judge. Open.
+- **C35. Line 0's sprites from a stale slot 0.** With no sprite in range of
+  line 239, evaluation leaves the last sprite's Y in secondary OAM slot 0
+  (tile, attribute and X $FF); the pre-render line's fetches check every slot
+  against 261 & 255 = 5 (AccuracyCoin "Sprites On Scanline 0"), so a
+  last Y of 0-5 draws tile $FF's column 0 at x = 255 of line 0. *Settled on
+  PPUSim* (`scripts/ppusim_line0.py`: Y $00 and $03 draw it in both, $F8
+  neither, the same fetch addresses). Mesen2 draws nothing there: thirteen
+  licensed dumps differ by that one pixel.
 
 ## Open items
 
@@ -451,3 +484,6 @@ before the board takes a side.
     set timing ("$2002 flag timing" 2). PPUSim fails the other two as well:
     "$2004 Stress Test" 3 (one byte, dot 199, the overflow scan's fourth
     copy read) and "Misaligned OAM2 Address" 4.
+19. **Milestone 7's open three**: the render-start OAM copy (C32), the M2
+    edge of cycle-counting IRQs (C33), the MMC5's in-frame onset (C34). Each
+    needs a hardware-corrected test; none was found.
