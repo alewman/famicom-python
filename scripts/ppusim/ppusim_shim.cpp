@@ -16,6 +16,71 @@
 using namespace BaseLogic;
 using namespace PPUSim;
 
+// PPUSim's classes befriend this one for tests; the shim uses it to read
+// internal signals into the trace (``inner``).
+namespace PPUSimUnitTest {
+class UnitTest {
+public:
+    static void inner(PPU &ppu, uint8_t out[5]) {
+        auto one = [](TriState t) { return t == One ? 1 : 0; };
+        out[0] = (uint8_t)(one(ppu.fsm.BLNK) | one(ppu.fsm.ZHPOS) << 1 | one(ppu.fsm.nVIS) << 2
+                           | one(ppu.fsm.OBJ_READ) << 3 | one(ppu.wire.PCLK) << 4
+                           | one(ppu.fsm.nFO) << 5 | one(ppu.wire.n_SPR0HIT) << 6
+                           | one(ppu.fsm.n_EVAL) << 7);
+        out[1] = (uint8_t)ppu.fifo->lane[0]->get_Counter();
+        uint8_t active = 0, enabled = 0;
+        for (int n = 0; n < 8; n++) {
+            active |= (uint8_t)(one(ppu.fifo->lane[n]->ZH_FF.get()) << n);
+            enabled |= (uint8_t)((ppu.fifo->lane[n]->n_EN == Zero ? 1 : 0) << n);
+        }
+        out[2] = active;
+        out[3] = enabled;
+        out[4] = (uint8_t)(one(ppu.wire.BLACK) | one(ppu.fsm.SCCNT) << 1
+                           | (ppu.fifo->lane[0]->nZ_COL0 == Zero ? 1 : 0) << 2
+                           | (ppu.fifo->lane[0]->nZ_COL1 == Zero ? 1 : 0) << 3
+                           | one(ppu.fifo->lane[0]->LOAD) << 4 | one(ppu.fifo->lane[0]->STEP) << 5);
+    }
+
+    // The background attribute path (bgcol.cpp): BGC_SRBit keeps its latches
+    // private and befriends no one, so read them through a mirror of its layout.
+    struct SRBitView {
+        DLatch in_latch;
+        DLatch out_latch;
+    };
+    static TriState bit_out(BGC_SRBit &bit) {
+        return reinterpret_cast<SRBitView &>(bit).out_latch.nget();
+    }
+    static void background(PPU &ppu, uint8_t out[8]) {
+        auto one = [](TriState t) { return t == One ? 1 : 0; };
+        BGCol &bg = *ppu.data_reader->bgcol;
+        out[0] = (uint8_t)(one(bg.SRLOAD) | one(bg.STEP2) << 1 | one(bg.PD_SEL) << 2
+                           | one(bg.NEXT) << 3 | one(bg.H01) << 4
+                           | one(bit_out(bg.BGC2_SRBit1)) << 5 | one(bit_out(bg.BGC3_SRBit1)) << 6
+                           | one(bg.STEP) << 7);
+        uint8_t sr2 = 0, sr3 = 0, at = 0, sr0 = 0, lo2 = 0, lo1 = 0, hi1 = 0;
+        for (int n = 0; n < 8; n++) {
+            sr2 |= (uint8_t)(one(bit_out(bg.BGC2_SR1.sr[n])) << n);
+            sr3 |= (uint8_t)(one(bit_out(bg.BGC3_SR1.sr[n])) << n);
+            at |= (uint8_t)(one(bg.pd_latch[n].get()) << n);
+            sr0 |= (uint8_t)(one(bit_out(bg.BGC1_SR2.sr[n])) << n);
+            lo2 |= (uint8_t)(one(bit_out(bg.BGC0_SR2.sr[n])) << n);  // inverted plane
+            lo1 |= (uint8_t)(one(bit_out(bg.BGC0_SR1.sr[n])) << n);  // inverted plane
+            hi1 |= (uint8_t)(one(bit_out(bg.BGC1_SR1.sr[n])) << n);
+        }
+        out[1] = sr2;
+        out[2] = sr3;
+        out[3] = at;
+        out[4] = (uint8_t)(one(ppu.wire.BGC[0]) | one(ppu.wire.BGC[1]) << 1
+                           | one(ppu.wire.BGC[2]) << 2 | one(ppu.wire.BGC[3]) << 3
+                           | one(ppu.wire.TVO[1]) << 4 | one(ppu.wire.THO[1]) << 5);
+        out[5] = sr0;
+        out[6] = (uint8_t)~lo2;
+        out[7] = (uint8_t)~lo1;
+        out[2] = hi1;  // (BGC3's shifter, bit 1 of the attribute, gives way)
+    }
+};
+}  // namespace PPUSimUnitTest
+
 namespace {
 
 // One master half-cycle as the pins and counters show it, for comparisons
@@ -26,9 +91,20 @@ struct TraceEntry {
     uint16_t address;   // PA0-13: the octal latch and PA8-13
     uint16_t video;     // RAW: eeellcccc, 0 outside the picture
     uint8_t pins;       // bit 0 ALE, 1 /RD low, 2 /WR low, 3 /INT low
-    uint8_t pad[5];
+    // Internal signals (PPUSimUnitTest::UnitTest::inner): 0 BLNK, ZHPOS,
+    // nVIS, OBJ_READ, PCLK, nFO, /SPR0HIT, /EVAL; 1 lane 0's X counter;
+    // 2 each lane's "active" flip-flop (ZH_FF); 3 each lane's shifter enable;
+    // 4 BLACK, SCCNT, lane 0's pixel bits 0-1, LOAD, STEP.
+    uint8_t inner[5];
+    // The background path (PPUSimUnitTest::UnitTest::background): 0 SRLOAD,
+    // STEP2, PD_SEL, NEXT, H01, the attribute latches' outputs (bits 0, 1),
+    // STEP; 1 the attribute's bit-0 shifter; 3 the attribute byte latch;
+    // 4 BGC0-3, TVO1, THO1; 5, 6 the high and low planes' second (current
+    // tile) shifters, 2 and 7 their first (next tile) ones; bit n is the
+    // pixel n dots on.
+    uint8_t background[8];
 };
-static_assert(sizeof(TraceEntry) == 24);
+static_assert(sizeof(TraceEntry) == 32);
 
 struct Board {
     PPU ppu{Revision::RP2C02G};
@@ -79,6 +155,8 @@ struct Board {
                                | (out[(size_t)OutputPad::n_RD] == Zero) << 1
                                | (out[(size_t)OutputPad::n_WR] == Zero) << 2
                                | (out[(size_t)OutputPad::n_INT] == Zero) << 3);
+            PPUSimUnitTest::UnitTest::inner(ppu, e.inner);
+            PPUSimUnitTest::UnitTest::background(ppu, e.background);
             trace.push_back(e);
         }
         half++;

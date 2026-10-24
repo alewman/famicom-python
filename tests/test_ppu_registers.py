@@ -61,7 +61,7 @@ def test_odd_frames_skip_a_dot_with_rendering_on() -> None:
     # alternate 89342 and 89341 dots; with rendering off every frame is 89342.
     for mask, expected in ((0x08, {89341, 89342}), (0x00, {89342})):
         _, ppu = _ppu_after_warmup()
-        ppu.mask = mask
+        ppu.set_mask(mask)
         starts = []
         frame = ppu.frame
         while len(starts) < 5:

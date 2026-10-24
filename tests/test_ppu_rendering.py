@@ -34,7 +34,8 @@ def _system(ctrl: int = 0x00, mask: int = 0x1E):
     ppu.palette[0x11:0x14] = bytes((0x21, 0x22, 0x23))
     for i in range(0, 256, 4):
         ppu.oam[i] = 0xF0  # every sprite below the picture
-    ppu.ctrl, ppu.mask = ctrl, mask
+    ppu.ctrl = ctrl
+    ppu.set_mask(mask)
     return system, ppu
 
 
@@ -73,7 +74,7 @@ def test_fine_x_selects_the_bit_and_the_left_column_can_be_hidden() -> None:
     system.run_frames(1)
     assert _row(ppu, 0) == [1, 1, 2, 2, BACKDROP, BACKDROP, BACKDROP, BACKDROP]
     ppu.x = 0
-    ppu.mask = 0x18  # BG on, left 8 pixels hidden
+    ppu.set_mask(0x18)  # BG on, left 8 pixels hidden
     system.run_frames(1)
     assert _row(ppu, 0) == [BACKDROP] * 8
 
@@ -209,7 +210,7 @@ def test_register_effects_land_dots_after_the_access() -> None:
     ppu.write_register(6, 0x3F)
     ppu.write_register(6, 0x05)
     x3 = access_at(102, 100)
-    ppu.write_register(1, 0x21)  # greyscale and red emphasis
+    ppu.write_register(1, 0x21, 0x20)  # greyscale and red emphasis, by STA $2001
     access_at(103, 0)
     ppu.write_register(1, 0x00)
     ppu.v = 0x3F01
@@ -220,3 +221,25 @@ def test_register_effects_land_dots_after_the_access() -> None:
     assert _row(ppu, 101, x2, 4) == [0x12, 0x12, 0x15, 0x15]
     assert _row(ppu, 102, x3 - 2, 3) == [0x15, 0x50, 0x50]  # $15 & $30, emphasis bit 6
     assert _row(ppu, 104, x4, 6) == [0x16, 0x16, 0x16, 0x16, 0x12, 0x12]
+
+
+def test_rendering_turned_off_at_the_end_of_a_line_fades_into_dot_0() -> None:
+    # A disable's fade dot can land on any dot, dot 0 of the next line too,
+    # which has no fetch (a crash before the certification run caught it).
+    for dot in range(334, 341):
+        _, ppu = _system()
+        while (ppu.line, ppu.dot) != (100, dot):
+            ppu.run_to(ppu.time + 1)
+        ppu.write_register(1, 0x00)
+        ppu.run_to(ppu.time + 8 * ppu.dot_ticks)
+        assert not ppu.rendering_now
+
+
+def test_the_ppu_stays_under_pypys_attribute_limit() -> None:
+    # PyPy keeps an instance's attributes in a fixed layout up to 79 of
+    # them; at 80 it falls back to a dict, and every self.x in the dot loop
+    # becomes a dict lookup: C12's state took the PPU to 80 and PyPy to a
+    # third of its speed, with nothing else to show for it.
+    system, ppu = _system()
+    system.run_frames(1)
+    assert len(vars(ppu)) < 80

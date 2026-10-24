@@ -183,11 +183,12 @@ class Board:
     def write_byte(self, address: int, value: int) -> None:
         self.apu.dmc_abort = False  # an aborted DMA meeting a write never happens
         t = self._begin_cycle(address, False)
+        early = self.data_bus  # what the bus holds until the CPU drives it
         self.data_bus = self.internal_bus = value
         ppu = self.ppu
         if 0x2000 <= address < 0x4000:
             ppu.run_to(t + self._ppu_access)
-            ppu.write_register(address & 7, value)
+            ppu.write_register(address & 7, value, early)
         ppu.run_to(t)
         if address < 0x2000:
             self.ram[address & 0x7FF] = value

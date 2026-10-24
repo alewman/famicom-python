@@ -129,7 +129,9 @@ class PPUSimPPU:
         """The board's M2-fall hook: PPUSim's pins already carry it."""
         return value
 
-    def write_register(self, register: int, value: int) -> None:
+    def write_register(self, register: int, value: int, early: int | None = None) -> None:
+        # The early-write value is this class's own model (early_value,
+        # early_halves), so a comparison drives both PPUs alike.
         self._access(0, register, value)
 
     def oam_dma_write(self, value: int) -> None:

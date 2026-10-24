@@ -1156,3 +1156,63 @@ suite passes.
 **Speed of the tool**: per dump, Mesen2 a median 4.1 s and the board 101 s
 (32-486 s) for 600 frames on PyPy, on a loaded machine; 80 board-hours for
 the sweep, 12 at a time.
+
+### C12: mid-line rendering toggles (2026-10-24)
+
+**Pins.** famicom-python at the commit that adds this record; 6502-python
+main `9dc34bd`; PPUSim `fb7de61` at skew 3, with the shim now recording
+internal signals (`scripts/ppusim/ppusim_shim.cpp`: `PPUSimUnitTest::UnitTest`
+is PPUSim's friend, so the shim reads the FSM, the object FIFO's counters and
+shifters and the background colour unit's latches and strobes into each trace
+entry, `TraceEntry.inner` and `.background`). PyPy 7.3.20.
+
+**What was built.** The model in undocumented-behavior.md C12: PPUMASK's
+rendering bits take effect through a fade dot (stopping) or a wake and a dark
+dot (starting), the pixel multiplexer latches its bits a dot and two dots
+after the access, sprites are eight FIFO lanes with their own X counters, the
+overflowed secondary-OAM address freezes the fetch, and the attribute latch
+and shifters work as PPUSim's. The board passes the open-bus value at each
+write (`early`) for greyscale's early-write bit. And the overflow flag
+reaches PPUSTATUS a dot after the evaluation's in-range check.
+
+**The sweeps** (`scripts/ppusim_c12_probes.py`, each against PPUSim pixel for
+pixel and ALE for ALE): `phases2` (disable and enable at all 8 fetch phases,
+00↔0A and 00↔1E): every case equal. `mux` (1E↔16, 1E↔0E: BG and sprite
+enables alone): equal. `sprblank`: equal. `window` (32 off-windows of 1-4 CPU
+cycles, 0A and 1E): 0 of 32 differ, both. `ppusim_compare.py c12` (emphasis,
+greyscale, BG off and on, clean and early-write bus): equal. `lanes` (49
+stops late on a line with a restart on the next): 3 differ, each by one
+background pixel after a restart whose wake falls on ph7 following a stop in
+the sprite fetch (open item 18). `flagset` (PPUSTATUS read each dot around
+line 128's sprite-0 hit and overflow): equal.
+
+**A comparison error found on the way.** `ppusim_compare.Pair.access` took
+our PPUSTATUS at the access point and PPUSim's as M2 falls, where the board
+(`PPU.end_read`) takes the sprite flags. Read that way the sprite-0 flag
+looked a dot late, and a dot-early hit was fitted to it; the board-against-
+PPUSim-board lockstep (`scripts/ppusim_lockstep.py "$2002 flag timing"`)
+then diverged at the read where the early hit showed. The pair now applies
+`end_read` to both; the hit is back on its pixel's dot, and the overflow
+flag, which was the dot early, moved instead. The `oam_start` and `c13`
+experiments, the other reads, are unchanged. (`c21_c22` and
+`c21_rendering` differ from PPUSim on `$2006` writes mid-line, ALE at dot 146
+and 4-95 pixels; main `94cbda7` gives the same output, so they predate this
+work and stay open.)
+
+**AccuracyCoin: 144 of 146.** "Stale BG Shift Registers", "BG Serial In",
+"Stale Sprite Shift Regs", "Frozen OAM2 Increment" and "$2002 flag timing"
+now pass. Left: "$2004 Stress Test" 3 and "Misaligned OAM2 Address" 4, which
+PPUSim fails too (open item 18). 127,878,004 cycles.
+
+**Everything else again**: the CPU (10), PPU (41) and APU (38) ROMs pass on
+PyPy; the mapper ROMs 83 of 83 (run on the tree before the last two fixes,
+which touch no mapper-visible state); the quick suite (74) passes. The
+certification run caught a crash first: a fade dot landing on dot 0 of a
+line indexed a sprite lane that does not exist (regression test added).
+
+**Speed** (240p Test Suite menu, 300 frames after 120 of warm-up, main and
+this tree side by side, five pairs on a loaded machine): PyPy 8.4 frames/s
+against main's 9.9, about 15 % slower, with a wide spread; CPython about 20 %
+by profile. The new state first took the PPU to 80 instance attributes, the
+count at which PyPy drops an object's fixed layout for a dict: a third of
+the speed, with no other symptom. A test now keeps the PPU under 80.
