@@ -19,6 +19,62 @@ index 27cf6f6..3337726 100644
  
  			if(!_irqEnabled) {
  				_console->GetCpu()->ClearIrqSource(IRQSource::DMC);
+diff --git a/Core/NES/Mappers/Bandai/BandaiFcg.h b/Core/NES/Mappers/Bandai/BandaiFcg.h
+index 0b01acd..a96ce25 100644
+--- a/Core/NES/Mappers/Bandai/BandaiFcg.h
++++ b/Core/NES/Mappers/Bandai/BandaiFcg.h
+@@ -87,6 +87,10 @@ protected:
+ 			RemoveRegisterRange(0x6000, 0x7FFF, MemoryOperation::Write);
+ 		}
+ 
++		//famicom-python patch: the ROM is always selected at $8000; its bank latch powers on
++		//unspecified, bank 0 here as on the board (Mesen2 left $8000-$BFFF unmapped: open bus)
++		SelectPrgPage(0, 0);
++
+ 		//Last bank
+ 		SelectPrgPage(1, 0x0F);
+ 	}
+@@ -153,7 +157,9 @@ protected:
+ 			output |= (_standardEeprom->Read() << 4);
+ 		}
+ 
+-		return output | _console->GetMemoryManager()->GetOpenBus(0xE7);
++		//famicom-python patch: D3 is the Datach barcode reader's; without one it is open bus
++		//(INES_Mapper_016.wiki: "xxxE xxxx", all but D4 open bus)
++		return output | _console->GetMemoryManager()->GetOpenBus(_barcodeReader ? 0xE7 : 0xEF);
+ 	}
+ 
+ 	void WriteRegister(uint16_t addr, uint8_t value) override
+diff --git a/Core/NES/Mappers/Mmc3Variants/MMC3_Coolboy.h b/Core/NES/Mappers/Mmc3Variants/MMC3_Coolboy.h
+index 9afc993..02358e6 100644
+--- a/Core/NES/Mappers/Mmc3Variants/MMC3_Coolboy.h
++++ b/Core/NES/Mappers/Mmc3Variants/MMC3_Coolboy.h
+@@ -9,7 +9,9 @@ private:
+ 	uint8_t _exRegs[4] = {};
+ 
+ protected:
+-	uint16_t RegisterStartAddress() override { return 0x6000; }
++	//famicom-python patch: odd submappers (MINDKIDS) decode the outer registers at $5000
++	//(NES_2.0_Mapper_268.wiki), even ones at $6000
++	uint16_t RegisterStartAddress() override { return (_romInfo.SubMapperID & 1) ? 0x5000 : 0x6000; }
+ 	uint32_t GetChrRamSize() override { return 0x40000; }
+ 
+ 	void Reset(bool softReset) override
+@@ -91,11 +93,12 @@ protected:
+ 	void WriteRegister(uint16_t addr, uint8_t value) override
+ 	{
+ 		if(addr < 0x8000) {
+-			if(GetState().RegA001 & 0x80) {
++			if(addr >= 0x6000 && (GetState().RegA001 & 0x80)) {
+ 				WritePrgRam(addr, value);
+ 			}
+ 
+-			if((_exRegs[3] & 0x90) != 0x80) {
++			bool outerPort = !(_romInfo.SubMapperID & 1) || addr < 0x6000;
++			if(outerPort && (_exRegs[3] & 0x90) != 0x80) {
+ 				_exRegs[addr & 0x03] = value;
+ 				UpdateState();
+ 			}
 diff --git a/Core/NES/NesCpu.h b/Core/NES/NesCpu.h
 index 6c0da75..061b455 100644
 --- a/Core/NES/NesCpu.h

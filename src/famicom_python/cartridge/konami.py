@@ -19,6 +19,12 @@ class VRC1(Banked):
     the board has four-screen VRAM) and D1/D2 the CHR banks' high bits;
     $E000 and $F000 their low four bits. Each register decodes $x000-$xFFF.
     Power-on registers unspecified: 0 here.
+
+    The PRG registers have four bits (128 KiB); here every bit written
+    selects, the bank wrapping at the image's size, so images of 128 KiB or
+    less see exactly the chip. The one larger licensed dump, *Ninja JaJaMaru*
+    (Retro Collection, 256 KiB), writes banks past $0F and runs only so, as
+    Mesen2's "oversized PRG" does: no hardware runs it, an extension.
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
@@ -33,7 +39,7 @@ class VRC1(Banked):
     def cpu_write(self, address: int, value: int, t: int) -> None:
         region = address & 0xF000
         if region in (0x8000, 0xA000, 0xC000):
-            self.map_prg((region - 0x8000) >> 13, 8, value & 0x0F)
+            self.map_prg((region - 0x8000) >> 13, 8, value)
         elif region == 0x9000:
             if not self.four_screen:
                 self.set_mirroring(HORIZONTAL if value & 1 else VERTICAL)
