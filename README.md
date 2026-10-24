@@ -7,9 +7,9 @@ around it: the 2A03's sound unit, DMA and joypad ports, the 2C02 picture
 processor dot by dot, the cartridge connector and the mappers behind it, and
 the clock that ties them together.
 
-**Status (2026-10-23): milestones 1-7 of 8 done**: the CPU on the board, the
+**Status (2026-10-24): milestones 1-7 of 8 done**: the CPU on the board, the
 PPU dot by dot, the APU, DMA and interrupts, AccuracyCoin run in full
-(139 of 146, every failure with its cause), the big six mappers with
+(144 of 146; PPUSim fails the two left as well), the big six mappers with
 their judges, lockstep with Mesen2 (six games identical instruction by
 instruction for a minute each), and 31 mappers covering 95.6 % of licensed
 dumps, every one of the 2,545 swept against Mesen2: 2,463 identical, the
@@ -61,14 +61,16 @@ analogue stage per console (`--wav`).
   detector), `apu_mixer`'s tones agree in timing, pitch and level.
 - **APUSim, the gate-level 2A03**, runs here but is not yet a judge: 3 of 8
   `apu_test`, for a cause found in its simulation order.
-- **AccuracyCoin** (`6bee919`, 146 tests): 139 pass, from 116 on the first
+- **AccuracyCoin** (`6bee919`, 146 tests): 144 pass, from 116 on the first
   run, fixed against its hardware answer keys: the frame IRQ's clear and
   inhibit, the controller strobe, the 2A03's internal data bus, its register
   decode during DMA, the DMC's reload timing, enable hold and abort bug, SHx
   after a DMA (6502-python PR #7), OAM evaluation, corruption and `$2004`,
   sprites from the pre-render line, and the PPU's octal latch (`$2007` reads
-  and `$2006` writes during rendering). Of the seven left, PPUSim passes five
-  (mid-line rendering toggles, mostly): open, with a judge.
+  and `$2006` writes during rendering), mid-line rendering toggles (C12,
+  settled on PPUSim's internal signals) and the overflow flag's set dot. The
+  two left, "$2004 Stress Test" and "Misaligned OAM2 Address", PPUSim fails
+  too: no judge.
 - **Mappers, 66 judges** on PyPy and CPython ([docs/claims.md](docs/claims.md)
   per mapper): blargg's `mmc3_test_2`, `mmc3_test` and `mmc3_irq_tests` on
   the Sharp and NEC IRQs, every Holy Mapperel build for mappers 0-4 and 7,

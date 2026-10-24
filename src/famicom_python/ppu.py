@@ -70,6 +70,7 @@ DELAYS = {
 
 DOTS = 341
 WIDTH, HEIGHT = 256, 240
+REVERSE = bytes(int(f"{i:08b}"[::-1], 2) for i in range(256))  # a byte's bits mirrored
 VBL, SPRITE0, OVERFLOW = 0x80, 0x40, 0x20
 # Sprite line-buffer entries: palette index (0x10-0x1F), then these flags.
 BEHIND, IS_SPRITE0 = 0x20, 0x40
@@ -88,7 +89,6 @@ class PPU:
         self.vblank_line = timing.vblank_line
         self.prerender_line = timing.lines - 1
         self.dot_ticks = timing.dot_divider
-        self.odd_frame_skip = timing.odd_frame_skip
         self.ciram = bytearray(0x800)
         self.palette = bytearray(0x20)
         self.oam = bytearray(0x100)
@@ -120,6 +120,9 @@ class PPU:
         self._last_pixel = -1  # picture index of the last pixel computed
         self._last_value = 0  # its palette value, before greyscale and emphasis
         self._last_pixel_time = -1  # the dot (its time) that computed it
+        self._prev_pixel = -1  # and the one before it
+        self._prev_value = 0
+        self._prev_pixel_time = -1
         self.power()
 
     # -- power and reset -------------------------------------------------
@@ -135,7 +138,8 @@ class PPU:
         # attribute shifters hold 8 copies of each bit; PPU_rendering.wiki's
         # 1-bit latch feeding an 8-bit shifter gives the same pixels).
         self.nt_latch = 0
-        self.at_latch = 0
+        self.at_byte = 0  # the attribute table byte last fetched
+        self.at_latch = 0  # its two bits for the tile, taken on the tile's last fetch dot
         self.lo_latch = 0
         self.hi_latch = 0
         self.bg_lo = 0
@@ -147,18 +151,24 @@ class PPU:
         self._oam2_index = 0
         self._copying = 0  # bytes of an in-range sprite still to copy
         self._eval_done = False
-        self._overflow_found = False
         self._sprite_count = 0
         self._sprite0_next = False
         self._sprite0_line = False
         self._fetch_tile = 0xFF
         self._fetch_attr = 0xFF
         self._garbage = 0x2000  # the first garbage fetch's address (dot 257)
-        self._fetch_x = 0xFF
-        self._fetch_lo = 0
-        # The sprite pixels of the line being drawn and of the next one.
+        # Secondary OAM's address overflowed: the sprite fetch reads index 0
+        # throughout (AccuracyCoin "Frozen OAM2 Increment").
+        self._oam2_frozen = False
+        # The object FIFO: eight lanes of [pattern low, pattern high (the
+        # pixels not yet shifted out, the next in bit 7), attribute, X
+        # counter, the time the lane starts drawing] (PPUSim fifo.cpp;
+        # :meth:`_plan_sprites`).
+        self._lanes = [[0, 0, 0, 0, 0] for _ in range(8)]
+        self._plan = [WIDTH] * 8  # each lane's first pixel on the line
+        self._zh = False  # dot 339 rendered: lanes still counting start counting
+        # The sprite pixels of the line being drawn.
         self.sprite_line = [0] * WIDTH
-        self._sprite_next = [0] * WIDTH
         self._vbl_suppress = False
         self._skip_sample = 0
         self.reset()
@@ -172,6 +182,15 @@ class PPU:
         """
         self.ctrl = 0
         self.mask = 0
+        self._mux = 0  # PPUMASK's enable and clip bits as the pixel multiplexer has them
+        # Rendering as the fetch, shift and sprite logic see it, a dot or two
+        # behind PPUMASK (write_register); ``_target`` is where it is going.
+        self._on = False
+        self._target = False
+        self._waking = False  # the next rendering dot is the wake dot
+        self._dark = False  # ... the first full one, whose pixel is still the backdrop
+        self._fading = False  # the next dot is the one after rendering stopped
+        self._reload_pending = False  # a fade's shifter load, due at the next shift
         self.t = 0
         self.x = 0
         self.w = 0
@@ -189,7 +208,8 @@ class PPU:
             dot = self.dot
             line = self.line
             if 1 <= dot < DOTS - 4 and (
-                not self.mask & 0x18 or self.vblank_line - 1 <= line < self.prerender_line
+                not (self._on or self.mask & 0x18 or self._fading)
+                or self.vblank_line - 1 <= line < self.prerender_line
             ):
                 # Idle until the line's end: no fetches and no events on dots
                 # 2-337; visible lines show the backdrop.
@@ -221,9 +241,18 @@ class PPU:
         picture = self.picture
         for index in range(base + first, base + last + 1):
             picture[index] = value
+        raw = self.palette[self.palette_index(v) if v >= 0x3F00 else 0]
+        last_time = self.time + (last - self.dot) * self.dot_ticks  # dot ``last``'s
+        if last > first:
+            self._prev_pixel, self._prev_value = base + last - 1, raw
+            self._prev_pixel_time = last_time - self.dot_ticks
+        else:
+            self._prev_pixel = self._last_pixel
+            self._prev_value = self._last_value
+            self._prev_pixel_time = self._last_pixel_time
         self._last_pixel = base + last
-        self._last_value = self.palette[self.palette_index(v) if v >= 0x3F00 else 0]
-        self._last_pixel_time = self.time + (last - self.dot) * self.dot_ticks  # dot ``last``
+        self._last_value = raw
+        self._last_pixel_time = last_time
 
     def _schedule(self, dots: int, action: Callable[[], None]) -> None:
         """Run ``action`` before the work of the ``dots``-th dot after the next."""
@@ -241,16 +270,18 @@ class PPU:
                 events.pop(0)[1]()
         dot = self.dot + 1
         line = self.line
-        rendering = self.mask & 0x18
+        rendering = self._on
         if dot == DOTS:
             dot = 0
             line = self._next_line(line)
+            self.dot = 0
+            self._line_start(line)
         elif (
             dot == DOTS - 1
             and line == self.prerender_line
             and self.frame & 1
             and self._skip_sample
-            and self.odd_frame_skip
+            and self.timing.odd_frame_skip
         ):
             # Odd frames with rendering on jump from (339, 261) to (0, 0),
             # doing dot 340's fetch there (PPU_frame_timing.wiki). Rendering
@@ -261,10 +292,11 @@ class PPU:
             dot = 0
             line = self._next_line(line)
             self.dot = 0
+            self._line_start(line)
             return
         self.dot = dot
         if dot == DOTS - 3:
-            self._skip_sample = rendering
+            self._skip_sample = self.mask & 0x18
         if dot == 1:
             if line == self.vblank_line:
                 if not self._vbl_suppress:
@@ -276,12 +308,26 @@ class PPU:
                 self.nmi = False
                 self.resetting = False
         if line < HEIGHT or line == self.prerender_line:
-            if rendering:
-                if self._oam_corrupt is not None:
-                    self._corrupt_oam()
+            # Sprite evaluation follows PPUMASK itself, without the fetches'
+            # delay (PPUSim, scripts/ppusim_compare.py c12).
+            if line < HEIGHT and 1 <= dot <= WIDTH and self.mask & 0x18:
+                self._evaluate(line, dot)
+            if self._waking:
+                self._waking = False
+                self._wake(line, dot)
+            elif self._fading:
+                self._fading = False
+                self._fade(line, dot)
+            elif rendering:
+                if self._oam_corrupt is not None and self.mask & 0x18:
+                    self._corrupt_oam()  # not on the dot that follows the stop
                 self._render(line, dot)
+                if self._dark:
+                    self._dark = False
             elif line < HEIGHT and 2 <= dot <= WIDTH + 1:
                 self._fill_backdrop(line, dot, dot)
+        else:
+            self._waking = self._fading = False
 
     def _next_line(self, line: int) -> int:
         line += 1
@@ -289,9 +335,21 @@ class PPU:
             line = 0
             self.frame += 1
         self.line = line
-        # The sprites fetched on the last line are this line's.
-        self.sprite_line, self._sprite_next = self._sprite_next, self.sprite_line
         return line
+
+    def _line_start(self, line: int) -> None:
+        """Dot 0: lanes the last line's dot 339 started counting begin, and a
+        rendered visible line plans its sprite pixels."""
+        if self._zh:
+            self._zh = False
+            now = self.time
+            ticks = self.dot_ticks
+            for lane in self._lanes:
+                if lane[4] <= now and lane[3]:
+                    lane[4] = now + lane[3] * ticks
+                    lane[3] = 0
+        if line < HEIGHT and self._on:
+            self._plan_sprites(0)
 
     # -- rendering -------------------------------------------------------
 
@@ -310,22 +368,29 @@ class PPU:
                 return
             if dot >= 2:
                 if visible:
-                    self._pixel(line, dot - 2)
+                    if self._dark:
+                        self._fill_backdrop(line, dot, dot)
+                    else:
+                        self._pixel(line, dot - 2)
                 self._shift()
-            if visible:
-                self._evaluate(line, dot)
+                if self._dark and self._reload_pending:
+                    self._reload_pending = False
+                    self._reload()
+            if dot == 63 or dot == 255:
+                self._oam2_frozen = False
             if dot <= WIDTH:
                 self._background_fetch(dot)
                 if dot == WIDTH:
                     self._increment_y()
             else:  # 257
-                self._reload()
+                if not self._dark:
+                    self._reload()
                 self.oam_addr = 0
+                if visible:
+                    self._lanes_shifted(WIDTH)
                 # Stale on the pre-render line: line 239's, or from before
                 # a forced blank (AccuracyCoin "Sprites On Scanline 0").
                 self._sprite0_line = self._sprite0_next
-                for i in range(WIDTH):
-                    self._sprite_next[i] = 0
                 # The first garbage fetch's address goes out before hori(v)
                 # is copied, and the octal latch holds it for the read on 258
                 # (PPUSim, docs/validation.md milestone 2).
@@ -339,12 +404,21 @@ class PPU:
         elif dot <= 336:
             if dot >= 322:
                 self._shift()
+                if self._dark and self._reload_pending:
+                    self._reload_pending = False
+                    self._reload()
             self._background_fetch(dot)
             self.oam_bus = self.oam2[0]
         else:  # 337-340: the next line's first nametable byte, twice
             if dot == 337:
                 self._shift()
-                self._reload()
+                if not self._dark:
+                    self._reload()
+            elif dot == 339:
+                # ZHPOS: lanes holding a nonzero X start counting at the next
+                # line's dot 0, and the overflow freeze clears.
+                self._zh = True
+                self._oam2_frozen = False
             address = 0x2000 | (self.v & 0x0FFF)
             if not dot & 1:
                 self.nt_latch = self._fetch(address)
@@ -356,8 +430,11 @@ class PPU:
     def _shift(self) -> None:
         self.bg_lo = (self.bg_lo << 1) & 0xFFFF
         self.bg_hi = ((self.bg_hi << 1) & 0xFFFF) | 1  # PPU_rendering.wiki: shifts in 1
-        self.at_lo = (self.at_lo << 1) & 0xFFFF
-        self.at_hi = (self.at_hi << 1) & 0xFFFF
+        # The attribute shifters take the latch's bits in serially (PPUSim
+        # bgcol.cpp), which shows only when a reload is missed (C12).
+        at = self.at_latch
+        self.at_lo = ((self.at_lo << 1) & 0xFFFF) | (at & 1)
+        self.at_hi = ((self.at_hi << 1) & 0xFFFF) | (at >> 1)
 
     def _reload(self) -> None:
         self.bg_lo = (self.bg_lo & 0xFF00) | self.lo_latch
@@ -370,7 +447,9 @@ class PPU:
         phase = (dot - 1) & 7
         v = self.v
         if phase == 0:
-            if dot >= 9:
+            # The reload stands for the shifters' load on the dot before
+            # (PPUSim SRLOAD), which a wake dot did not do.
+            if dot >= 9 and not self._dark:
                 self._reload()
             if self._watch:
                 self._ale(0x2000 | (v & 0x0FFF))
@@ -380,8 +459,9 @@ class PPU:
             if self._watch:
                 self._ale(0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07))
         elif phase == 3:
-            at = self._fetch(0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07))
-            self.at_latch = (at >> (((v >> 4) & 4) | (v & 2))) & 3
+            self.at_byte = self._fetch(
+                0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
+            )
         elif phase == 4:
             if self._watch:
                 self._ale(self._bg_pattern(v))
@@ -392,6 +472,11 @@ class PPU:
                 self._ale(self._bg_pattern(v) | 8)
         else:
             self.hi_latch = self._fetch(self._bg_pattern(v) | 8)
+            # The latch takes the byte's quadrant for v as it is now, before
+            # the increment: after rendering restarts, the quadrant of the
+            # tile in hand applied to whatever byte the latch last took
+            # (PPUSim bgcol.cpp; scripts/ppusim_compare.py c12).
+            self.at_latch = (self.at_byte >> (((v >> 4) & 4) | (v & 2))) & 3
             # Coarse X++ (PPU_scrolling.wiki "Wrapping around").
             if v & 0x1F == 31:
                 self.v = (v & ~0x1F) ^ 0x0400
@@ -418,24 +503,28 @@ class PPU:
         self.v = (v & ~0x03E0) | (y << 5)
 
     def _pixel(self, line: int, x: int) -> None:
-        mask = self.mask
+        mux = self._mux
         bg = 0
-        if mask & 0x08 and (x >= 8 or mask & 0x02):
+        if mux & 0x08 and (x >= 8 or mux & 0x02):
             shift = 15 - self.x
             bg = ((self.bg_hi >> shift) & 1) << 1 | ((self.bg_lo >> shift) & 1)
             if bg:
                 bg |= (((self.at_hi >> shift) & 1) << 3) | (((self.at_lo >> shift) & 1) << 2)
         sprite = self.sprite_line[x]
-        if sprite and mask & 0x10 and (x >= 8 or mask & 0x04):
+        if sprite and mux & 0x10 and (x >= 8 or mux & 0x04):
             if bg and sprite & IS_SPRITE0 and x != 255:
                 self.status |= SPRITE0
             index = bg if bg and sprite & BEHIND else sprite & 0x1F
         else:
             index = bg
         value = self.palette[index]
+        self._prev_pixel = self._last_pixel
+        self._prev_value = self._last_value
+        self._prev_pixel_time = self._last_pixel_time
         self._last_pixel = line * WIDTH + x
         self._last_value = value
         self._last_pixel_time = self.time
+        mask = self.mask
         if mask & 0x01:
             value &= 0x30
         self.picture[line * WIDTH + x] = value | ((mask & 0xE0) << 1)
@@ -454,7 +543,6 @@ class PPU:
                 self._oam2_index = 0
                 self._copying = 0
                 self._eval_done = False
-                self._overflow_found = False
                 self._sprite0_next = False
             self.oam_bus = self.oam[self.oam_addr]
             return
@@ -478,6 +566,8 @@ class PPU:
             if self._copying:
                 self._copying -= 1
                 self._oam2_index = index + 1
+                if index == 31:
+                    self._oam2_frozen = True  # full: the address overflowed
                 address = (address + 1) & 0xFF
                 if not self._copying and not 0 <= line - value < height:
                     # The X byte gets Y's range check too: out of range, the
@@ -508,7 +598,9 @@ class PPU:
             if not self._copying:
                 self._eval_done = True
         elif 0 <= line - value < height:
-            self.status |= OVERFLOW
+            # PPUSTATUS shows it a dot later (PPUSim; AccuracyCoin "$2002 flag
+            # timing" 2, read as M2 falls).
+            self._schedule(0, self._set_overflow)
             self._copying = 3
             address = (address + 1) & 0xFF
         else:
@@ -518,6 +610,9 @@ class PPU:
             if n == 0:
                 self._eval_done = True
         self.oam_addr = address
+
+    def _set_overflow(self) -> None:
+        self.status |= OVERFLOW
 
     def _sprite_fetch(self, line: int, dot: int, visible: bool) -> None:
         """Dots 257-320: per slot, Y, tile, attribute, X, then the pattern pair.
@@ -531,7 +626,10 @@ class PPU:
         slot = (dot - 257) >> 3
         phase = (dot - 257) & 7
         oam2 = self.oam2
-        base = slot << 2
+        # Each slot's four bytes, or index 0 for all of them while the
+        # overflow freeze holds the address there.
+        base, step = (0, 0) if self._oam2_frozen else (slot << 2, 1)
+        lane = self._lanes[slot]
         if phase == 0:
             if slot == 0:
                 self._sprite_count = min(self._oam2_index, 32) >> 2 if visible else 8
@@ -540,30 +638,42 @@ class PPU:
             if self._watch:
                 self._ale(self._garbage)
         elif phase == 1:
-            self._fetch_tile = self.oam_bus = oam2[base + 1]
-            self._fetch(self._garbage)
+            self._fetch_tile = self.oam_bus = oam2[base + step]
+            self.nt_latch = self._fetch(self._garbage)
         elif phase == 2:
-            self._fetch_attr = self.oam_bus = oam2[base + 2]
+            self._fetch_attr = self.oam_bus = lane[2] = oam2[base + 2 * step]
             if self._watch:
                 self._ale(0x2000 | (self.v & 0x0FFF))
         elif phase == 3:
-            self._fetch_x = self.oam_bus = oam2[base + 3]
-            self._fetch(0x2000 | (self.v & 0x0FFF))
+            self.oam_bus = x = oam2[base + 3 * step]
+            self.nt_latch = self._fetch(0x2000 | (self.v & 0x0FFF))
+            lane[3] = x
+            if lane[4] > self.time:  # still counting: it counts on from X
+                lane[4] = self.time + x * self.dot_ticks
         elif phase == 4:
             if self._watch:
                 self._ale(self._sprite_pattern(line, oam2[base]))
         elif phase == 5:
-            self._fetch_lo = self._fetch(self._sprite_pattern(line, oam2[base]))
+            lo = self._fetch(self._sprite_pattern(line, oam2[base]))
+            lane[0] = self._lane_bits(slot, visible, line, oam2[base], lo)
         elif phase == 6:
             if self._watch:
                 self._ale(self._sprite_pattern(line, oam2[base]) | 8)
         else:
             hi = self._fetch(self._sprite_pattern(line, oam2[base]) | 8)
-            height = 16 if self.ctrl & 0x20 else 8
-            if slot < self._sprite_count and (visible or 0 <= line - oam2[base] < height):
-                self._draw_sprite(slot, self._fetch_lo, hi)
+            lane[1] = self._lane_bits(slot, visible, line, oam2[base], hi)
+            if slot == 7:
+                self._oam2_frozen = True  # the address wraps from 31 to 0
         if phase >= 3:
-            self.oam_bus = oam2[base + 3]
+            self.oam_bus = oam2[base + 3 * step]
+
+    def _lane_bits(self, slot: int, visible: bool, line: int, y: int, bits: int) -> int:
+        """A pattern byte as its lane takes it: first pixel in bit 7 (the
+        attribute's flip applied), or none for a slot with no sprite in range."""
+        height = 16 if self.ctrl & 0x20 else 8
+        if slot >= self._sprite_count or not (visible or 0 <= line - y < height):
+            return 0
+        return REVERSE[bits] if self._fetch_attr & 0x40 else bits
 
     def _sprite_pattern(self, line: int, y: int) -> int:
         tile = self._fetch_tile
@@ -576,23 +686,56 @@ class PPU:
             row = 7 - (row & 7)
         return ((self.ctrl & 0x08) << 9) | (tile << 4) | (row & 7)
 
-    def _draw_sprite(self, slot: int, lo: int, hi: int) -> None:
-        """Put a fetched sprite into the next line's buffer; lower slots win."""
-        attr = self._fetch_attr
-        x = self._fetch_x
-        flags = 0x10 | ((attr & 3) << 2) | (BEHIND if attr & 0x20 else 0)
-        if slot == 0 and self._sprite0_line:
-            flags |= IS_SPRITE0
-        buffer = self._sprite_next
-        flip = attr & 0x40
-        for i in range(8):
-            px = x + i
-            if px >= WIDTH:
-                break
-            bit = i if flip else 7 - i
-            pixel = ((hi >> bit) & 1) << 1 | ((lo >> bit) & 1)
-            if pixel and not buffer[px]:
-                buffer[px] = flags | pixel
+    def _plan_sprites(self, x1: int) -> None:
+        """The line's sprite pixels from pixel ``x1`` on, rendering assumed to
+        stay on (a stop calls :meth:`_lanes_shifted`; a restart plans again).
+
+        Each lane is PPUSim's FIFO lane: an X down-counter that steps every
+        dot, rendering or not, until it reaches 0, and a pair of shifters
+        that shift out a pixel on each rendered visible dot once it has. A
+        lane's pixel x is due on dot x (the pixel shows on dot x + 2, with
+        the background's). Dot 339 starts the counters of lanes loaded with
+        a nonzero X; without it every lane keeps drawing, so a lane that has
+        not shifted out its pattern draws the rest from the next rendered
+        pixel (AccuracyCoin "Stale Sprite Shift Regs", "Stale BG Shift
+        Registers" 4). Lower lanes win.
+        """
+        buffer = self.sprite_line
+        for i in range(WIDTH):
+            buffer[i] = 0
+        now = self.time  # dot x1's
+        ticks = self.dot_ticks
+        sprite0 = self._sprite0_line
+        plan = []
+        for n, (lo, hi, attr, _, zero) in enumerate(self._lanes):
+            start = x1 if zero <= now else x1 + (zero - now) // ticks
+            plan.append(start)
+            if start >= WIDTH or not (lo | hi):
+                continue
+            flags = 0x10 | ((attr & 3) << 2) | (BEHIND if attr & 0x20 else 0)
+            if n == 0 and sprite0:
+                flags |= IS_SPRITE0
+            x = start
+            for bit in range(7, -1, -1):
+                if x >= WIDTH:
+                    break
+                pixel = ((hi >> bit) & 1) << 1 | ((lo >> bit) & 1)
+                if pixel and not buffer[x]:
+                    buffer[x] = flags | pixel
+                x += 1
+        self._plan = plan
+
+    def _lanes_shifted(self, x0: int) -> None:
+        """Lanes stop shifting at pixel ``x0`` (rendering stopped, or the
+        visible dots ended): shift out what each drew. The planes load
+        separately (:meth:`_sprite_fetch`), so one can be new while the
+        other is spent."""
+        for lane, start in zip(self._lanes, self._plan, strict=True):
+            if start < x0:
+                n = min(8, x0 - start)
+                lane[0] = (lane[0] << n) & 0xFF
+                lane[1] = (lane[1] << n) & 0xFF
+        self._plan = [WIDTH] * 8
 
     # -- the PPU bus -----------------------------------------------------
 
@@ -713,10 +856,146 @@ class PPU:
         self.oam[row * 8 : row * 8 + 8] = self.oam[source : source + 8]
         self.oam2[row] = self.oam2[0]
 
+    def _wake(self, line: int, dot: int) -> None:
+        """The first dot rendering is back on (PPUSim, scripts/ppusim_compare.py
+        c12): an ALE dot puts its address out, an attribute fetch's still the
+        nametable address (its /RD then reads a hybrid of the two), but
+        nothing shifts, latches or increments; the next dot's pixel is still
+        the backdrop (``_dark``), and a reload there stands for a load this
+        dot did not do. (A /RD dot strobes /RD with a stale byte; no latch
+        takes it and the board leaves it out.) Sprite lanes draw again from
+        this dot's pixel."""
+        visible = line < HEIGHT
+        if visible and 2 <= dot <= WIDTH + 1:
+            self._fill_backdrop(line, dot, dot)
+        if dot & 1 and dot <= 339:
+            if dot <= WIDTH or dot >= 321:
+                phase = (dot - 1) & 7
+                if phase <= 2 or dot >= 337:
+                    address = 0x2000 | (self.v & 0x0FFF)
+                else:
+                    address = self._fetch_address(dot + 1)
+                if phase == 2:
+                    self._octal = address & 0xFF
+            else:
+                address = self._fetch_address(dot + 1)
+            if self._watch:
+                self._ale(address)
+        if visible and dot < WIDTH:
+            self._plan_sprites(dot)
+        self._dark = True
+
+    def _latch_mux(self, bits: int, value: int) -> None:
+        self._mux = (self._mux & ~bits) | (value & bits)
+
+    def set_mask(self, value: int) -> None:
+        """PPUMASK as if written long ago: rendering state follows at once."""
+        self.mask = self._mux = value
+        self._on = self._target = bool(value & 0x18)
+        self._waking = self._fading = self._dark = False
+
+    def _wake_up(self) -> None:
+        self._on = True
+        self._waking = True
+        self._fading = False
+
+    def _fade(self, line: int, dot: int) -> None:
+        """The dot after rendering stops (PPUSim, scripts/ppusim_compare.py
+        c12): ALE, /RD and pixels have stopped, but the shifters still shift
+        and the fetch stage runs one more dot. Its latches load, with no /RD,
+        the AD bus, which still carries the low byte of the address the PPU
+        drives: the attribute address on the attribute fetch's dot, the
+        nametable address (v) on the others. Reloads and increments happen
+        as on a rendered dot.
+        """
+        if line < HEIGHT and 2 <= dot <= WIDTH + 1:
+            # The background has gone to the backdrop; a sprite still shows.
+            x = dot - 2
+            sprite = self.sprite_line[x]
+            mux = self._mux
+            if sprite and mux & 0x10 and (x >= 8 or mux & 0x04):
+                value = self.palette[sprite & 0x1F]
+                self._prev_pixel = self._last_pixel
+                self._prev_value = self._last_value
+                self._prev_pixel_time = self._last_pixel_time
+                self._last_pixel = line * WIDTH + x
+                self._last_value = value
+                self._last_pixel_time = self.time
+                if self.mask & 0x01:
+                    value &= 0x30
+                self.picture[line * WIDTH + x] = value | ((self.mask & 0xE0) << 1)
+            else:
+                self._fill_backdrop(line, dot, dot)
+        if 2 <= dot <= WIDTH + 1 or 322 <= dot <= 337:
+            self._shift()
+        if 1 <= dot <= WIDTH or 321 <= dot <= 336:
+            phase = (dot - 1) & 7
+            v = self.v
+            if phase == 0:
+                if dot >= 9:
+                    self._reload()
+            elif phase == 1:
+                self.nt_latch = v & 0xFF
+            elif phase == 3:
+                self.at_byte = 0xC0 | ((v >> 4) & 0x38) | ((v >> 2) & 0x07)
+            elif phase == 5:
+                self.lo_latch = v & 0xFF
+            elif phase == 7:
+                self.hi_latch = v & 0xFF
+                self.at_latch = (self.at_byte >> (((v >> 4) & 4) | (v & 2))) & 3
+                self.v = (v & ~0x1F) ^ 0x0400 if v & 0x1F == 31 else v + 1
+                # The shifters load now; the board's reload, which follows a
+                # dot's shift, stands for that at the next shift, rendering's
+                # first.
+                self._reload_pending = True
+            if dot == WIDTH:
+                self._increment_y()
+        elif dot == WIDTH + 1:
+            self._reload()
+            self.v = (self.v & ~0x041F) | (self.t & 0x041F)
+        elif WIDTH + 1 < dot <= 320:
+            self._sprite_fade(line, dot)
+        elif dot == 337:
+            self._reload()
+
+    def _sprite_fade(self, line: int, dot: int) -> None:
+        """The sprite fetch's part of :meth:`_fade`: secondary OAM is still
+        read and the lane loads, its pattern planes from the AD bus."""
+        visible = line < HEIGHT
+        if not visible:
+            line &= 0xFF
+        slot = (dot - 257) >> 3
+        phase = (dot - 257) & 7
+        oam2 = self.oam2
+        base, step = (0, 0) if self._oam2_frozen else (slot << 2, 1)
+        lane = self._lanes[slot]
+        if phase == 1:
+            self._fetch_tile = oam2[base + step]
+        elif phase == 2:
+            self._fetch_attr = lane[2] = oam2[base + 2 * step]
+        elif phase == 3:
+            x = oam2[base + 3 * step]
+            lane[3] = x
+            if lane[4] > self.time:
+                lane[4] = self.time + x * self.dot_ticks
+        elif phase == 5:
+            lane[0] = self._lane_bits(slot, visible, line, oam2[base], self.v & 0xFF)
+        elif phase == 7:
+            lane[1] = self._lane_bits(slot, visible, line, oam2[base], self.v & 0xFF)
+            if slot == 7:
+                self._oam2_frozen = True
+
+    def _turn_off(self) -> None:
+        self._on = False
+        self._waking = False
+        self._fading = True
+        if self.line < HEIGHT and self.dot <= WIDTH:
+            self._lanes_shifted(min(self.dot + 1, WIDTH))
+
     @property
     def rendering_now(self) -> bool:
         """Rendering is on and this is a line on which the PPU fetches."""
-        return bool(self.mask & 0x18) and (self.line < HEIGHT or self.line == self.prerender_line)
+        return self._on and (self.line < HEIGHT or self.line == self.prerender_line)
 
     # -- the CPU's registers ---------------------------------------------
 
@@ -843,7 +1122,11 @@ class PPU:
             if self._watch:
                 self._ale(self.v & 0x3FFF)
 
-    def write_register(self, register: int, value: int) -> None:
+    def write_register(self, register: int, value: int, early: int | None = None) -> None:
+        """A CPU write; ``early`` is the open-bus value the data bus holds at
+        the start of the write cycle, before the CPU drives ``value``
+        (PPU_glitches.wiki "Early Writes"; None: valid for the whole cycle).
+        On the 2C02G only PPUMASK's greyscale bit sees it (below)."""
         self._drive(value)
         if register == 0:
             if self.resetting:
@@ -863,11 +1146,38 @@ class PPU:
                     # and is 0 by the line's end: nothing to corrupt.
                     self._oam_corrupt = None
                 self.mask = value
-                # Greyscale and emphasis act a stage after the palette lookup,
-                # so they reach the pixel already looked up (PPUSim, DELAYS).
-                if self._last_pixel_time == self.time:  # still in the pipeline
-                    colour = self._last_value & (0x30 if value & 0x01 else 0x3F)
-                    self.picture[self._last_pixel] = colour | ((value & 0xE0) << 1)
+                # Fetches, shifts and sprite lanes follow a dot later when
+                # rendering stops, and two when it starts, the first of them
+                # a wake dot (:meth:`_wake`; PPUSim, scripts/ppusim_compare.py
+                # c12, undocumented-behavior.md C12).
+                target = bool(value & 0x18)
+                if target != self._target:
+                    self._target = target
+                    self._schedule(1, self._wake_up if target else self._turn_off)
+                # The multiplexer's enable and clip bits are latched: the pixel
+                # this dot computes still sees the old ones (the sprite bits,
+                # the next one too). Emphasis acts a
+                # stage after the palette lookup, so it reaches that pixel;
+                # greyscale, asynchronous, the one before it too, with the
+                # early-write value's bit there ("Any write to PPUMASK can ...
+                # turn off the monochrome flag for one pixel", PPU_glitches.wiki;
+                # PPUSim, scripts/ppusim_compare.py c12, both bus models).
+                # The sprite bits a dot after the background's.
+                self._schedule(1, lambda: self._latch_mux(0x0A, value))
+                self._schedule(2, lambda: self._latch_mux(0x14, value))
+                grey = 0x30 if value & 0x01 else 0x3F
+                first = 0x30 if (value if early is None else early) & 0x01 else 0x3F
+                picture = self.picture
+                ticks = self.dot_ticks
+                if self._prev_pixel_time == self.time - ticks:
+                    index = self._prev_pixel
+                    picture[index] = (self._prev_value & first) | (picture[index] & 0x1C0)
+                if self._last_pixel_time == self.time:
+                    colour = self._last_value & grey
+                    picture[self._last_pixel] = colour | ((value & 0xE0) << 1)
+                elif self._last_pixel_time == self.time - ticks:
+                    index = self._last_pixel
+                    picture[index] = (self._last_value & first) | (picture[index] & 0x1C0)
         elif register == 3:
             self.oam_addr = value
         elif register == 4:

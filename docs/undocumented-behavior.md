@@ -219,22 +219,46 @@ before the board takes a side.
   DMA, unexpected reload) are not modelled yet: AccuracyCoin (milestone 4).
 - **C12. Rendering-enable latency.** Wiki: 3–4 dots. Mesen2: 1 dot.
   AccuracyCoin: 2–5 dots depending on the PPU revision and the CPU/PPU
-  alignment. *Settled in part on PPUSim (milestone 2)*: greyscale and
-  emphasis act a stage after the palette lookup, so a `$2001` write reaches
-  the pixel looked up on the dot before it (with the early-write bus; with the
-  written value on the bus for all of M2, greyscale reaches one pixel
-  further back). The board does that. Turning BG on mid-line, PPUSim's first
-  one or two fetches differ from the board's (its first ALE carries v's
-  nametable address, and its tile latch keeps the tile from before rendering
-  went off), and turning it off, the last pixel can differ by one. Those stay
-  open, as does every revision but the 2C02G. *Milestone 4*: with rendering
-  off for 2 or 6 CPU cycles mid-line, PPUSim keeps fetching about 3 dots past
-  the board's stop and resumes 2-3 dots after the board, without the
-  coarse-X increment the board makes on resuming. Delaying PPUMASK's bits
-  4-1 by 2 dots matched those fetches but left every AccuracyCoin outcome as
-  it was and made the `scanline` and `colorwin` frames differ from PPUSim
-  more (16 and 7 pixels against 2 and 6), so it was not kept: the model of
-  enabling and disabling is still to be found (open item 18).
+  alignment. *Settled on PPUSim (C12 work, after milestone 7)*, with
+  PPUSim's internal signals traced (`scripts/ppusim/ppusim_shim.cpp`: the
+  object FIFO's counters and shifters, the background shifters, their load
+  and step strobes). D is the first dot after the access, where BLACK
+  changes:
+  - *Stopping*: D still renders. D+1 is a *fade* dot: no ALE, /RD or
+    pixel, but the shifters shift and the fetch stage runs once more, its
+    latches taking the AD bus, which still carries the low byte of the
+    address the PPU drives (the attribute address on the attribute fetch's
+    dot, v's nametable address on the others); reloads and increments
+    happen. A load on its ph7 lands at the next shift.
+  - *Starting*: D is off. D+1 is a *wake* dot: an ALE dot puts its address
+    out (an attribute slot's still the nametable address, so its /RD reads
+    a hybrid), nothing shifts, latches or increments. D+2 renders but its
+    pixel is still the backdrop, and its ph0 reload, standing for the load
+    a wake dot did not do, is skipped.
+  - *The pixel multiplexer*: the background enable and clip bits reach the
+    pixel a dot after D, the sprite bits a dot later still (a sprite shows
+    on the fade dot). Emphasis reaches the pixel looked up on D-1;
+    greyscale, asynchronous, also the one before, with the early-write
+    value's bit there (PPU_glitches.wiki; the board passes the open-bus
+    value at each write).
+  - *Sprites*: eight lanes as PPUSim's FIFO: an X counter that steps every
+    dot, rendering or not, a per-plane pair of shifters that shift only on
+    rendered visible dots, and dot 339's start of the counters, so a lane
+    not restarted draws what it has left from the next rendered pixel
+    ("Stale Sprite Shift Regs", "Stale BG Shift Registers" 4). The
+    overflowed secondary OAM address freezes the fetch at index 0 until
+    dot 63, 255 or 339 renders ("Frozen OAM2 Increment"). Evaluation follows
+    PPUMASK itself.
+  - The attribute latch takes its quadrant on the tile's last fetch dot
+    from v then, and the attribute shifters take its bits in serially; the
+    tile latch also takes the sprite phase's garbage nametable reads.
+  Every disable and enable at all 8 phases, BG and sprite enable toggles,
+  32 off-windows of 1-4 CPU cycles and the c12 experiment (both bus models)
+  match PPUSim pixel for pixel and ALE for ALE; of 49 stops late on a line
+  with a restart on the next, 46 do (the other three: one background pixel
+  after a restart whose wake falls on ph7 following a stop in the sprite
+  fetch; open item 18). AccuracyCoin's four toggle tests pass. Every
+  revision but the 2C02G stays open.
 - **C13. Odd-frame skip condition.** Diagram and blargg's tests: BG enabled.
   Wiki text: rendering enabled (BG or sprites). *Board*: BG or sprites,
   sampled as dot 338 runs; `ppu_vbl_nmi/10-even_odd_timing` pins the dot (a
@@ -475,15 +499,17 @@ before the board takes a side.
     0.8 dB loud and the DMC tone 0.4–1.5 dB loud (validation.md, milestone 3).
     The recording's analogue path is uncharacterised, so this is evidence, not
     a verdict on blargg's formula.
-18. **AccuracyCoin's remaining seven** (milestone 4, docs/validation.md;
-    "ALE + Read", "Hybrid Addresses" and "$2007 Stress Test" pass since the
-    octal latch, C31): each with its cause as far as found. PPUSim passes
-    five of them, so those are open board bugs with a judge: mid-line
-    rendering toggles ("Stale BG Shift Registers", "BG Serial In", "Stale
-    Sprite Shift Regs", "Frozen OAM2 Increment"; C12) and the sprite flags'
-    set timing ("$2002 flag timing" 2). PPUSim fails the other two as well:
-    "$2004 Stress Test" 3 (one byte, dot 199, the overflow scan's fourth
-    copy read) and "Misaligned OAM2 Address" 4.
+18. **AccuracyCoin's remaining two**: "$2004 Stress Test" 3 (one byte, dot
+    199, the overflow scan's fourth copy read) and "Misaligned OAM2 Address"
+    4, which PPUSim fails as well. The five PPUSim passes are fixed: four
+    mid-line toggles (C12) and "$2002 flag timing" 2, where the overflow
+    flag reaches PPUSTATUS a dot after the evaluation's in-range check (the
+    sprite-0 flag stays on its pixel's dot; a comparison that read our
+    PPUSTATUS at the access and PPUSim's as M2 falls had suggested a dot
+    earlier). Left of C12: three line-crossing restarts where one
+    background pixel differs from PPUSim (above); the next-tile shifter's
+    step there depends on whether rendering stopped on the same line, and no
+    model found explains both.
 19. **Milestone 7's open three**: the render-start OAM copy (C32), the M2
     edge of cycle-counting IRQs (C33), the MMC5's in-frame onset (C34). Each
     needs a hardware-corrected test; none was found.

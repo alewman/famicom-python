@@ -61,7 +61,8 @@ class TraceEntry(ctypes.Structure):
         ("address", ctypes.c_uint16),
         ("video", ctypes.c_uint16),
         ("pins", ctypes.c_uint8),
-        ("pad", ctypes.c_uint8 * 5),
+        ("inner", ctypes.c_uint8 * 5),  # internal signals (ppusim_shim.cpp)
+        ("background", ctypes.c_uint8 * 8),  # the background path (ppusim_shim.cpp)
     ]
 
 
@@ -110,10 +111,15 @@ class Pair:
             ppu.run_to(self.t + ACCESS_TICKS - CYCLE)
             if value is None:
                 results.append(ppu.read_register(register))
+            elif ppu is self.ours:
+                ppu.write_register(register, value, self.sim.early_value)
+                results.append(value)
             else:
                 ppu.write_register(register, value)
                 results.append(value)
             ppu.run_to(self.t)
+            if value is None:  # what passes through to M2's fall, as on the board
+                results[-1] = ppu.end_read(register, results[-1])
         return results[0], results[1]
 
     def write(self, register: int, value: int) -> None:
