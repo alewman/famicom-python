@@ -92,6 +92,28 @@ def test_bandai_lz93d50_reads_the_sda_line_on_d4_alone() -> None:
     assert cart.battery_ram() == bytes(256)
 
 
+def test_bandai_acknowledge_holds_sda_when_the_master_releases_it() -> None:
+    # Rokudenashi Blues: START, device byte $A0, then SCL high on the ninth
+    # clock, and only then the release (D7). The 24C02 still pulls SDA low;
+    # released SDA reading high there would be a STOP.
+    cart = MAPPERS[16](_with_nvram(image(16, 5), 256), TICKS)
+    writes = [0x00, 0x40, 0x60, 0x20, 0x00]  # START
+    for bit in (1, 0, 1, 0, 0, 0, 0, 0):
+        writes += [bit << 6, bit << 6 | 0x20, bit << 6]
+    writes += [0x00, 0x20, 0xA0]
+    for value in writes:
+        cart.cpu_write(0x800D, value, 0)
+    value = cart.cpu_read(0x6000, 0)
+    assert value is not None and value & 0x10 == 0
+
+
+def test_datach_chr_ram_is_unbanked() -> None:
+    cart = build(157, chr_kib=0)
+    for kib in range(8):
+        cart.ppu_write(kib * 0x400, kib + 1, 0)
+    assert [cart.ppu_read(kib * 0x400, 0) for kib in range(8)] == list(range(1, 9))
+
+
 def test_bandai_counter_is_tested_then_decremented() -> None:
     cart = build(16, 5)
     cart.cpu_write(0x800B, 2, 0)

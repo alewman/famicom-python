@@ -5,7 +5,8 @@ docs/undocumented-behavior.md open item 1: with PPUSim shown to reproduce
 ``ppu_vbl_nmi`` (docs/validation.md, milestone 2; skew 3), it judges what no
 test ROM pins: the PPUMASK latency (C12), the odd-frame skip's enable bit
 (C13), the sprite garbage fetches (C15), the empty-slot row, the $2006 delay
-(C21) and the $2007 increment (C22).
+(C21), the $2007 increment (C22) and the render-start OAM copy (C32,
+``oam_start``).
 
 Both PPUs are driven exactly as the board drives one (board.py: run to the
 access point, access, run to the cycle's end), from the same list of CPU
@@ -435,7 +436,37 @@ def c13(pair: Pair) -> None:
             print(f"  frame {frame}: ours {line}/{dot}, PPUSim {v}/{h}")
 
 
+def oam_start(pair: Pair) -> None:
+    """OAMADDR at render start: is row OAMADDR & $F8 copied over OAM[0-7] (Errata.wiki)?
+
+    Sprite 0 and 1 are off-screen; row $80 holds a sprite over the opaque
+    background. OAMADDR is left at the start value by writing OAM through
+    $2004 (no $2003 write, which has its own corruption); after a rendered
+    frame, $2002 bit 6 says whether a sprite 0 hit happened.
+    """
+    setup_picture(pair)
+    for row, start in ((0, 0), (0x80, 0x80), (0x80, 0x84), (0x80, 0x04)):
+        oam = [0xF8] * 256
+        oam[row : row + 4] = [39, 0x41, 0x00, 16]
+        pair.to_line(241, 10)
+        pair.write(1, 0x00)
+        pair.write(3, 0)
+        for value in oam + oam[:start]:
+            pair.write(4, value)
+        pair.to_line(261, 100)
+        scroll_zero(pair)
+        pair.write(0, 0x00)  # 8x8 sprites from $0000, where the font is
+        pair.write(1, 0x1E)
+        pair.to_line(100, 0)
+        ours, sim = pair.access(2)
+        print(
+            f"sprite in row ${row:02X}, OAMADDR ${start:02X} at render start: "
+            f"$2002 ours ${ours:02X}, PPUSim ${sim:02X}"
+        )
+
+
 EXPERIMENTS: dict[str, Callable[[Pair], None]] = {
+    "oam_start": oam_start,
     "c13": c13,
     "calibrate": calibrate,
     "fetches": fetches,

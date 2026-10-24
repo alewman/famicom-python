@@ -107,7 +107,10 @@ class BandaiFCG(Banked):
         self.map_chr(number, 1, value)
 
     def clock_eeproms(self) -> None:
-        sda = 1 if self.releasing else self.sda
+        # SDA is open drain: a part pulling it low (an acknowledge, a 0 bit)
+        # holds it there when the master releases it, so releasing with SCL
+        # high is no STOP.
+        sda = self.sda_line()
         for eeprom in self.eeproms:
             eeprom.lines(self.scl, sda)
 
@@ -132,6 +135,10 @@ class Datach(BandaiFCG):
     is being swiped; input is milestone 8's).
     """
 
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.map_chr(0, 8, 0)  # unbanked: the 8 KiB straight through
+
     def _eeproms(self, nvram: int) -> list[Eeprom]:
         return [Eeprom(), X24C01()] if nvram == 128 else [Eeprom()]
 
@@ -144,10 +151,11 @@ class Datach(BandaiFCG):
 
     def chr_register(self, number: int, value: int) -> None:
         if number < 4 and len(self.eeproms) == 2:
-            self.eeproms[1].lines((value >> 3) & 1, 1 if self.releasing else self.sda)
+            self.eeproms[1].lines((value >> 3) & 1, self.sda_line())
 
     def clock_eeproms(self) -> None:
-        self.eeproms[0].lines(self.scl, 1 if self.releasing else self.sda)
+        sda = self.sda_line()
+        self.eeproms[0].lines(self.scl, sda)
         if len(self.eeproms) == 2:
             external = self.eeproms[1]
-            external.lines(external.scl, 1 if self.releasing else self.sda)
+            external.lines(external.scl, sda)
