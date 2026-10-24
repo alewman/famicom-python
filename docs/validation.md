@@ -1078,3 +1078,81 @@ Speed of the octal latch: not measured yet. A best-of-5 interleaved A/B on
 the 240p Test Suite menu gave 6.2 frames/s before and 5.6 after, but at a load
 average of 75 on this 32-core machine (other sessions' runs), where both are
 a twelfth of the quiet-machine figures; to repeat when it is quiet.
+
+### Milestone 7: the compatibility sweep, and mappers to 95 % (2026-10-23)
+
+**Pins.** famicom-python at the commit that adds this record; 6502-python
+main `9dc34bd`; Mesen2 `b9fa69d` with `scripts/mesen2-detector-fixes.patch`
+(six hunks, below); PPUSim `fb7de61`. Dumps from the local No-Intro
+`Nintendo - Nintendo Entertainment System (Headered)` and its 2024 set, read
+in place, a dump the first set already gave (by its .nes CRC) skipped. PyPy
+7.3.20.
+
+**Coverage.** 31 mappers, 23 of them new: 5 MMC5; 9 MMC2 and 10 MMC4; 16,
+157, 159 Bandai; 18 SS88006; 19 Namco 163; 21/22/23/25 VRC2 and VRC4; 32
+G-101; 33 TC0190; 66 GxROM; 69 FME-7; 75 VRC1; 87; 118 TxSROM; 185; 206
+Namco 108; 210 Namco 175/340; 268 AA6023. **2,545 of the 2,662 licensed
+dumps (95.60 %)**; the rest are 80, 184, 48, 68, 88, 86, 152, 140, 70 and
+others, a few dumps each. Their judges, where any exist, pass with the old
+ones: **83 mapper cases** (`scripts/run_test_roms.py --suite mappers`; 17
+new: Holy Mapperel's M9, M10 ×2, M66, M69 ×2 and M118, AWJ's `vrctest` on all
+nine VRC2/4 boards, tepples's `fme7acktest`), each new one checked with a
+seeded fault (a frozen MMC2 latch, A10 from the arrangement on TxSROM, a
+344-step VRC prescaler, an FME-7 acknowledge on D0 only: each fails).
+`tests/test_mappers_m7.py` pins what no ROM reaches (the EEPROMs' protocol,
+counter edges, latch order).
+
+**The tool.** `scripts/compat_sweep.py` runs every licensed dump of an
+implemented mapper on Mesen2 and on the board, no input, from power-on
+(`MACHINE`, milestone 6), and compares frames 60, 300 and 600 pixel value for
+pixel value (Mesen2's frame N is the board's N − 1). Mesen2 runs as
+milestone 6 configures it, plus: NTSC whatever the dump's region, and a
+standard controller in each port without its game database's input (which
+plugs a Zapper in for *Bayou Billy*). `scripts/sweep_triage.py` replays a
+differing dump on the board to that frame and sorts it by what the board did
+on the differing lines (a rendering toggle, a register access while
+rendering); `mesen_lockstep.py` then finds the first instruction where the
+large ones part.
+
+**Result: 2,463 of 2,545 dumps identical (96.8 %); every one of the other 82
+has its cause.**
+
+| Dumps | Cause | Tier |
+| ---: | --- | --- |
+| 41 | A register access while rendering (`$2000`/`$2005`/`$2006`/`$2007` mid-line, or `$2007` with v in the palette while rendering is off): the board's latencies and bus are PPUSim's (C13, C15, C21, C22, C31), Mesen2's differ. *International Cricket* writes `$2007` 120 times with rendering on (CPU identical for 600 frames in lockstep) | die-derived, settled in milestones 2 and 6 |
+| 13 | **Mesen2**: line 0's stale sprite slot 0 at x = 255 (C35); one pixel | die-derived: `scripts/ppusim_line0.py` |
+| 8 | A rendering toggle mid-line (C12): Mesen2 enables in 1 dot | open, with a judge: the C12 work next |
+| 9 | The same, then an MMC3 IRQ on another line, A12 following the changed fetches (*Terminator 2* ×3, *Incredible Crash Dummies* ×2, *Krusty's Fun House* ×2, *Tom & Jerry* (E), *Wayne Gretzky Hockey*; lockstep: T2's CPU parts at its IRQ) | as above |
+| 7 | The MMC5's in-frame onset, one fetch apart on row 0 (C34): Koei's six and Demo Vision | open, no judge |
+| 2 | An M2-counted IRQ one CPU cycle apart (C33): *Racer Mini Yonku*, *TMNT 2* (J) | open, no judge |
+| 1 | The render-start OAM row copy (C32): *Tatakai no Banka*'s `$2002` sprite-0 bit | open: PPUSim and Errata.wiki disagree |
+| 1 | *Bionic Commando* (Capcom Classics Mini Mix) `[b]`: a bad dump | |
+
+**Board bugs the sweep found, fixed** (each a dump that then runs as on
+Mesen2, in frames and in lockstep):
+
+| Bug | Found by | Fix |
+| --- | --- | --- |
+| The `$2007` read buffer loaded during the PPU's reset | *Argus*, *Family Stadium '87* | held at 0 until the pre-render line (PPU_power_up_state.wiki); identical in lockstep for 130 frames |
+| The Bandai EEPROMs saw a STOP when the master released SDA during an acknowledge: SDA is open drain, and the part still held it low | *Rokudenashi Blues*, *SD Gundam Gaiden* 2 and 3 (16.5) | the parts clocked with the line's level, the master's AND theirs; identical 600 frames in lockstep |
+| Datach's unbanked CHR-RAM aliased one 1 KiB bank eight times | all seven Datach dumps | mapped straight through; all seven identical, Battle Rush in lockstep 600 frames |
+| VRC1's four-bit PRG registers cannot reach *Ninja JaJaMaru*'s 256 KiB Switch reissue, which writes bank $1D | the reissue | every bit written selects (an extension, Mesen2's "oversized PRG"; identical for 128 KiB and less); identical 600 frames |
+
+**The Mesen2 patches**, 4-6 new (each makes the detector agree with the
+specification where Mesen2 departs from it, so lockstep can run past the
+point): 4. Bandai's `$8000-$BFFF` mapped at power (bank 0, as the board;
+Mesen2 left it open bus, and the Datach games read it before banking);
+5. AA6023 (268) odd submappers' outer registers at `$5000` (NES 2.0 Mapper
+268.wiki; Mesen2 decoded `$6000` only, so *Rod Land* and *Shadow of the
+Ninja* never banked); 6. the LZ93D50's `$6000` read drives D4 alone,
+D3 only with the Datach's barcode reader (INES_Mapper_016.wiki). Mesen2
+settings, not patches, account for the rest: region, input, OAM corruption.
+
+**Everything else again**, on the final tree: the CPU (10), PPU (41) and APU
+(38) ROMs pass on PyPy; the mapper ROMs 83 of 83; AccuracyCoin 139 of 146
+with milestone 6's 124,304,328 cycles and the same seven failures; the quick
+suite passes.
+
+**Speed of the tool**: per dump, Mesen2 a median 4.1 s and the board 101 s
+(32-486 s) for 600 frames on PyPy, on a loaded machine; 80 board-hours for
+the sweep, 12 at a time.

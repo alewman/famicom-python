@@ -39,8 +39,8 @@ written against the NES 2.0 definition, not measured on hardware.
 | 21/22/23/25 VRC2, VRC4 | all nine boards of the submapper table: wiring, VRC2's 1-bit latch, VRC4's one-screen, swap mode, RAM enable, VRC IRQ in both modes | AWJ's `vrctest` identifies each of the nine boards and finds both IRQ modes on time (fails with a 344-step prescaler) | community | VRC2's microwire (no game uses it) |
 | 118 TxSROM | CHR A17 to CIRAM A10 | HM `M118_P128K_C64K` (fails with the A10 from the arrangement) | manufacturing test | |
 | 5 MMC5 | PRG modes 0-3 with RAM in `$8000-$DFFF`, CHR modes 0-3 with the 10-bit registers, 8x16 A/B sets, ExRAM modes, fill, extended attributes, vertical split ("CL" wiring), scanline IRQ and in-frame flag, multiplier | none (the `mmc5test` ROMs are viewers) | detector only: the sweep | reset detection, MMC5A's `$5207-$520A` and `$5800`, the `$2002`/`$2005` snoops, the sound (milestone 8) |
-| 16 Bandai FCG/LZ93D50 | 16.4 (ports at `$6000`), 16.5 (at `$8000`, latch), 24C02 EEPROM | `tests/test_mappers_m7.py` (EEPROM protocol, counter order) | detector only: the sweep | the counter's test-then-decrement order is Mesen2's, not documented |
-| 157 Datach | 24C02 and Battle Rush's X24C01, CHR-RAM | `tests/test_mappers_m7.py` | detector only | the barcode reader (idle) |
+| 16 Bandai FCG/LZ93D50 | 16.4 (ports at `$6000`), 16.5 (at `$8000`, latch), 24C02 EEPROM on an open-drain SDA | `tests/test_mappers_m7.py` (EEPROM protocol, the acknowledge held through the master's release, counter order) | detector only: the sweep | the counter's test-then-decrement order is Mesen2's, not documented |
+| 157 Datach | 24C02 and Battle Rush's X24C01, unbanked CHR-RAM | `tests/test_mappers_m7.py` | detector only | the barcode reader (idle) |
 | 159 Bandai X24C01 | | `tests/test_mappers_m7.py` | detector only | |
 | 18 SS88006 | nibble registers, 4/8/12/16-bit counter | `tests/test_mappers_m7.py` | detector only | the µPD7755/56 speech chip |
 | 19 Namco 163 | CHR banks, CIRAM or CHR-ROM nametables, chip RAM port, 15-bit up counter | `tests/test_mappers_m7.py` | detector only | pattern tables in CIRAM; counting only while enabled (Mesen2's reading); the sound |
@@ -48,7 +48,7 @@ written against the NES 2.0 definition, not measured on hardware.
 | 206 Namco 108 | 206.0, 206.1 (unbanked 32 KiB) | none | detector only | the Namco 108's spurious bank switch (games avoid it) |
 | 32 Irem G-101 | PRG mode, 32.1 one-screen | none | detector only | |
 | 33 Taito TC0190 | | none | detector only | |
-| 75 VRC1 | | none | detector only | |
+| 75 VRC1 | PRG registers past their four bits for images over 128 KiB (an extension: *Ninja JaJaMaru*'s 256 KiB reissue, as Mesen2's "oversized PRG") | none | detector only | |
 | 87 J87 | swapped CHR bits | none | detector only | |
 | 185 CNROM + diodes | 185.4-7 chip selects, D0 pulled up when disabled | `tests/test_mappers_m7.py` | detector only | 185.0 (no licensed dump) |
 | 268 AA6023 | 268.0/1 and 268.8/9: outer PRG/CHR banks, GNROM mode, lockout, NEC IRQ | none | detector only | the "weird" modes, mixed CHR-ROM/RAM, mega-UNROM, other PCBs |
@@ -64,7 +64,12 @@ settled on PPUSim): without it, `$2000=$10` counted every line twice.
 
 "Detector only" mappers have no judge ROM (docs/cartridge.md): their claim is
 milestone 7's sweep, every licensed dump's frames against Mesen2's
-(validation.md, milestone 7), plus the unit tests named.
+(validation.md, milestone 7), plus the unit tests named. In it every dump of
+every mapper above runs as on Mesen2 (identical frames, or identical CPU in
+lockstep), except where a cause is named there. Two of those causes are
+mapper questions no judge settles: the MMC5's in-frame onset (C34) and which
+M2 edge clocks a cycle-counting IRQ (C33).
 
-**Not yet**: mapper 119 (TQROM); the mappers past 95 % of licensed dumps;
+**Not yet**: the licensed dumps the 31 mappers do not reach (4.40 %: 80, 184,
+48, 68, 88, 86, 152, 140, 70 and others, a few dumps each; 119 TQROM);
 expansion audio (milestone 8).

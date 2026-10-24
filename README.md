@@ -7,17 +7,22 @@ around it: the 2A03's sound unit, DMA and joypad ports, the 2C02 picture
 processor dot by dot, the cartridge connector and the mappers behind it, and
 the clock that ties them together.
 
-**Status (2026-10-22): milestones 1-6 of 8 done**: the CPU on the board, the
+**Status (2026-10-23): milestones 1-7 of 8 done**: the CPU on the board, the
 PPU dot by dot, the APU, DMA and interrupts, AccuracyCoin run in full
 (139 of 146, every failure with its cause), the big six mappers with
-their judges, and lockstep with Mesen2: five games identical instruction by
-instruction for a minute each. One master-clock
+their judges, lockstep with Mesen2 (six games identical instruction by
+instruction for a minute each), and 31 mappers covering 95.6 % of licensed
+dumps, every one of the 2,545 swept against Mesen2: 2,463 identical, the
+other 82 each with its cause (docs/validation.md, milestone 7). One master-clock
 timeline with the PPU and APU advanced inside each CPU bus cycle, the memory
 map and open bus, both controller clocking models, OAM and DMC DMA inside the
 stalled read (get/put cycles, DMC precedence), the cartridge connector
 (every PPU fetch on it, dot by dot), the iNES/NES 2.0 loader with nes20db, and
 mappers 0, 1 (with its board wirings), 2, 3, 4 (MMC3 with both IRQs, MMC6,
-MC-ACC), 7, 34 and 155. The PPU renders: background and sprite fetches,
+MC-ACC), 5 (MMC5), 7, 9 and 10 (MMC2/4), 16, 157 and 159 (Bandai, with their
+EEPROMs), 18, 19 (Namco 163), 21-25 (VRC2/4), 32, 33, 34, 66, 69 (FME-7), 75
+(VRC1), 87, 118, 155, 185, 206, 210 and 268 ([docs/claims.md](docs/claims.md)).
+The PPU renders: background and sprite fetches,
 per-dot sprite evaluation with the overflow bug, sprite-0 hit, the odd-frame
 skip, the VBL/NMI races, the decaying I/O latch; frames come out as 9-bit
 palette values, or PNG through a `.pal` file. The APU sounds: two pulses,
@@ -112,8 +117,9 @@ python -m famicom_python ROM --frames 600 --png out.png --wav out.wav
 | Famicom Disk System, Vs. System, PlayChoice-10 | later |
 
 Mappers live in this repository behind a signal-level cartridge connector
-([docs/cartridge.md](docs/cartridge.md)); the first six (0, 1, 2, 3, 4, 7),
-done, cover 83 % of licensed cartridges, 26 cover 95 %.
+([docs/cartridge.md](docs/cartridge.md)); the first six (0, 1, 2, 3, 4, 7)
+cover 83 % of licensed cartridges, and the 31 done cover 95.6 % (2,545 of
+2,662 licensed dumps).
 
 ## What is fetched
 
@@ -150,6 +156,10 @@ reported and kept; everything else must match its hash.
 | `scripts/build_apusim.py`, `scripts/apusim/` | Breaknes APUSim (gate-level 2A03) built with our shim: a stub board around the whole chip |
 | `scripts/apusim_board.py` | a test ROM on APUSim, `$6000` result and per-cycle channel outputs |
 | `scripts/count_mappers.py` | mapper coverage over the local No-Intro sets, read in place ([docs/cartridge.md](docs/cartridge.md)) |
+| `scripts/mesen_lockstep.py` | a game on the board against Mesen2's trace, instruction by instruction, to the first divergence |
+| `scripts/compat_sweep.py` | every licensed dump of an implemented mapper against Mesen2, frames 60, 300 and 600 |
+| `scripts/sweep_triage.py` | the sweep's differing dumps sorted by what the board did on the differing lines |
+| `scripts/ppusim_line0.py` | line 0's stale sprite slot 0 on the board's PPU and PPUSim (C35) |
 
 ## Licence
 
