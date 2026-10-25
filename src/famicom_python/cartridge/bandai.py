@@ -117,6 +117,11 @@ class BandaiFCG(Banked):
     def battery_ram(self) -> bytes | None:
         return b"".join(bytes(e.memory) for e in self.eeproms) or None
 
+    def _restore(self, data: bytes) -> None:
+        for eeprom in self.eeproms:
+            size = len(eeprom.memory)
+            eeprom.memory[:], data = data[:size], data[size:]
+
 
 class BandaiX24C01(BandaiFCG):
     """Mapper 159: the LZ93D50 with Xicor's 128-byte X24C01 (INES_Mapper_159.wiki)."""

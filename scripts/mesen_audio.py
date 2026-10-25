@@ -50,8 +50,11 @@ end, emu.eventType.endFrame)
 """
 
 
-def mesen_wave(rom: Path, frames: int, out: Path, seconds: float = 300) -> tuple[list[float], int]:
-    """Mesen2's output for its first ``frames`` frames, left channel, as floats."""
+def mesen_wave(
+    rom: Path, frames: int, out: Path, seconds: float = 300, apu: bool = True
+) -> tuple[list[float], int]:
+    """Mesen2's output for its first ``frames`` frames, left channel, as floats;
+    without the APU's five channels (only a cartridge's) if not ``apu``."""
     m = load_library()
     m.WaveRecord.argtypes = [ctypes.c_char_p]
     HOME.mkdir(parents=True, exist_ok=True)
@@ -63,7 +66,8 @@ def mesen_wave(rom: Path, frames: int, out: Path, seconds: float = 300) -> tuple
     config = m.GetNesConfig()
     for i in range(11):
         at = NES_CONFIG_CHANNEL_VOLUMES + 4 * i
-        config.raw[at : at + 4] = list((100).to_bytes(4, "little"))
+        volume = 100 if apu or i >= 5 else 0  # square 1, 2, triangle, noise, DMC first
+        config.raw[at : at + 4] = list(volume.to_bytes(4, "little"))
     m.SetNesConfig(config)
     if not m.LoadRom(str(rom.resolve()).encode(), b""):
         raise SystemExit("LoadRom failed")
@@ -92,10 +96,15 @@ def mesen_wave(rom: Path, frames: int, out: Path, seconds: float = 300) -> tuple
     return left[: round(frames * rate / 60.0988)], rate
 
 
-def board_wave(rom: Path, frames: int, rate: int, machine: Machine) -> list[float]:
-    """The board's mixer output (before the analogue stage) at ``rate``."""
+def board_wave(
+    rom: Path, frames: int, rate: int, machine: Machine, apu_on: bool = True
+) -> list[float]:
+    """The board's mixer output (before the analogue stage) at ``rate``; only the
+    cartridge's expansion sound if not ``apu_on``."""
     system = System.from_rom(rom, machine)
     apu = system.board.apu
+    if not apu_on:
+        apu._mix = lambda: 0.0  # type: ignore[method-assign]
     system.board.set_sample_rate(rate)
     samples: list[float] = []
     for _ in range(frames):
@@ -173,9 +182,15 @@ def main() -> int:
         default="nes",
         help="the board's console: expansion sound needs a Famicom (famicom)",
     )
+    parser.add_argument(
+        "--expansion-only",
+        action="store_true",
+        help="silence the APU on both sides: compare a cartridge's sound chip alone",
+    )
     args = parser.parse_args()
-    mesen, rate = mesen_wave(args.rom, args.frames, args.wav)
-    board = board_wave(args.rom, args.frames, rate, MACHINES[args.machine])
+    apu = not args.expansion_only
+    mesen, rate = mesen_wave(args.rom, args.frames, args.wav, apu=apu)
+    board = board_wave(args.rom, args.frames, rate, MACHINES[args.machine], apu)
     print(f"{args.rom.name}: {args.frames} frames at {rate} Hz")
     for row in compare(board, mesen, rate, args.window):
         print(row)

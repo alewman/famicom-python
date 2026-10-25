@@ -1,5 +1,7 @@
 """Run a cartridge headless: ``python -m famicom_python ROM [--frames N]``.
 
+``famicom-python play ROM`` opens a window instead (frontend.py, pygame-ce).
+
 Prints how the cartridge was identified, runs it, and reports what a test ROM
 says: blargg's $6000 text if present, else the first nametable as text.
 ``--png`` saves the last frame; ``--wav`` saves the sound of the whole run.
@@ -20,6 +22,11 @@ from .video import DEFAULT_PALETTE, load_palette, to_rgb, write_png
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["play"]:
+        from .frontend import main as play
+
+        return play(argv[1:])
     parser = argparse.ArgumentParser(prog="famicom-python", description=__doc__.splitlines()[0])
     parser.add_argument("rom", help="an iNES/NES 2.0 file, or a .zip holding one")
     parser.add_argument("--machine", choices=sorted(MACHINES), default="nes")

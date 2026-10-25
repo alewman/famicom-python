@@ -12,6 +12,10 @@ Mesen2's frame N is the board's N - 1 (measured on SMB1 and Zelda). The
 board's frame either side is tried as well and reported if it is closer.
 
     nice pypy3 scripts/compat_sweep.py --jobs 12 [--only REGEX] [--frames 60,300,600]
+    nice pypy3 scripts/compat_sweep.py --aftermarket --mappers 30 --every 20
+
+``--aftermarket`` sweeps the Aftermarket set (homebrew, every dump) instead of
+the licensed ones; ``--every N`` keeps one dump in N, in name order.
 
 One line of JSON per dump in ``--out`` (appended; dumps already there are
 skipped, so an interrupted sweep resumes), and Mesen2's first differing frame
@@ -44,6 +48,7 @@ SETS = [
     "Nintendo - Nintendo Entertainment System (Headered)",
     "2024 - Nintendo - Nintendo Entertainment System (Headered)",
 ]
+AFTERMARKET = "Nintendo - Nintendo Entertainment System (Headered) (Aftermarket)"
 OUT = ROOT / "tests" / "mame_traces" / "sweep"
 WIDTH, PIXELS = 256, 256 * HEIGHT
 
@@ -64,16 +69,21 @@ end, emu.eventType.endFrame)
 """
 
 
-def licensed_dumps(only: str | None, mappers: set[int] | None = None) -> list[Path]:
-    """Every licensed dump of ``SETS`` whose header names an implemented mapper (of ``mappers``).
+def licensed_dumps(
+    only: str | None, mappers: set[int] | None = None, aftermarket: bool = False
+) -> list[Path]:
+    """Every licensed dump of ``SETS`` (every dump of the Aftermarket set) whose
+    header names an implemented mapper (of ``mappers``).
 
     The 2024 set renames many of the other's dumps; a dump whose .nes CRC (from
     the zip's directory) an earlier set already gave is skipped.
     """
     found, seen = [], set()
-    for name in SETS:
+    for name in [AFTERMARKET] if aftermarket else SETS:
         for path in sorted((BASE / name).glob("*.zip")):
-            if classify(path.stem) != "licensed" or (only and not re.search(only, path.stem)):
+            if (not aftermarket and classify(path.stem) != "licensed") or (
+                only and not re.search(only, path.stem)
+            ):
                 continue
             with zipfile.ZipFile(path) as archive:
                 members = [n for n in archive.namelist() if n.lower().endswith(".nes")]
@@ -200,6 +210,8 @@ def main() -> int:
     parser.add_argument("--only", help="regular expression on the dump's name")
     parser.add_argument("--mappers", help="comma-separated iNES mapper numbers")
     parser.add_argument("--out", type=Path, default=OUT / "results.jsonl")
+    parser.add_argument("--aftermarket", action="store_true", help="the Aftermarket set instead")
+    parser.add_argument("--every", type=int, default=1, help="keep one dump in N")
     args = parser.parse_args()
     frames = sorted(int(f) for f in args.frames.split(","))
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -207,7 +219,8 @@ def main() -> int:
     if args.out.exists():
         done = {json.loads(line)["rom"] for line in args.out.read_text().splitlines() if line}
     mappers = {int(m) for m in args.mappers.split(",")} if args.mappers else None
-    roms = [r for r in licensed_dumps(args.only, mappers) if r.name not in done]
+    roms = licensed_dumps(args.only, mappers, args.aftermarket)[:: args.every]
+    roms = [r for r in roms if r.name not in done]
     print(f"{len(roms)} dumps to run ({len(done)} already in {args.out})", flush=True)
     # One process per dump: MesenCore keeps global state between loads.
     context = multiprocessing.get_context("spawn")

@@ -112,3 +112,8 @@ class Cartridge:
     def battery_ram(self) -> bytes | None:
         """The battery-backed memory to persist, if any."""
         return None
+
+    def restore_battery(self, data: bytes) -> bool:
+        """Put back what :meth:`battery_ram` returned on an earlier run; False
+        (and nothing changed) if this cartridge keeps no such memory."""
+        return False

@@ -218,6 +218,11 @@ class Namco163(Banked):
     def battery_ram(self) -> bytes | None:
         return bytes(self.prg_ram) + bytes(self.chip_ram) if self.battery else None
 
+    def _restore(self, data: bytes) -> None:
+        split = len(self.prg_ram)
+        self.prg_ram[:] = data[:split]
+        self.chip_ram[:] = data[split:]
+
 
 class Namco175(Banked):
     """Mapper 210: Namco 175 (210.1) and 340 (210.2), the 163's banking without its extras.
