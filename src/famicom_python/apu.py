@@ -446,6 +446,9 @@ class APU:
         self._cpu_hz = 1_789_773  # NTSC (39,375,000 * 6 / 11 / 12): set by the board
         self._level = 0.0
         self._level_dirty = True
+        # A cartridge's expansion sound, mixed on the cartridge (Famicom pins
+        # 45/46) and summed here every cycle: it sets this when its output moves.
+        self.expansion = 0.0
         self._accumulated = 0.0
         self._accumulated_cycles = 0
         self._phase = 0  # Bresenham: CPU cycles * sample_rate
@@ -523,7 +526,7 @@ class APU:
         # The mixer, one CPU cycle's worth.
         if self._level_dirty:
             self._level = self._mix()
-        self._accumulated += self._level
+        self._accumulated += self._level + self.expansion
         self._accumulated_cycles += 1
         self._phase += self.sample_rate
         if self._phase >= self._cpu_hz:

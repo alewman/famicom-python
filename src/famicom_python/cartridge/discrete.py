@@ -1,15 +1,16 @@
-"""Discrete-logic boards: NROM (0), UxROM (2), CNROM (3), AxROM (7), BNROM and NINA-001 (34),
-GxROM (66), J87 (87) and CNROM with copy-protection diodes (185).
+"""Discrete-logic boards: NROM (0), UxROM (2), CNROM (3), AxROM (7), UNROM 512 (30), BNROM and
+NINA-001 (34), GxROM (66), J87 (87) and CNROM with copy-protection diodes (185).
 
 Judged in milestone 5 by Holy Mapperel, rainwarrior's ``2_test``,
 ``3_test``, ``7_test`` and ``34_test``, and tepples's ``bntest``
 (docs/claims.md); 66 by Holy Mapperel; 87 and 185 have no judge (milestone 7's
-sweep against Mesen2, a detector).
+sweep against Mesen2, a detector); 30, milestone 8's homebrew board, by its
+own tests (tests/test_mappers.py).
 """
 
 from __future__ import annotations
 
-from .banked import SCREEN_A, SCREEN_B, Banked
+from .banked import HORIZONTAL, SCREEN_A, SCREEN_B, VERTICAL, Banked
 from .ines import RomImage
 
 
@@ -212,3 +213,112 @@ def mapper_34(image: RomImage, cpu_cycle_ticks: int) -> Banked:
     if submapper == 1 or (submapper != 2 and len(image.chr) > 0x2000):
         return NINA001(image, cpu_cycle_ticks)
     return BNROM(image, cpu_cycle_ticks)
+
+
+class UNROM512(Banked):
+    """Mapper 30: UNROM 512, RetroUSB's and InfiniteNESLives' homebrew board.
+
+    UNROM_512.wiki: a write sets ``NCCPPPPP``: the 16 KiB PRG bank at $8000
+    ($C000 the last), the 8 KiB CHR-RAM bank (32 KiB) and, with one-screen
+    nametables, which screen. Header byte 6 D3/D0 wire the nametables:
+    vertical arrangement, horizontal, one-screen switchable, or four screens
+    of cartridge VRAM, the CHR-RAM's last 8 KiB. Submapper 3 switches
+    horizontal and vertical with N instead (Mega Man II 30th Anniversary).
+
+    Bus conflicts on submapper 2, and on 0 without the battery bit; there the
+    register answers all of $8000-$FFFF. On the others it is at $C000-$FFFF,
+    and with the battery bit $8000-$BFFF is the flash's command port: the
+    SST39SF040's sequences ($5555 = $AA, $2AAA = $55, then $A0 to program a
+    byte, or $80 $AA $55 $30 to erase a 4 KiB sector) with the flash
+    address made of the latched bank and A13-A0. Programming only clears
+    bits and completes at once (the data polling the wiki describes reads
+    the result at once); the flash is the save (:meth:`battery_ram`). The
+    submapper-4 LEDs take their writes and show nothing.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        board = image.board
+        self.submapper = board.submapper
+        flags6 = (
+            image.header[6]
+            if len(image.header) > 6
+            else (0x08 if board.mirroring == "4" else 0x01 if board.mirroring == "V" else 0)
+        )
+        self.one_screen = flags6 & 0x09 == 0x08 and self.submapper != 3
+        self.cart_vram = flags6 & 0x09 == 0x09 and self.submapper != 3
+        self.bus_conflicts = self.submapper == 2 or (self.submapper == 0 and not board.battery)
+        self.flashable = board.battery and self.submapper in (0, 1, 4)
+        self.prg = bytearray(image.prg)
+        if not image.chr and not (image.nes2 and board.chr_ram + board.chr_nvram):
+            self.chr = bytearray(0x8000)  # iNES says nothing: 32 KiB (the wiki)
+        self.four_screen = False
+        self.latch = 0
+        self.flash_step = 0  # where in a command sequence the flash is
+        self.flash_command = 0
+        self.flash_dirty = False
+        last = len(self.prg) // 0x4000 - 1
+        self.map_prg(2, 16, last)
+        self._apply(0)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+            return
+        if self.bus_conflicts:
+            self._apply(self.bus_conflict(address, value))
+        elif address >= 0xC000:
+            self._apply(value)
+        elif self.flashable:
+            self._flash(((self.latch & 0x1F) << 14 | (address & 0x3FFF)) % len(self.prg), value)
+
+    def _apply(self, value: int) -> None:
+        self.latch = value
+        self.map_prg(0, 16, value & 0x1F)
+        self.map_chr(0, 8, (value >> 5) & 3)
+        if self.one_screen:
+            self.set_mirroring(SCREEN_B if value & 0x80 else SCREEN_A)
+        elif self.submapper == 3:
+            self.set_mirroring(VERTICAL if value & 0x80 else HORIZONTAL)
+
+    def _flash(self, offset: int, value: int) -> None:
+        """One write to the flash's command port (SST39SF040 data sheet)."""
+        unlock = offset & 0x7FFF
+        step = self.flash_step
+        if (step in (0, 3) and unlock == 0x5555 and value == 0xAA) or (
+            step in (1, 4) and unlock == 0x2AAA and value == 0x55
+        ):
+            self.flash_step = step + 1
+        elif step == 2 and unlock == 0x5555 and value in (0xA0, 0x80):
+            self.flash_command = value
+            self.flash_step = 6 if value == 0xA0 else 3
+        elif step == 5 and value == 0x30:  # sector erase
+            sector = offset & ~0xFFF
+            self.prg[sector : sector + 0x1000] = bytes([0xFF]) * 0x1000
+            self.flash_dirty = True
+            self.flash_step = 0
+        elif step == 6:  # byte program: bits only clear
+            self.prg[offset] &= value
+            self.flash_dirty = True
+            self.flash_step = 0
+        else:
+            self.flash_step = 0
+
+    def ciram_a10(self, address: int) -> int | None:
+        if self.cart_vram:
+            return None
+        return super().ciram_a10(address)
+
+    def ppu_read(self, address: int, t: int) -> int | None:
+        if self.cart_vram and address >= 0x2000:
+            return self.chr[len(self.chr) - 0x2000 + (address & 0x1FFF)]
+        return super().ppu_read(address, t)
+
+    def ppu_write(self, address: int, value: int, t: int) -> None:
+        if self.cart_vram and address >= 0x2000:
+            self.chr[len(self.chr) - 0x2000 + (address & 0x1FFF)] = value
+            return
+        super().ppu_write(address, value, t)
+
+    def battery_ram(self) -> bytes | None:
+        return bytes(self.prg) if self.flashable else None

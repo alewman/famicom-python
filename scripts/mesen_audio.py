@@ -31,6 +31,7 @@ from pathlib import Path
 
 from mesen_run import CONSOLE_MODE, MAXIMUM_SPEED, ROOT, configure_for_comparison, load_library
 
+from famicom_python.machine import MACHINES, Machine
 from famicom_python.system import System
 
 HOME = ROOT / "tests" / "mame_traces" / "mesen-home"
@@ -91,9 +92,9 @@ def mesen_wave(rom: Path, frames: int, out: Path, seconds: float = 300) -> tuple
     return left[: round(frames * rate / 60.0988)], rate
 
 
-def board_wave(rom: Path, frames: int, rate: int) -> list[float]:
+def board_wave(rom: Path, frames: int, rate: int, machine: Machine) -> list[float]:
     """The board's mixer output (before the analogue stage) at ``rate``."""
-    system = System.from_rom(rom)
+    system = System.from_rom(rom, machine)
     apu = system.board.apu
     system.board.set_sample_rate(rate)
     samples: list[float] = []
@@ -166,9 +167,15 @@ def main() -> int:
     parser.add_argument("--frames", type=int, default=600)
     parser.add_argument("--window", type=float, default=0.5, help="seconds per row")
     parser.add_argument("--wav", type=Path, default=HOME / "mesen.wav")
+    parser.add_argument(
+        "--machine",
+        choices=sorted(MACHINES),
+        default="nes",
+        help="the board's console: expansion sound needs a Famicom (famicom)",
+    )
     args = parser.parse_args()
     mesen, rate = mesen_wave(args.rom, args.frames, args.wav)
-    board = board_wave(args.rom, args.frames, rate)
+    board = board_wave(args.rom, args.frames, rate, MACHINES[args.machine])
     print(f"{args.rom.name}: {args.frames} frames at {rate} Hz")
     for row in compare(board, mesen, rate, args.window):
         print(row)

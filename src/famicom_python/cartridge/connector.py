@@ -34,9 +34,34 @@ else of the board (``tests/test_cartridge_boundary.py`` enforces it).
   :meth:`Cartridge.ppu_read` and :meth:`Cartridge.ppu_write`.
 - **No reset**: the reset button never reaches the cartridge (MMC5 sees it as a
   gap in M2, which the timestamps show).
+- **Sound** (milestone 8): a mapper with a sound chip sets
+  :attr:`Cartridge.expansion_audio`; on a console that routes the 2A03's sound
+  through the cartridge (the Famicom's pins 45/46) the board connects
+  :attr:`Cartridge.audio_out`, and the chip sets its ``expansion`` level, in
+  the APU mixer's units, each time its output moves. The level includes the
+  board's mix resistors: :func:`expansion_gain`. Elsewhere (the NES-001) the
+  sound goes nowhere, as on the console.
 """
 
 from __future__ import annotations
+
+#: A full-volume APU square, alone, in the mixer's units (APU_Mixer.wiki:
+#: 95.88 / (8128 / 15 + 100)).
+APU_SQUARE = 95.88 / (8128 / 15 + 100)
+
+
+def expansion_gain(db: float, full_square: int) -> float:
+    """Mixer units per step of a chip whose full-volume square is ``full_square``
+    steps and sounds ``db`` dB against a full-volume APU square (the measured
+    mix levels, docs/undocumented-behavior.md)."""
+    return APU_SQUARE * 10 ** (db / 20) / full_square
+
+
+class Unplugged:
+    """Where a chip's sound goes when the console does not route it (or before
+    the board connects it)."""
+
+    expansion = 0.0
 
 
 class Cartridge:
@@ -45,9 +70,11 @@ class Cartridge:
     snoops_cpu_reads = False  # also receive reads of $0000-$401F
     counts_m2 = False  # receive m2(t) every CPU cycle
     watches_ppu_address = False  # receive ppu_address(address, t) on every ALE
+    expansion_audio = False  # has a sound chip: the board may connect audio_out
 
     def __init__(self) -> None:
         self.irq = False  # /IRQ, wired-OR on the board: True asserts it
+        self.audio_out: Unplugged = Unplugged()  # the APU, on a Famicom
 
     # -- the CPU side ----------------------------------------------------
 
@@ -81,10 +108,6 @@ class Cartridge:
         """A PPU write (palette writes never reach the connector)."""
 
     # -- outputs the board samples --------------------------------------
-
-    def audio(self, apu_in: float, t: int) -> float:
-        """Famicom pin 45 in, pin 46 out: the cartridge may mix its own sound."""
-        return apu_in
 
     def battery_ram(self) -> bytes | None:
         """The battery-backed memory to persist, if any."""

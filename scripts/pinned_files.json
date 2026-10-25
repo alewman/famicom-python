@@ -1386,6 +1386,15 @@
   "note": "fetched 2026-10-05 (APU researcher): INES Mapper 019"
  },
  {
+  "path": "reference/nesdev-wiki/INES_Mapper_019_Submapper_table.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_019/Submapper_table&action=raw",
+  "sha256": "18fc4c8e3dc62158fd6b5394c8bb00b11398a4e6c400369116eb4c22a2318ff3",
+  "size": 678,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "fetched 2026-10-24 (milestone 8): the N163 mixing-resistor submappers, transcluded by INES Mapper 019"
+ },
+ {
   "path": "reference/nesdev-wiki/INES_Mapper_032.wiki",
   "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_032&action=raw",
   "sha256": "47d538b755ddd23daf10f24dee38a1402fe9f0ed03bc2c8d33da8960ed0e3e5a",
