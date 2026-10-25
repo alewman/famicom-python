@@ -210,7 +210,7 @@ class RomCase:
     """One test ROM, how it reports, and how long it may take (emulated seconds)."""
 
     path: str  # under tests/test_roms/nes-test-roms; "x.7z/member" reads inside an archive
-    protocol: str  # "6000", "screen", "holy" (Holy Mapperel), "values" or "ram"
+    protocol: str  # "6000", "screen", "holy" (Holy Mapperel), "values", "ram" or "spans"
     seconds: float = 60.0
     buttons: int = 0  # held on pad 1 from power-on
     passed: str = "Passed"
@@ -219,7 +219,9 @@ class RomCase:
     # other submapper of a chip, or RAM a test ROM's board lacks.
     board: tuple[tuple[str, int], ...] = ()
     # "values": blocks of whole lines that must be on screen (in ``font``) after ``seconds``;
-    # "ram": "ADDR=VALUE" hex bytes that work RAM must hold then.
+    # "ram": "ADDR=VALUE" hex bytes that work RAM must hold then;
+    # "spans": "LINE=X0-X1,..." the runs of non-backdrop pixels that line must
+    # show over the next 4 frames, each of them at least once and nothing else.
     expect: tuple[str, ...] = ()
     font: str = "ascii"
     sprites: bool = False  # "values": read sprite tiles as text too
@@ -229,6 +231,26 @@ class RomCase:
         changes = ", ".join(f"{field} {value}" for field, value in self.board)
         return self.path + (f" ({changes})" if changes else "")
 
+
+_CPU_TEST5_LIST = "\n".join(
+    (
+        "Running tests...",
+        "-----------------------------",
+        "01-implied",
+        "02-immediate",
+        "03-zero_page",
+        "04-zp_xy",
+        "05-absolute",
+        "06-abs_xy",
+        "07-ind_x",
+        "08-ind_y",
+        "09-branches",
+        "10-stack",
+        "11-special",
+        "-----------------------------",
+        "All tests complete",
+    )
+)
 
 #: Milestone 1's judges (docs/handoff-brief.md): the CPU on the board.
 CPU_ROMS = (
@@ -243,6 +265,14 @@ CPU_ROMS = (
     RomCase("cpu_dummy_reads/cpu_dummy_reads.nes", "screen", 20),
     RomCase("cpu_dummy_writes/cpu_dummy_writes_ppumem.nes", "6000", 60),
     RomCase("cpu_exec_space/test_cpu_exec_space_ppuio.nes", "6000", 60),
+    # blargg's 2005 instruction tests print each failing opcode under its
+    # test's name, then "Errors: N": a pass is the whole list with nothing between.
+    *(
+        RomCase(f"blargg_nes_cpu_test5/{name}.nes", "values", 25, expect=(_CPU_TEST5_LIST,))
+        for name in ("official", "cpu")
+    ),
+    RomCase("cpu_reset/registers.nes", "6000", 20),
+    RomCase("cpu_reset/ram_after_reset.nes", "6000", 20),
 )
 
 
@@ -314,6 +344,15 @@ PPU_ROMS = (
     RomCase("ppu_read_buffer/test_ppu_read_buffer.nes", "6000", 60),
     RomCase("oam_read/oam_read.nes", "6000", 30),
     RomCase("oam_stress/oam_stress.nes", "6000", 60),
+    # Drawn by greyscale writes timed from a synchronized NMI: on hardware the
+    # middle line's left edge lines up with the sprites above and below, its
+    # first pixel flashing (nmi_sync/readme.txt, "tested on hardware").
+    RomCase(
+        "nmi_sync/demo_ntsc.nes",
+        "spans",
+        2,
+        expect=("119=80-103", "121=80-103,81-103", "123=80-103"),
+    ),
 )
 
 
@@ -715,6 +754,18 @@ def run_case(case: RomCase, root: Path) -> RomOutcome:
         ram = system.board.ram
         wrong = [e for e in case.expect if ram[int(e[:4], 16)] != int(e[5:], 16)]
         passed, detail = not wrong, f"wrong {wrong}: " + bytes(ram[:0x100]).hex(" ")
+    elif case.protocol == "spans":
+        system.run_frames(int(case.seconds * 60))
+        want = {int(e.split("=")[0]): set(e.split("=")[1].split(",")) for e in case.expect}
+        seen: dict[int, set[str]] = {line: set() for line in want}
+        for _ in range(4):
+            system.run_frames(1)
+            picture = system.board.ppu.picture
+            for line in want:
+                row = picture[line * 256 : line * 256 + 256]
+                xs = [x for x in range(256) if row[x] != row[0]]
+                seen[line].add(f"{xs[0]}-{xs[-1]}" if xs else "none")
+        passed, detail = seen == want, f"seen {seen}"
     elif case.protocol == "holy":
         passed, detail = None, ""
         for _ in range(int(case.seconds)):

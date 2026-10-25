@@ -229,12 +229,16 @@ before the board takes a side.
     latches taking the AD bus, which still carries the low byte of the
     address the PPU drives (the attribute address on the attribute fetch's
     dot, v's nametable address on the others); reloads and increments
-    happen. A load on its ph7 lands at the next shift.
+    happen. D+2 shifts the background once more (and takes a load D+1's
+    ph7 left), and draws the backdrop.
   - *Starting*: D is off. D+1 is a *wake* dot: an ALE dot puts its address
     out (an attribute slot's still the nametable address, so its /RD reads
     a hybrid), nothing shifts, latches or increments. D+2 renders but its
-    pixel is still the backdrop, and its ph0 reload, standing for the load
-    a wake dot did not do, is skipped.
+    pixel is still the backdrop, its background does not shift, and its
+    ph0 reload, standing for the load a wake dot did not do, is skipped.
+    (The extra shift stopping and the missing one starting cancel when
+    both fall where the shifters run, so a stop in the sprite fetch, where
+    they do not, is what shows them: the PPUSim goldens' `lanes`.)
   - *The pixel multiplexer*: the background enable and clip bits reach the
     pixel a dot after D, the sprite bits a dot later still (a sprite shows
     on the fade dot). Emphasis reaches the pixel looked up on D-1;
@@ -251,14 +255,18 @@ before the board takes a side.
     PPUMASK itself.
   - The attribute latch takes its quadrant on the tile's last fetch dot
     from v then, and the attribute shifters take its bits in serially; the
-    tile latch also takes the sprite phase's garbage nametable reads.
+    tile latch also takes each sprite slot's first garbage nametable read
+    (dot 258 reads $2142 where ALE put out $2542: A8-A13 come from v after
+    dot 257's copy, the low byte from the octal latch), and no latch takes
+    the second (dot 260).
   Every disable and enable at all 8 phases, BG and sprite enable toggles,
-  32 off-windows of 1-4 CPU cycles and the c12 experiment (both bus models)
-  match PPUSim pixel for pixel and ALE for ALE; of 49 stops late on a line
-  with a restart on the next, 46 do (the other three: one background pixel
-  after a restart whose wake falls on ph7 following a stop in the sprite
-  fetch; open item 18). AccuracyCoin's four toggle tests pass. Every
-  revision but the 2C02G stays open.
+  32 off-windows of 1-4 CPU cycles, 49 stops late on a line with a restart
+  on the next, and the c12 experiment (both bus models) match PPUSim pixel
+  for pixel and ALE for ALE, on blargg's font and on the goldens' denser
+  tiles (`tests/ppusim_goldens.json.gz`, replayed by the quick suite); two
+  sprite-enable cases whose set-up stops evaluation mid-way do not (open
+  item 18). AccuracyCoin's four toggle tests pass. Every revision but the
+  2C02G stays open.
 - **C13. Odd-frame skip condition.** Diagram and blargg's tests: BG enabled.
   Wiki text: rendering enabled (BG or sprites). *Board*: BG or sprites,
   sampled as dot 338 runs; `ppu_vbl_nmi/10-even_odd_timing` pins the dot (a
@@ -506,10 +514,11 @@ before the board takes a side.
     flag reaches PPUSTATUS a dot after the evaluation's in-range check (the
     sprite-0 flag stays on its pixel's dot; a comparison that read our
     PPUSTATUS at the access and PPUSim's as M2 falls had suggested a dot
-    earlier). Left of C12: three line-crossing restarts where one
-    background pixel differs from PPUSim (above); the next-tile shifter's
-    step there depends on whether rendering stopped on the same line, and no
-    model found explains both.
+    earlier). Left of C12: when rendering stops during sprite evaluation and
+    restarts before the line ends, PPUSim's secondary OAM takes one more,
+    misaligned, entry (`53 02 65 68`) and ours none (the goldens' two
+    `mux` cases, kept as KNOWN in `tests/test_ppusim_goldens.py`): the
+    same corner as "Misaligned OAM2 Address", unmodelled.
 19. **Milestone 7's open three**: the render-start OAM copy (C32), the M2
     edge of cycle-counting IRQs (C33), the MMC5's in-frame onset (C34). Each
     needs a hardware-corrected test; none was found.
