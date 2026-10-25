@@ -22,10 +22,15 @@ cycle), performs the read and hands the byte to :meth:`dmc_fill`
 (``board.py`` "DMA").
 
 **Output.** Each CPU cycle adds the mixer's level (blargg's formula,
-APU_Mixer.wiki) to an accumulator; every host-rate sample period the board's
-:meth:`take_samples` gets their box-filtered average. The analogue stage after
-it (``AnalogueStage``) is labelled "fitted": first-order filters at the corner
-frequencies of APU_Mixer.wiki, not a measured response.
+APU_Mixer.wiki), and a cartridge's expansion level, to an accumulator; every
+quarter of a host-rate sample period their average is taken (a box filter at
+four times the host rate), and :meth:`take_samples` low-passes those with a
+windowed sinc and keeps every fourth. The second stage is for what the box
+alone lets through: tones above the host's Nyquist rate (the N163 switching
+its channels at 30 kHz, ultrasonic triangles) fold down into the audible
+band through a box, which the console's output never does. The analogue
+stage after it (``AnalogueStage``) is labelled "fitted": first-order filters
+at the corner frequencies of APU_Mixer.wiki, not a measured response.
 
 The interface is pin-shaped so the APU can later leave as its own core:
 :meth:`clock`, :meth:`write`, :meth:`read_status`, :attr:`irq`,
@@ -35,6 +40,25 @@ The interface is pin-shaped so the APU can later leave as its own core:
 from __future__ import annotations
 
 import math
+
+OVERSAMPLE = 4  # the box filter's rate, in host samples
+TAPS = 96  # the decimating low-pass's length, at the box filter's rate
+
+
+def lowpass_taps(cutoff: float, rate: float, count: int = TAPS) -> list[float]:
+    """A Blackman-windowed sinc low-pass at ``cutoff`` Hz for samples at ``rate``,
+    unity gain at DC: about -74 dB from ``cutoff`` + 5.5 * rate / count up."""
+    middle = (count - 1) / 2
+    fc = cutoff / rate
+    taps = []
+    for i in range(count):
+        x = i - middle
+        sinc = 2 * fc if x == 0 else math.sin(2 * math.pi * fc * x) / (math.pi * x)
+        phase = 2 * math.pi * i / (count - 1)
+        taps.append(sinc * (0.42 - 0.5 * math.cos(phase) + 0.08 * math.cos(2 * phase)))
+    total = sum(taps)
+    return [t / total for t in taps]
+
 
 # APU_Length_Counter.wiki.
 LENGTHS = (
@@ -441,9 +465,10 @@ class APU:
         self._stopped_in = -2  # the APU cycle playback last stopped in
         # Length counters written this cycle, settled at the next clock.
         self._unsettled: list[LengthCounter] = []
-        # The mixer: a box filter at the host rate (see take_samples).
-        self.sample_rate = sample_rate
+        # The mixer: a box filter at OVERSAMPLE times the host rate, then a
+        # decimating low-pass (see take_samples).
         self._cpu_hz = 1_789_773  # NTSC (39,375,000 * 6 / 11 / 12): set by the board
+        self.sample_rate = sample_rate
         self._level = 0.0
         self._level_dirty = True
         # A cartridge's expansion sound, mixed on the cartridge (Famicom pins
@@ -451,8 +476,20 @@ class APU:
         self.expansion = 0.0
         self._accumulated = 0.0
         self._accumulated_cycles = 0
-        self._phase = 0  # Bresenham: CPU cycles * sample_rate
-        self._samples: list[float] = []
+        self._phase = 0  # Bresenham: CPU cycles * the box filter's rate
+        self._samples: list[float] = []  # the box filter's, since take_samples
+        self._history = [0.0] * (TAPS - 1)  # the low-pass's last inputs
+
+    @property
+    def sample_rate(self) -> int:
+        """The host rate :meth:`take_samples` delivers."""
+        return self._sample_rate
+
+    @sample_rate.setter
+    def sample_rate(self, rate: int) -> None:
+        self._sample_rate = rate
+        self._box_rate = rate * OVERSAMPLE
+        self._taps = lowpass_taps(min(20_000.0, 0.45 * rate), self._box_rate)[::-1]
 
     def set_cpu_rate(self, cpu_hz: float) -> None:
         self._cpu_hz = round(cpu_hz)
@@ -528,7 +565,7 @@ class APU:
             self._level = self._mix()
         self._accumulated += self._level + self.expansion
         self._accumulated_cycles += 1
-        self._phase += self.sample_rate
+        self._phase += self._box_rate
         if self._phase >= self._cpu_hz:
             self._phase -= self._cpu_hz
             self._samples.append(self._accumulated / self._accumulated_cycles)
@@ -598,9 +635,24 @@ class APU:
         return level
 
     def take_samples(self) -> list[float]:
-        """The mixer's output since the last call, box-filtered to ``sample_rate``."""
-        samples, self._samples = self._samples, []
-        return samples
+        """The mixer's output since the last call, at ``sample_rate``: the box
+        filter's samples low-passed and decimated by OVERSAMPLE."""
+        boxed, self._samples = self._samples, []
+        keep = len(boxed) - len(boxed) % OVERSAMPLE
+        if keep < len(boxed):  # an incomplete group waits for the next call
+            self._samples = boxed[keep:]
+        window = self._history + boxed[:keep]
+        taps = self._taps
+        span = len(taps)
+        out = []
+        # Each output ends on every OVERSAMPLE-th new sample (the history is span - 1).
+        for end in range(span - 1 + OVERSAMPLE, len(window) + 1, OVERSAMPLE):
+            total = 0.0
+            for tap, x in zip(taps, window[end - span : end], strict=True):
+                total += tap * x
+            out.append(total)
+        self._history = window[len(window) - (span - 1) :]
+        return out
 
     # -- the DMC's DMA ---------------------------------------------------
 

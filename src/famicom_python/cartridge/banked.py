@@ -104,3 +104,14 @@ class Banked(Cartridge):
 
     def battery_ram(self) -> bytes | None:
         return bytes(self.prg_ram) if self.battery else None
+
+    def restore_battery(self, data: bytes) -> bool:
+        saved = self.battery_ram()
+        if saved is None or len(saved) != len(data):
+            return False
+        self._restore(data)
+        return True
+
+    def _restore(self, data: bytes) -> None:
+        """The inverse of :meth:`battery_ram`, for data of its length."""
+        self.prg_ram[:] = data

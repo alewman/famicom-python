@@ -19,6 +19,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The desktop window (famicom_python.frontend): SDL through pygame-ce, which ships PyPy wheels.
+frontend = ["pygame-ce>=2.5"]
 dev = [
     "pytest>=8",
     # Pinned: `ruff format --check` in CI must see the formatter the tree was formatted with.

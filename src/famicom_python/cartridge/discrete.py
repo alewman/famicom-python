@@ -322,3 +322,6 @@ class UNROM512(Banked):
 
     def battery_ram(self) -> bytes | None:
         return bytes(self.prg) if self.flashable else None
+
+    def _restore(self, data: bytes) -> None:
+        self.prg[:] = data
