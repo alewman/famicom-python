@@ -4228,5 +4228,23 @@
   "kind": "die",
   "license": "Furrtek's VGChips repository (reverse-engineered schematics, Sean Gonsalves 2020); no explicit license file",
   "note": "MMC3C reverse-engineered schematic: page 4 has the A12 filter (three M2-clocked DFFs reset by A12) and the asynchronous IRQ path (milestone 6)"
+ },
+ {
+  "path": "tests/test_roms/nesdev-forum/ExpAudio_testroms.7z",
+  "url": "https://forums.nesdev.org/download/file.php?id=13249",
+  "sha256": "d091f690113eefe165bb7dad17173ecb831497edbcdbd238c40ff372500b3c0c",
+  "size": 2286,
+  "kind": "test-rom",
+  "license": "Author-distributed test ROM (forum attachment); freely distributable test program, no explicit license",
+  "note": "fetched 2026-10-24: NewRisingSun's 2018 expansion-audio test ROMs (VRC6TEST, VRC6TESA, MMC5TEST, N163TEST), nesdev-forum/16910.html; his hardware recordings of them are not pinned (open item 20)"
+ },
+ {
+  "path": "tests/test_roms/nesdev-forum/N163TESTv2.7z",
+  "url": "https://forums.nesdev.org/download/file.php?id=11493",
+  "sha256": "5dfa07a751880cbc2b5a9f33325e7a80ad11c7ade577bd2ea35bba3d17ee9bb2",
+  "size": 1122,
+  "kind": "test-rom",
+  "license": "Author-distributed test ROM (forum attachment); freely distributable test program, no explicit license",
+  "note": "fetched 2026-10-24: NewRisingSun's N163 one- and eight-channel test, v2, nesdev-forum/16910.html"
  }
 ]
