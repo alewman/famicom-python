@@ -129,6 +129,14 @@ class Machine:
     # (undocumented-behavior.md C10): an assumption, cited, not a fact.
     audio_high_pass_hz: tuple[float, ...] = (90.0, 440.0)
     audio_low_pass_hz: float | None = 14_000.0
+    # The hard-wired player-2 controller's microphone, read at $4016 D2
+    # (Standard_controller.wiki; the RF Famicom only: the AV Famicom's second
+    # pad is a standard one).
+    microphone: bool = False
+    # Data lines D0-D4 of $4016 and $4017 left to open bus rather than pulled
+    # to 0 when nothing drives them (Controller_reading.wiki "Unconnected data
+    # lines"): the Famicom's $4016 D3-D4, the NES-101's $4016 D2.
+    pad_open_bus: tuple[int, int] = (0, 0)
     certified: bool = True
 
 
@@ -154,6 +162,8 @@ FAMICOM = Machine(
     dmc_unexpected_reload_bug=False,
     audio_high_pass_hz=(37.0,),
     audio_low_pass_hz=None,
+    microphone=True,
+    pad_open_bus=(0x18, 0),
 )
 
 AV_FAMICOM = Machine(
@@ -165,6 +175,7 @@ AV_FAMICOM = Machine(
     joypad_oe_per_cycle=False,
     famicom_audio_through_cart=True,
     dmc_unexpected_reload_bug=False,
+    pad_open_bus=(0x18, 0),  # the wiki's "Famicom" column: UNVERIFIED for this model
 )
 
 NES_101 = Machine(
@@ -176,6 +187,7 @@ NES_101 = Machine(
     joypad_oe_per_cycle=False,
     famicom_audio_through_cart=False,
     dmc_unexpected_reload_bug=False,
+    pad_open_bus=(0x04, 0),
 )
 
 # Data only until a later milestone certifies them (docs/handoff-brief.md).

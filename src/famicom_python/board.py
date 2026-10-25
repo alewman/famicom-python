@@ -59,6 +59,14 @@ class Board:
             self.apu.sample_rate, machine.audio_high_pass_hz, machine.audio_low_pass_hz
         )
         self.pads = [StandardController(), StandardController()]
+        # Pads on the Famicom expansion port's D1 of $4016 and $4017: the
+        # third and fourth players of the four-player adapters
+        # (Expansion_port.wiki). None: nothing there.
+        self.expansion_pads: list[StandardController | None] = [None, None]
+        # The player-2 microphone's report, $4016 D2, on a machine that has one.
+        self.microphone = False
+        self._has_microphone = machine.microphone
+        self._open_lines = (0xE0 | machine.pad_open_bus[0], 0xE0 | machine.pad_open_bus[1])
         self.t = 0  # master ticks at the end of the last CPU cycle
         self.data_bus = 0
         self.internal_bus = 0
@@ -80,6 +88,8 @@ class Board:
         self._ppu_access = PPU_ACCESS_TICKS - self.cycle_ticks  # relative to the cycle's end
         self._snoop_reads = cartridge.snoops_cpu_reads
         self._counts_m2 = cartridge.counts_m2
+        if machine.famicom_audio_through_cart and cartridge.expansion_audio:
+            cartridge.audio_out = self.apu  # type: ignore[assignment]
         # Observers of every CPU-bus cycle, (kind, address, value, t); the trace
         # and the debugger attach here. Empty costs one truth test per cycle.
         self.bus_observers: list[Callable[[str, int, int, int], None]] = []
@@ -105,17 +115,10 @@ class Board:
         self.analogue = AnalogueStage(rate, machine.audio_high_pass_hz, machine.audio_low_pass_hz)
 
     def take_samples(self) -> list[float]:
-        """Audio since the last call at the APU's sample rate, through the
-        cartridge (Famicom pins 45/46) and the console's fitted analogue stage.
-
-        The cartridge sees each sample with the current time only: expansion
-        sound that must be mixed cycle by cycle arrives with milestone 8.
-        """
-        samples = self.apu.take_samples()
-        if self.machine.famicom_audio_through_cart:
-            audio, t = self.cartridge.audio, self.t
-            samples = [audio(sample, t) for sample in samples]
-        return self.analogue.process(samples)
+        """Audio since the last call at the APU's sample rate, a cartridge's
+        expansion sound mixed in cycle by cycle (Famicom pins 45/46), through
+        the console's fitted analogue stage."""
+        return self.analogue.process(self.apu.take_samples())
 
     # -- one CPU cycle ---------------------------------------------------
 
@@ -128,11 +131,17 @@ class Board:
             # l.43; AccuracyCoin "Controller Strobing" 3 and 4).
             for pad in self.pads:
                 pad.set_strobe(self._strobe)
+            for pad in self.expansion_pads:
+                if pad is not None:
+                    pad.set_strobe(self._strobe)
             self._strobe = None
         oe = self._pad_oe
         if oe >= 0 and (self._oe_per_cycle or not reading or address != 0x4016 + oe):
             # /OE rose: the end of the pulse shifts the pad.
             self.pads[oe].clock()
+            expansion = self.expansion_pads[oe]
+            if expansion is not None:
+                expansion.clock()
             self._pad_oe = -1
         return t
 
@@ -238,12 +247,23 @@ class Board:
         elif address == 0x4016 or address == 0x4017:
             port = address - 0x4016
             self._pad_oe = port
-            # D0-D4 from the port (nothing on D1-D4 here); D7-D5 open bus.
-            value = (self.data_bus & 0xE0) | self.pads[port].read()
+            # D0-D4 from the port; D7-D5 open bus, and any line the machine
+            # leaves undriven.
+            value = (self.data_bus & self._open_lines[port]) | self._port_bits(port)
         else:
             return self.data_bus  # $4000-$4014, $4018-$401F: write-only or absent
         self.data_bus = value
         return value
+
+    def _port_bits(self, port: int) -> int:
+        """D0-D4 of $4016 (port 0) or $4017: the pad, the expansion port's D1, the microphone."""
+        bits = self.pads[port].read()
+        expansion = self.expansion_pads[port]
+        if expansion is not None:
+            bits |= expansion.read() << 1
+        if not port and self.microphone and self._has_microphone:
+            bits |= 4
+        return bits
 
     def _write_io(self, address: int, value: int) -> None:
         if address == 0x4014:
@@ -346,7 +366,7 @@ class Board:
         if register == 0x4016 or register == 0x4017:
             port = register - 0x4016
             self._pad_oe = port
-            mixed = (external & 0xE0) | self.pads[port].read()
+            mixed = (external & self._open_lines[port]) | self._port_bits(port)
             self.data_bus = mixed
             return mixed if self._undriven else external
         return external

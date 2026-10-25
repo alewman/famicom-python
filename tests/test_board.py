@@ -10,7 +10,7 @@ import dataclasses
 
 from conftest import nrom_image, nrom_system
 
-from famicom_python.joypad import RIGHT, START, A
+from famicom_python.joypad import RIGHT, START, A, B, StandardController
 from famicom_python.machine import FAMICOM, NES_001, PowerOn
 
 
@@ -156,3 +156,34 @@ def test_power_on_fields_that_no_source_pins_are_settable() -> None:
     power = PowerOn(ppustatus=0x00, ppu_dot=4, dmc_timer=213)
     board = powered(dataclasses.replace(NES_001, power_on=power))
     assert (board.ppu.status & 0xE0, board.ppu.dot, board.apu.dmc.timer) == (0x00, 4, 213)
+
+
+def test_the_famicom_microphone_reads_on_4016_d2_and_nowhere_else() -> None:
+    famicom = nrom_system(b"", FAMICOM).board
+    famicom.microphone = True
+    assert famicom.read_byte(0x4016) & 0x04
+    assert not famicom.read_byte(0x4017) & 0x04
+    nes = nrom_system(b"").board
+    nes.microphone = True  # no microphone on this console
+    assert not nes.read_byte(0x4016) & 0x04
+
+
+def test_expansion_pads_shift_out_on_d1_with_the_ports() -> None:
+    board = nrom_system(b"", FAMICOM).board
+    board.expansion_pads = [StandardController(), StandardController()]
+    board.expansion_pads[0].buttons = B  # player 3: A clear, B pressed
+    board.expansion_pads[1].buttons = A  # player 4
+    _strobe(board, 1)
+    _strobe(board, 0)
+    third = [(board.read_byte(0x4016) >> 1) & 1 for _ in range(3)]
+    fourth = [(board.read_byte(0x4017) >> 1) & 1 for _ in range(2)]
+    assert third == [0, 1, 0] and fourth == [1, 0]
+
+
+def test_famicom_4016_d3_d4_are_open_bus() -> None:
+    board = nrom_system(b"", FAMICOM).board
+    board.data_bus = 0x18
+    assert board.read_byte(0x4016) & 0x18 == 0x18
+    nes = nrom_system(b"").board
+    nes.data_bus = 0x18
+    assert nes.read_byte(0x4016) & 0x18 == 0

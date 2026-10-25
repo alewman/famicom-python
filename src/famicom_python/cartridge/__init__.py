@@ -21,11 +21,21 @@ from .bandai import BandaiFCG, BandaiX24C01, Datach
 from .banked import Banked
 from .connector import Cartridge
 from .database import load_mame_features, load_nes20db, lookup_mame, lookup_nes20db
-from .discrete import CNROM, J87, NROM, AxROM, CNROMProtected, GxROM, UxROM, mapper_34
+from .discrete import (
+    CNROM,
+    J87,
+    NROM,
+    UNROM512,
+    AxROM,
+    CNROMProtected,
+    GxROM,
+    UxROM,
+    mapper_34,
+)
 from .ines import BoardInfo, RomImage, parse
 from .irem import G101
 from .jaleco import SS88006
-from .konami import VRC1, VRC24
+from .konami import VRC1, VRC6, VRC24
 from .mmc1 import MMC1, MMC1A
 from .mmc2 import MMC2, MMC4
 from .mmc3 import AA6023, TxSROM, mmc3_for
@@ -52,7 +62,10 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     21: VRC24,
     22: VRC24,
     23: VRC24,
+    24: VRC6,
     25: VRC24,
+    26: VRC6,
+    30: UNROM512,
     32: G101,
     33: TC0190,
     34: mapper_34,

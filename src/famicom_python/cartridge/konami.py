@@ -1,13 +1,15 @@
-"""Konami's VRC mappers: VRC1 (75), VRC2 and VRC4 (21, 22, 23, 25), and the VRC IRQ.
+"""Konami's VRC mappers: VRC1 (75), VRC2 and VRC4 (21, 22, 23, 25), VRC6 (24, 26), the VRC IRQ.
 
 AWJ's ``vrctest`` judges the VRC2/VRC4 wiring and IRQ (docs/claims.md); no
 judge ROM exists for the VRC1, whose claim rests on milestone 7's sweep
-against Mesen2, a detector.
+against Mesen2, a detector. The VRC6's sound level is rainwarrior's
+``db_vrc6`` measurement (milestone 8).
 """
 
 from __future__ import annotations
 
 from .banked import HORIZONTAL, SCREEN_A, SCREEN_B, VERTICAL, Banked
+from .connector import expansion_gain
 from .ines import RomImage
 
 
@@ -223,3 +225,209 @@ class VRC24(VRCIrq, Banked):
         self.map_prg(1, 8, self.prg_registers[1])
         self.map_prg(2, 8, third)
         self.map_prg(3, 8, last)
+
+
+class VRC6Pulse:
+    """VRC6_audio.wiki: a 12-bit divider clocking a 16-step duty generator, 15 down to 0."""
+
+    def __init__(self) -> None:
+        self.control = 0  # MDDD VVVV
+        self.period = 0
+        self.enabled = False
+        self.counter = 0
+        self.step = 15
+
+    def output(self) -> int:
+        control = self.control
+        if self.enabled and (control & 0x80 or self.step <= (control >> 4) & 7):
+            return control & 0x0F
+        return 0
+
+    def clock(self, shift: int) -> bool:
+        """One CPU cycle; True when the output may have moved."""
+        if self.counter:
+            self.counter -= 1
+            return False
+        self.counter = self.period >> shift
+        self.step = (self.step - 1) & 15
+        return True
+
+
+class VRC6Saw:
+    """VRC6_audio.wiki: the same divider clocking an accumulator that adds its
+    rate on every second clock, six times, and clears on the fourteenth."""
+
+    def __init__(self) -> None:
+        self.rate = 0
+        self.period = 0
+        self.enabled = False
+        self.counter = 0
+        self.step = 0
+        self.accumulator = 0
+
+    def output(self) -> int:
+        return self.accumulator >> 3 if self.enabled else 0
+
+    def clock(self, shift: int) -> bool:
+        if self.counter:
+            self.counter -= 1
+            return False
+        self.counter = self.period >> shift
+        if not self.enabled:
+            return False  # the divider runs on; the accumulator holds zero
+        step = self.step + 1
+        if step == 14:
+            self.step = 0
+            self.accumulator = 0
+            return True
+        self.step = step
+        if not step & 1:
+            self.accumulator = (self.accumulator + self.rate) & 0xFF
+            return True
+        return False
+
+
+#: The VRC6's level, measured: a full-volume square +0.2 dB against the APU's
+#: (rainwarrior's db_vrc6 on an AV Famicom, nesdev-forum/17741.html; James-F
+#: measured -1.11 dB on an HVC-CPU-07: boards and consoles differ). Its DAC
+#: sums the three channels linearly.
+VRC6_DB = 0.2
+
+
+class VRC6(VRCIrq, Banked):
+    """Mappers 24 (VRC6a) and 26 (VRC6b, A0 and A1 swapped), with the sound.
+
+    VRC6.wiki, registers as wired on mapper 24 ($x000-$x003, decoded by A0,
+    A1 and A12-A15):
+
+    - $8000: 16 KiB PRG at $8000; $C000: 8 KiB at $C000; the last 8 KiB fixed.
+    - $9000-$9003, $A000-$A002, $B000-$B002: the sound (VRC6_audio.wiki).
+    - $B003: PRG-RAM enable (D7), the CHR banking mode (D1-D0, with D5's
+      passing of PPU A10 through 2 KiB banks) and the nametable arrangement
+      (D3-D2: vertical, horizontal, one-screen A, B). Only CIRAM nametables
+      are modelled, with D5 set, as Konami's three games use them: ROM
+      nametables (D4) and the D5-clear arrangements are not.
+    - $D000-$E003: R0-R7, the CHR banks.
+    - $F000 IRQ latch, $F001 control, $F002 acknowledge (VRC_IRQ.wiki).
+
+    Power-on registers unspecified: 0 here.
+    """
+
+    counts_m2 = True
+    expansion_audio = True
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.swap_lines = image.board.mapper == 26
+        self.prg_ram_enabled = False
+        self.banking = 0
+        self.chr_registers = [0] * 8
+        self.pulses = (VRC6Pulse(), VRC6Pulse())
+        self.saw = VRC6Saw()
+        self.halt = False
+        self.shift = 0
+        self.gain = expansion_gain(VRC6_DB, 15)
+        self.irq_reset()
+        self.map_prg(0, 16, 0)
+        self.map_prg(2, 8, 0)
+        self.map_prg(3, 8, len(self.prg) // 0x2000 - 1)
+        self._update_chr()
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+            return
+        region, register = address & 0xF000, address & 3
+        if self.swap_lines:
+            register = (register & 1) << 1 | register >> 1
+        if region == 0x8000:
+            self.map_prg(0, 16, value & 0x0F)
+        elif region == 0xC000:
+            self.map_prg(2, 8, value & 0x1F)
+        elif region == 0xD000 or region == 0xE000:
+            self.chr_registers[(region == 0xE000) << 2 | register] = value
+            self._update_chr()
+        elif region == 0xF000:
+            if register == 0:
+                self.irq_latch = value
+            elif register == 1:
+                self.irq_control(value)
+            elif register == 2:
+                self.irq_acknowledge()
+        elif region == 0xB000 and register == 3:
+            self.prg_ram_enabled = bool(self.prg_ram) and bool(value & 0x80)
+            self.banking = value & 0x3F
+            self.set_mirroring((VERTICAL, HORIZONTAL, SCREEN_A, SCREEN_B)[(value >> 2) & 3])
+            self._update_chr()
+        elif region in (0x9000, 0xA000, 0xB000):
+            self._sound_write(region, register, value)
+
+    def _sound_write(self, region: int, register: int, value: int) -> None:
+        if region == 0x9000 and register == 3:
+            self.halt = bool(value & 1)
+            self.shift = 8 if value & 4 else 4 if value & 2 else 0
+            return
+        channel = self.saw if region == 0xB000 else self.pulses[region == 0xA000]
+        if register == 0:
+            if channel is self.saw:
+                channel.rate = value & 0x3F
+            else:
+                channel.control = value
+        elif register == 1:
+            channel.period = (channel.period & 0xF00) | value
+        else:
+            channel.period = (channel.period & 0x0FF) | (value & 0x0F) << 8
+            channel.enabled = bool(value & 0x80)
+            if not channel.enabled:
+                # The duty generator restarts from the beginning; the saw's
+                # accumulator holds zero (its divider runs on).
+                if channel is self.saw:
+                    channel.accumulator = channel.step = 0
+                else:
+                    channel.step = 15
+        self._mix()
+
+    def m2(self, t: int) -> None:
+        VRCIrq.m2(self, t)
+        if self.halt:
+            return
+        shift = self.shift
+        pulse1, pulse2 = self.pulses
+        moved = pulse1.enabled and pulse1.clock(shift)
+        if pulse2.enabled and pulse2.clock(shift):
+            moved = True
+        if self.saw.clock(shift):
+            moved = True
+        if moved:
+            self._mix()
+
+    def _mix(self) -> None:
+        pulse1, pulse2 = self.pulses
+        level = pulse1.output() + pulse2.output() + self.saw.output()
+        self.audio_out.expansion = level * self.gain
+
+    def _update_chr(self) -> None:
+        r = self.chr_registers
+        mode = self.banking & 3
+        if mode == 0:
+            for window in range(8):
+                self.map_chr(window, 1, r[window])
+            return
+
+        # 2 KiB banks: with D5 set PPU A10 picks the half (the register's
+        # low bit ignored); clear, both halves are the register's 1 KiB bank.
+        def two(window: int, bank: int) -> None:
+            if self.banking & 0x20:
+                self.map_chr(window, 2, bank >> 1)
+            else:
+                self.map_chr(window, 1, bank)
+                self.map_chr(window + 1, 1, bank)
+
+        if mode == 1:
+            for i in range(4):
+                two(2 * i, r[i])
+        else:
+            for window in range(4):
+                self.map_chr(window, 1, r[window])
+            two(4, r[4])
+            two(6, r[5])

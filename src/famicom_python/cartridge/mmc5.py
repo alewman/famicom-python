@@ -2,8 +2,8 @@
 
 MMC5.wiki throughout. The forum's ``mmc5test`` ROMs are not pinned; the claim
 rests on milestone 7's sweep against Mesen2, a detector (docs/claims.md). The
-sound is milestone 8's; MMC5A's extras ($5207-$520A, $5800) and reset
-detection are not modelled.
+sound (milestone 8) is mmc5_sound.py; MMC5A's extras ($5207-$520A, $5800)
+and reset detection are not modelled.
 
 **Reading the PPU.** The MMC5 watches the PPU's reads (/RD), not its address
 phases: every read reaches the cartridge, nametable-space reads through
@@ -21,12 +21,14 @@ from __future__ import annotations
 
 from .banked import Banked
 from .ines import RomImage
+from .mmc5_sound import MMC5Sound
 
 SPRITE_SLOTS = range(32, 40)
 
 
 class MMC5(Banked):
     counts_m2 = True
+    expansion_audio = True
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
         super().__init__(image, cpu_cycle_ticks)
@@ -63,6 +65,7 @@ class MMC5(Banked):
         self.prg_windows: list[tuple[bool, int] | None] = [None] * 5
         self.chr_a = [0] * 8  # 1 KiB window offsets: $5120-$5127
         self.chr_b = [0] * 8  # $5128-$512B
+        self.sound = MMC5Sound(self)
         self._update_prg()
         self._update_chr()
 
@@ -117,12 +120,20 @@ class MMC5(Banked):
             if window is None:
                 return None
             rom, offset = window
-            return (self.prg if rom else self.prg_ram)[offset + (address & 0x1FFF)]
+            value = (self.prg if rom else self.prg_ram)[offset + (address & 0x1FFF)]
+            if self.sound.read_mode and 0x8000 <= address < 0xC000:
+                self.sound.dac(value)  # PCM read mode: the byte goes to the DAC too
+                self._update_irq()
+            return value
         if address >= 0x5C00:
             return self.exram[address - 0x5C00] if self.exram_mode >= 2 else None
         if address == 0x5204:
             value = (0x80 if self.irq_pending else 0) | (0x40 if self.in_frame else 0)
             self.irq_pending = False
+            self._update_irq()
+            return value
+        if address == 0x5010 or address == 0x5015:
+            value = self.sound.read(address)
             self._update_irq()
             return value
         if address == 0x5205:
@@ -145,6 +156,9 @@ class MMC5(Banked):
                 # times "they may be ignored or cause a corruption": 0 here,
                 # as Mesen2 writes (Mappers/Nintendo/MMC5.h).
                 self.exram[address - 0x5C00] = value if self.exram_mode == 2 or self.in_frame else 0
+        elif address <= 0x5015:
+            self.sound.write(address, value)
+            self._update_irq()
         elif 0x5100 <= address <= 0x5206:
             self._register(address, value)
 
@@ -334,6 +348,7 @@ class MMC5(Banked):
             self.split_tile = (line & 0xF8) << 2 | column
 
     def m2(self, t: int) -> None:
+        self.sound.m2()
         if self.read_since_m2:
             self.read_since_m2 = False
             self.idle = 0
@@ -348,7 +363,7 @@ class MMC5(Banked):
         self.matches = 0
 
     def _update_irq(self) -> None:
-        self.irq = self.irq_pending and self.irq_enabled
+        self.irq = (self.irq_pending and self.irq_enabled) or self.sound.irq
 
     def battery_ram(self) -> bytes | None:
         return bytes(self.prg_ram) if self.battery else None
