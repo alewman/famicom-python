@@ -189,7 +189,8 @@ class PPU:
         self._target = False
         self._waking = False  # the next rendering dot is the wake dot
         self._dark = False  # ... the first full one, whose pixel is still the backdrop
-        self._fading = False  # the next dot is the one after rendering stopped
+        # Dots left of rendering's stop: 2, the fade dot next; 1, the dot after it.
+        self._fading = 0
         self._reload_pending = False  # a fade's shifter load, due at the next shift
         self.t = 0
         self.x = 0
@@ -316,8 +317,11 @@ class PPU:
                 self._waking = False
                 self._wake(line, dot)
             elif self._fading:
-                self._fading = False
-                self._fade(line, dot)
+                self._fading -= 1
+                if self._fading:
+                    self._fade(line, dot)
+                else:
+                    self._after_fade(line, dot)
             elif rendering:
                 if self._oam_corrupt is not None and self.mask & 0x18:
                     self._corrupt_oam()  # not on the dot that follows the stop
@@ -327,7 +331,8 @@ class PPU:
             elif line < HEIGHT and 2 <= dot <= WIDTH + 1:
                 self._fill_backdrop(line, dot, dot)
         else:
-            self._waking = self._fading = False
+            self._waking = False
+            self._fading = 0
 
     def _next_line(self, line: int) -> int:
         line += 1
@@ -372,8 +377,9 @@ class PPU:
                         self._fill_backdrop(line, dot, dot)
                     else:
                         self._pixel(line, dot - 2)
-                self._shift()
-                if self._dark and self._reload_pending:
+                if not self._dark:
+                    self._shift()
+                elif self._reload_pending:
                     self._reload_pending = False
                     self._reload()
             if dot == 63 or dot == 255:
@@ -403,17 +409,17 @@ class PPU:
             self._sprite_fetch(line, dot, visible)
         elif dot <= 336:
             if dot >= 322:
-                self._shift()
-                if self._dark and self._reload_pending:
+                if not self._dark:
+                    self._shift()
+                elif self._reload_pending:
                     self._reload_pending = False
                     self._reload()
             self._background_fetch(dot)
             self.oam_bus = self.oam2[0]
         else:  # 337-340: the next line's first nametable byte, twice
-            if dot == 337:
+            if dot == 337 and not self._dark:
                 self._shift()
-                if not self._dark:
-                    self._reload()
+                self._reload()
             elif dot == 339:
                 # ZHPOS: lanes holding a nonzero X start counting at the next
                 # line's dot 0, and the overflow freeze clears.
@@ -638,15 +644,20 @@ class PPU:
             if self._watch:
                 self._ale(self._garbage)
         elif phase == 1:
+            # /RD: the octal latch still holds the ALE's low byte, but A8-A13
+            # come from v, whose copy from t (dot 257) came between: on dot
+            # 258 $2542 reads as $2142 (PPUSim).
             self._fetch_tile = self.oam_bus = oam2[base + step]
-            self.nt_latch = self._fetch(self._garbage)
+            self.nt_latch = self._fetch((0x2000 | (self.v & 0x0F00)) | (self._garbage & 0xFF))
         elif phase == 2:
             self._fetch_attr = self.oam_bus = lane[2] = oam2[base + 2 * step]
             if self._watch:
                 self._ale(0x2000 | (self.v & 0x0FFF))
         elif phase == 3:
+            # The fetch's attribute slot: no latch takes its byte, which a
+            # restart before dot 321 shows (PPUSim, tests/ppusim_scenes.py lanes).
             self.oam_bus = x = oam2[base + 3 * step]
-            self.nt_latch = self._fetch(0x2000 | (self.v & 0x0FFF))
+            self._fetch(0x2000 | (self.v & 0x0FFF))
             lane[3] = x
             if lane[4] > self.time:  # still counting: it counts on from X
                 lane[4] = self.time + x * self.dot_ticks
@@ -892,12 +903,13 @@ class PPU:
         """PPUMASK as if written long ago: rendering state follows at once."""
         self.mask = self._mux = value
         self._on = self._target = bool(value & 0x18)
-        self._waking = self._fading = self._dark = False
+        self._waking = self._dark = False
+        self._fading = 0
 
     def _wake_up(self) -> None:
         self._on = True
         self._waking = True
-        self._fading = False
+        self._fading = 0
 
     def _fade(self, line: int, dot: int) -> None:
         """The dot after rendering stops (PPUSim, scripts/ppusim_compare.py
@@ -958,6 +970,21 @@ class PPU:
         elif dot == 337:
             self._reload()
 
+    def _after_fade(self, line: int, dot: int) -> None:
+        """The second dot after rendering stops (PPUSim, tests/ppusim_scenes.py
+        lanes): the background shifters shift once more, taking a load the
+        fade dot left pending; the pixel is the backdrop. Rendering's first
+        full dot back does not shift (:meth:`_render`, ``_dark``), so a stop
+        and a restart within the shifting dots cancel, but not a stop in the
+        sprite fetch, where nothing shifts."""
+        if line < HEIGHT and 2 <= dot <= WIDTH + 1:
+            self._fill_backdrop(line, dot, dot)
+        if 2 <= dot <= WIDTH + 1 or 322 <= dot <= 337:
+            self._shift()
+            if self._reload_pending:
+                self._reload_pending = False
+                self._reload()
+
     def _sprite_fade(self, line: int, dot: int) -> None:
         """The sprite fetch's part of :meth:`_fade`: secondary OAM is still
         read and the lane loads, its pattern planes from the AD bus."""
@@ -988,7 +1015,7 @@ class PPU:
     def _turn_off(self) -> None:
         self._on = False
         self._waking = False
-        self._fading = True
+        self._fading = 2
         if self.line < HEIGHT and self.dot <= WIDTH:
             self._lanes_shifted(min(self.dot + 1, WIDTH))
 

@@ -1216,3 +1216,51 @@ against main's 9.9, about 15 % slower, with a wide spread; CPython about 20 %
 by profile. The new state first took the PPU to 80 instance attributes, the
 count at which PyPy drops an object's fixed layout for a dict: a third of
 the speed, with no other symptom. A test now keeps the PPU under 80.
+
+### PPUSim goldens and four more ROMs (2026-10-24)
+
+**Pins.** As the C12 record; PPUSim `fb7de61` at skew 3.
+
+**The goldens.** `tests/ppusim_scenes.py` turns the C12 sweeps (`phases2`,
+`mux`, `window` 0A and 1E, `lanes`, `flagset`) into scenes on a made-up
+NROM cartridge whose tiles are dense (few transparent pixels, unlike
+blargg's font), with tile $FF solid in both tables. `scripts/ppusim_goldens.py`
+ran them once on PPUSim and kept its pixels, the traced line's ALE
+addresses and the PPUSTATUS reads (191 cases, `tests/ppusim_goldens.json.gz`,
+17 KB); `tests/test_ppusim_goldens.py` replays them on our PPU alone in the
+quick suite (about 30 s on PyPy), with no PPUSim build and no fetched ROM.
+
+**What the denser tiles found.** 14 of 191 cases differed where blargg's
+font had shown 3. Traced in PPUSim's background shifters: they shift on
+the fade dot *and* the dot after it, and not on the first full dot back,
+where ours shifted once on each side; the two cancel unless the stop falls
+in dots 257-320, where nothing shifts (12 `lanes` cases). Then the sprite
+slot's garbage reads: dot 258 reads at A8-A13 from v after dot 257's copy
+($2142 for an ALE of $2542), into the tile latch, and the dot-260 read goes
+to no latch (2 more; a first try sending it to the attribute latch broke a
+third case and was dropped). Left: two `mux` cases where the set-up stops
+rendering mid-evaluation and PPUSim's secondary OAM takes a misaligned
+entry ours does not (undocumented-behavior.md open item 18), kept in the
+test as KNOWN, which fails if they start matching. `ppusim_compare.py c12`:
+24 of 24 equal after the fixes.
+
+**Four more hardware-checked ROMs** (`testrom.py`): `cpu_reset/registers`
+and `ram_after_reset` (blargg, `$6000`, the harness presses reset);
+`blargg_nes_cpu_test5` `official` and `cpu` (his 2005 instruction tests,
+whose CRCs are a NES's; a pass is the whole list with no failing opcode
+printed: the new `values` block); and `nmi_sync/demo_ntsc`, a line drawn
+by greyscale writes timed from a synchronized NMI, whose readme describes
+the hardware picture: its left edge with the reference sprites' (x 80) and
+its first pixel flashing. The new `spans` protocol checks exactly that over
+four frames (x 80-103 on lines 119 and 123; 80-103 and 81-103 on 121).
+Not added: `dmc_tests` (blank screen, status.txt "not sure yet"),
+`instr_test-v3` (superseded by v5), and the mapper ROMs that report only a
+picture. Of those, Mesen2's frame 300 equals ours for `mmc1_a12`,
+`m22chrbankingtest`, `mmc5exram`, `mmc5test` and `mmc5test_v2`;
+`scanline-a1` differs in 10 pixels on one frame in four, which PPUSim
+draws as ours does (frames 19, 23, 27; same pixels): the board sides with
+the judge.
+
+**Everything again**, on PyPy with these changes: CPU 14 of 14, PPU 42 of
+42, APU 38 of 38, mappers 83 of 83, AccuracyCoin 144 of 146 (the same
+two), the quick suite 80.

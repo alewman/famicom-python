@@ -32,21 +32,24 @@ analogue stage per console (`--wav`).
 
 - **nestest**: 8,991 of 8,991 lines of `nestest.log` (PC, A, X, Y, P, SP, CYC
   and the PPU columns).
-- **blargg's and Bisqwit's CPU ROMs**, all 10 passing on PyPy and CPython:
+- **blargg's and Bisqwit's CPU ROMs**, all 14 passing on PyPy:
   `instr_test-v5` (all 16), `instr_timing`, `instr_misc`, `cpu_timing_test6`
   (official and unofficial), `branch_timing_tests` 1-3, `cpu_dummy_reads`,
-  `cpu_dummy_writes_ppumem`, `cpu_exec_space_ppuio`.
-- **41 PPU ROMs**, all passing on PyPy and CPython: `ppu_vbl_nmi` (10),
+  `cpu_dummy_writes_ppumem`, `cpu_exec_space_ppuio`, `cpu_reset` (2),
+  `blargg_nes_cpu_test5` (official and all).
+- **42 PPU ROMs**, all passing on PyPy: `ppu_vbl_nmi` (10),
   `vbl_nmi_timing` (7), `sprite_hit_tests` (11), `sprite_overflow_tests` (5),
   blargg's 2005 PPU tests (4), `ppu_open_bus`, `ppu_read_buffer`, `oam_read`,
-  `oam_stress`.
+  `oam_stress`, and `nmi_sync`'s demo, whose line is checked against the
+  hardware picture its readme describes.
 - **PPUSim, the gate-level 2C02G, as judge**: on the board in place of the
   PPU it passes `ppu_vbl_nmi` 10/10 (at one CPU/PPU skew); compared pin for
   pin, it settled the questions no test ROM pins (the `$2006`/`$2007` delays,
   the sprite garbage fetches, the empty-slot row, the odd-frame skip, the
   colour bits of `$2001`), and the board now matches it: `full_palette` and
   `flowing_palette` frames identical, every fetch address of rendered lines
-  identical. Mid-line BG enable/disable stays open.
+  identical. Mid-line rendering toggles (C12) match it too, and 191 of its
+  answers are kept as goldens the quick suite replays without it.
 - **Mesen2, pixel for pixel** (a detector): identical frames for the 240p test
   suite, demos and scrolling tests; where it differs, PPUSim sides with the
   board or the case is open (docs/validation.md, milestone 2).
@@ -153,6 +156,8 @@ reported and kept; everything else must match its hash.
 | `scripts/ppusim_compare.py` | the board's PPU and PPUSim fed the same register accesses, compared pin for pin, or a whole frame (`frame ROM N`) |
 | `scripts/accuracycoin.py` | AccuracyCoin run in full or test by test, each result with its error code |
 | `scripts/ppusim_lockstep.py` | an AccuracyCoin test on the board and the PPUSim board in lockstep, to the first divergence |
+| `scripts/ppusim_c12_probes.py` | the C12 investigation's probes: mid-line toggles on the board's PPU and PPUSim, with PPUSim's internal signals |
+| `scripts/ppusim_goldens.py` | records PPUSim's answers to `tests/ppusim_scenes.py` for the quick suite (`--check`: where ours differs) |
 | `scripts/mesen_audio.py` | the board's sound against Mesen2's recording, window by window (aligned, gain-fitted, residual) |
 | `scripts/volume_levels.py` | the channels' relative levels in `volume_tests` against its NES-001 recording |
 | `scripts/build_apusim.py`, `scripts/apusim/` | Breaknes APUSim (gate-level 2A03) built with our shim: a stub board around the whole chip |
