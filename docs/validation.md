@@ -1349,3 +1349,21 @@ test ROMs (open item 20); the 5B (an AY-3-8910 core, later), the VRC7
 APU 38 of 38, mappers 83 of 83, AccuracyCoin 144 of 146 (the same two, the
 same 127,878,004 cycles), the quick suite 105 (the window's test included
 where pygame-ce is installed).
+
+**Follow-ups (2026-10-24).** *Reachability*: every one of the 470 pinned
+files and 29 repositories answers when fetched with curl and the fetcher's
+User-Agent; the NESdev forum serves a 403 page only to curl's default one
+(and nesdev.org to Python's urllib), so open item 20's first reading was
+wrong. NewRisingSun's test ROMs are now pinned; his recordings are not
+(404, and archive.org offline that day). *The N163 against Mesen2*: the
+games' music starts two frames apart (Mesen2 1,602 samples earlier in
+*Rolling Thunder*), beyond `mesen_audio.py`'s 1 ms alignment; with
+`--lag-ms 50`, *Rolling Thunder*'s 4 channels match to -10 to -15 dB, and
+*King of Kings*' 8 to only -2 dB: there the switching (14.9 kHz) is in band
+and the board plays it, where Mesen2 averages (C37). *Speed*: milestone
+3's board measures what milestone 8's does (three concurrent pairs, 240p
+menu, CPU time: 4.3/5.7, 7.1/5.3, 5.0/6.0 frames/s), with either 6502-python
+pin; every milestone between falls in the same 3-7 band. Nothing in the
+code lost the 53.6 frames/s of milestone 3's record: the machine did (load
+average 76-90 on 32 threads, most of them E-cores), and `perf` is not
+available to count instructions instead. Measure on an idle machine.

@@ -138,13 +138,16 @@ def best_lag(x: list[float], y: list[float], max_lag: int) -> int:
     return max(fine, key=lambda lag: score(lag, 1))
 
 
-def compare(board: list[float], mesen: list[float], rate: int, window: float) -> list[str]:
-    """Window by window: align (within 1 ms: the streams start together, and a
-    wider search only finds other periods of a steady tone), fit a gain,
-    measure the residual."""
+def compare(
+    board: list[float], mesen: list[float], rate: int, window: float, lag_ms: float = 1.0
+) -> list[str]:
+    """Window by window: align (within ``lag_ms``: 1 ms by default, as the streams
+    start together and a wider search only finds other periods of a steady
+    tone; a game whose music starts a frame or two apart needs more), fit a
+    gain, measure the residual."""
     board, mesen = high_pass(board, rate), high_pass(mesen, rate)
     size = max(1, int(window * rate))
-    max_lag = rate // 1000
+    max_lag = max(1, int(rate * lag_ms / 1000))
     n = min(len(board), len(mesen)) - max_lag
     rows = ["| window s | board rms | Mesen2 rms | lag | gain | residual dB |"]
     rows.append("| ---: | ---: | ---: | ---: | ---: | ---: |")
@@ -187,12 +190,15 @@ def main() -> int:
         action="store_true",
         help="silence the APU on both sides: compare a cartridge's sound chip alone",
     )
+    parser.add_argument(
+        "--lag-ms", type=float, default=1.0, help="alignment search either side (default 1 ms)"
+    )
     args = parser.parse_args()
     apu = not args.expansion_only
     mesen, rate = mesen_wave(args.rom, args.frames, args.wav, apu=apu)
     board = board_wave(args.rom, args.frames, rate, MACHINES[args.machine], apu)
     print(f"{args.rom.name}: {args.frames} frames at {rate} Hz")
-    for row in compare(board, mesen, rate, args.window):
+    for row in compare(board, mesen, rate, args.window, args.lag_ms):
         print(row)
     return 0
 
