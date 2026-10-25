@@ -548,7 +548,9 @@ before the board takes a side.
     (`VRC6TEST`/`VRC6TESA`, MMC5, `N163TEST`: fifteen volume steps of each
     chip's square and saw, the MMC5 DAC, N163 one and eight channels) were
     recorded on hardware (nesdev-forum/16910.html), which would judge the
-    VRC6's and MMC5's volume curves, C36 and C37. On 2026-10-24 the forum
-    answered "not authorised" to every attachment (the pinned `vrctest.zip`
-    too), the recordings' host 404, and archive.org rate-limited the
-    lookup: retry, or download by hand.
+    VRC6's and MMC5's volume curves, C36 and C37. The ROMs are pinned
+    (`ExpAudio_testroms.7z`, `N163TESTv2.7z`); the recordings
+    (`symphoniae.com/nrs/nesdev/2018-08-06_ExpansionAudio.7z`) answer 404,
+    and on 2026-10-24 archive.org was offline: look there again. (The forum
+    refuses curl's default User-Agent with a 403 page, not anonymous
+    downloads: `fetch_references.py` sends its own and gets every file.)
