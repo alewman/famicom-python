@@ -1264,3 +1264,88 @@ the judge.
 **Everything again**, on PyPy with these changes: CPU 14 of 14, PPU 42 of
 42, APU 38 of 38, mappers 83 of 83, AccuracyCoin 144 of 146 (the same
 two), the quick suite 80.
+
+### Milestone 8: the window, the Famicom's sound and inputs, mapper 30 (2026-10-24)
+
+**Pins.** As the C12 record; Mesen2 2.1.1 with the detector fixes; rainwarrior's
+`nes-audio-tests` (`reference/src/nes-audio-tests`, its `build/` ROMs);
+the NESdev wiki's `INES_Mapper_019/Submapper_table` (pinned this milestone);
+pygame-ce 2.5.8 (SDL 2.32.10) on PyPy 7.3.20.
+
+**The sound path.** A cartridge's sound chip sets the APU's `expansion`
+level (mixer units) through `Cartridge.audio_out`, which the board connects
+only where the console routes the cartridge's sound (the Famicom's pins
+45/46: `famicom`, `av-famicom`); the APU adds it every CPU cycle. On the
+NES-001 the chips play to nothing, as on the console.
+`connector.expansion_gain(dB, steps)` turns a measured level, a chip's
+full-volume square against a full-volume APU square, into mixer units.
+
+**Levels** (`scripts/expansion_levels.py`: each `db_*` ROM on a Famicom, the
+RMS of its chip square over its APU square, from the mixer's output):
+
+| ROM | board | measured (rainwarrior, AV Famicom) |
+| --- | ---: | ---: |
+| `db_vrc6a` (24) | +0.20 dB | +0.2 dB |
+| `db_vrc6b` (26) | +0.20 dB | +0.2 dB |
+| `db_mmc5` | +1.00 dB | +1.0 dB |
+| `db_n163` (submapper 0) | +18.00 dB | 18.0 dB, the nine games' median |
+
+The gains are set from these measurements, so the match checks the path,
+the registers (both VRC6 wirings) and the waveforms' duty, not the level
+itself. Other consoles and cartridges measured differently (James-F: VRC6
+-1.11 dB, MMC5 +0.05 dB on an HVC-CPU-07; N163 boards 11-19.5 dB by
+resistor, which the submapper carries).
+
+**A band-limited output.** The N163 outputs its channels in turn, 15 CPU
+cycles each (C37): with 4 channels a 29.8 kHz switching tone, ultrasonic on
+the console, which the plain box filter at 44.1 kHz folded to about 18 kHz,
+3 dB under *Rolling Thunder*'s music. The APU's box filter now runs at four
+times the host rate and `take_samples` low-passes it (96-tap Blackman sinc
+at 20 kHz) and decimates: the switching is 20 dB under, a 30 kHz square 36
+dB (the box stage's uneven 10/11-cycle windows set that floor). In band
+nothing moved: `volume_tests` against the NES-001 recording within 0.03 dB
+of milestone 3's table on every tone but the random noise, and the four
+levels above unchanged.
+
+**Against Mesen2** (detectors). Pictures of the three VRC6 games at frames
+600 and 1800: 5 of 6 identical; *Akumajou Densetsu*'s frame 600 differs in
+3 rows, and the lockstep (`mesen_lockstep.py`) finds the board's VRC IRQ
+taken one instruction before Mesen2's at instruction 63,185: C33 again.
+Sound: Mesen2 mixes the VRC6 2.4 dB quieter against the APU than the
+measurement (`db_vrc6a`: its fitted gain 1.238 on the APU square, 1.637 on
+the VRC6's), and counts the VRC6 pulse's steps the other way from the wiki
+(C36); *Akumajou Densetsu*'s VRC6 alone (`mesen_audio.py --expansion-only`)
+matches Mesen2's to -0.3 to -3 dB as built, and to -7 to -16 dB with
+Mesen2's direction, about the APU's own floor against it (milestone 3).
+Mesen2 sums the N163's channels where the board takes them in turn (C37).
+
+**UNROM 512** (30). `tests/test_mappers_m8.py` pins the banking, the
+nametable wirings and the flash's command sequences. Against Mesen2's
+frames 60, 300 and 600, one in 20 of the Aftermarket set's mapper-30 dumps
+(`compat_sweep.py --aftermarket --mappers 30 --every 20`): 53 of 53
+identical.
+
+**Inputs.** Machine data says which `$4016`/`$4017` lines a console leaves
+to open bus (the Famicom's `$4016` D3-D4, the NES-101's D2) and whether
+player 2's pad has the microphone (`$4016` D2, the RF Famicom); the board
+reads a pad on each port's D1 through the expansion port, the four-player
+adapters' players 3 and 4 (`tests/test_board.py`).
+
+**The window** (`famicom-python play`, `frontend.py`). sms-python's design:
+SDL through pygame-ce, a frame-sized surface scaled on the GPU, sound
+through SDL's audio callback pacing the loop where the board keeps up;
+keyboard and gamepads (four on a Famicom), the microphone on M, reset,
+power cycle, pause, fast forward, screenshots; battery memory (and UNROM
+512's flash) read from and written to `ROM.sav`
+(`Cartridge.restore_battery`, the inverse of `battery_ram`). Tested
+through SDL's dummy drivers (`tests/test_frontend.py`: frames run, a save
+written and restored); not tested on a display here.
+
+**Not reached.** NewRisingSun's hardware recordings of his expansion-audio
+test ROMs (open item 20); the 5B (an AY-3-8910 core, later), the VRC7
+(YM2413, later) and the FDS.
+
+**Everything again**, on PyPy with milestone 8: CPU 14 of 14, PPU 42 of 42,
+APU 38 of 38, mappers 83 of 83, AccuracyCoin 144 of 146 (the same two, the
+same 127,878,004 cycles), the quick suite 105 (the window's test included
+where pygame-ce is installed).

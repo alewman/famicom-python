@@ -7,21 +7,27 @@ around it: the 2A03's sound unit, DMA and joypad ports, the 2C02 picture
 processor dot by dot, the cartridge connector and the mappers behind it, and
 the clock that ties them together.
 
-**Status (2026-10-24): milestones 1-7 of 8 done**: the CPU on the board, the
+**Status (2026-10-24): all 8 milestones done**: the CPU on the board, the
 PPU dot by dot, the APU, DMA and interrupts, AccuracyCoin run in full
 (144 of 146; PPUSim fails the two left as well), the big six mappers with
 their judges, lockstep with Mesen2 (six games identical instruction by
-instruction for a minute each), and 31 mappers covering 95.6 % of licensed
+instruction for a minute each), 31 mappers covering 95.6 % of licensed
 dumps, every one of the 2,545 swept against Mesen2: 2,463 identical, the
-other 82 each with its cause (docs/validation.md, milestone 7). One master-clock
+other 82 each with its cause (docs/validation.md, milestone 7), and
+milestone 8: a window to play in (`famicom-python play`), the Famicom's
+sound path with the VRC6's, MMC5's and Namco 163's sound at their measured
+levels, its microphone and expansion-port pads, and UNROM 512 for homebrew
+(34 mappers, 95.8 % of licensed dumps). One master-clock
 timeline with the PPU and APU advanced inside each CPU bus cycle, the memory
 map and open bus, both controller clocking models, OAM and DMC DMA inside the
 stalled read (get/put cycles, DMC precedence), the cartridge connector
 (every PPU fetch on it, dot by dot), the iNES/NES 2.0 loader with nes20db, and
 mappers 0, 1 (with its board wirings), 2, 3, 4 (MMC3 with both IRQs, MMC6,
-MC-ACC), 5 (MMC5), 7, 9 and 10 (MMC2/4), 16, 157 and 159 (Bandai, with their
-EEPROMs), 18, 19 (Namco 163), 21-25 (VRC2/4), 32, 33, 34, 66, 69 (FME-7), 75
-(VRC1), 87, 118, 155, 185, 206, 210 and 268 ([docs/claims.md](docs/claims.md)).
+MC-ACC), 5 (MMC5, with its sound), 7, 9 and 10 (MMC2/4), 16, 157 and 159
+(Bandai, with their EEPROMs), 18, 19 (Namco 163, with its sound), 21-25
+(VRC2/4), 24 and 26 (VRC6, with its sound), 30 (UNROM 512, with its flash
+save), 32, 33, 34, 66, 69 (FME-7), 75 (VRC1), 87, 118, 155, 185, 206, 210 and
+268 ([docs/claims.md](docs/claims.md)).
 The PPU renders: background and sprite fetches,
 per-dot sprite evaluation with the overflow bug, sprite-0 hit, the odd-frame
 skip, the VBL/NMI races, the decaying I/O latch; frames come out as 9-bit
@@ -110,7 +116,13 @@ python scripts/run_test_roms.py --suite ppu
 python scripts/run_test_roms.py --suite apu
 python scripts/accuracycoin.py --failures     # all of AccuracyCoin (--test NAME for one)
 python -m famicom_python ROM --frames 600 --png out.png --wav out.wav
+python -m pip install -e '.[frontend]'        # pygame-ce, for the window
+famicom-python play ROM --machine famicom     # play (keys: famicom-python play -h)
 ```
+
+The window is the reference board's: on PyPy it runs at a fraction of real
+time on a loaded machine (docs/validation.md, milestone 8), and shows every
+frame it makes. Battery saves (and UNROM 512's flash) go to `ROM.sav`.
 
 ## Scope
 
@@ -123,7 +135,7 @@ python -m famicom_python ROM --frames 600 --png out.png --wav out.wav
 
 Mappers live in this repository behind a signal-level cartridge connector
 ([docs/cartridge.md](docs/cartridge.md)); the first six (0, 1, 2, 3, 4, 7)
-cover 83 % of licensed cartridges, and the 31 done cover 95.6 % (2,545 of
+cover 83 % of licensed cartridges, and the 34 done cover 95.8 % (2,551 of
 2,662 licensed dumps).
 
 ## What is fetched
@@ -160,6 +172,7 @@ reported and kept; everything else must match its hash.
 | `scripts/ppusim_goldens.py` | records PPUSim's answers to `tests/ppusim_scenes.py` for the quick suite (`--check`: where ours differs) |
 | `scripts/mesen_audio.py` | the board's sound against Mesen2's recording, window by window (aligned, gain-fitted, residual) |
 | `scripts/volume_levels.py` | the channels' relative levels in `volume_tests` against its NES-001 recording |
+| `scripts/expansion_levels.py` | each sound chip's level in rainwarrior's `db_*` ROMs against the measured one |
 | `scripts/build_apusim.py`, `scripts/apusim/` | Breaknes APUSim (gate-level 2A03) built with our shim: a stub board around the whole chip |
 | `scripts/apusim_board.py` | a test ROM on APUSim, `$6000` result and per-cycle channel outputs |
 | `scripts/count_mappers.py` | mapper coverage over the local No-Intro sets, read in place ([docs/cartridge.md](docs/cartridge.md)) |

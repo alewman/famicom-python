@@ -426,7 +426,9 @@ before the board takes a side.
   cycle. *Board*: the cartridge's `m2()` runs at the cycle's end and /IRQ is
   sampled at once (the APU's frame IRQ takes the same path, judged by
   blargg's timing ROMs). Mesen2 takes the IRQ one instruction later in three
-  dumps' lockstep (*Racer Mini Yonku*, *TMNT 2* (J), *SD Gundam Gaiden 2*).
+  dumps' lockstep (*Racer Mini Yonku*, *TMNT 2* (J), *SD Gundam Gaiden 2*),
+  and in the VRC6's (*Akumajou Densetsu*, milestone 8: 63,185 instructions
+  in, the board's IRQ entry one instruction before Mesen2's).
   AWJ's `vrctest` times the IRQ on a 5-cycle slide and says itself its
   adjustment may be one off on hardware: no judge. Open.
 - **C34. When the MMC5's in-frame flag starts the extended attributes.**
@@ -442,6 +444,26 @@ before the board takes a side.
   PPUSim* (`scripts/ppusim_line0.py`: Y $00 and $03 draw it in both, $F8
   neither, the same fetch addresses). Mesen2 draws nothing there: thirteen
   licensed dumps differ by that one pixel.
+- **C36. Which end of its period the VRC6 pulse is high.** VRC6_audio.wiki:
+  the duty generator counts down from 15 and the volume is output while the
+  step is at or below D (the pulse high at the end of each period, "inverted
+  compared to the 2A03"). Mesen2 counts up from 0 with the same test (high
+  at the start). Kevin Horton's `vrcvi.txt`, the wiki's source, does not
+  say. Same duty and level, so only the pulses' phase against the saw and
+  each other moves: with Mesen2's direction *Akumajou Densetsu*'s VRC6
+  alone matches Mesen2 to -7 to -16 dB, near the APU's own floor against
+  it (milestone 3), and to -0.3 to -3 dB with the wiki's. *Board*: the
+  wiki's. No judge (NewRisingSun's hardware recordings, which could settle
+  it, are no longer reachable: open item 20).
+- **C37. The N163's channels: taken in turn, or summed.** Namco_163_audio.wiki:
+  the chip outputs one channel at a time, each held 15 CPU cycles, and
+  "it is often preferred to simply sum the channel outputs, and divide";
+  Mesen2 sums and divides. *Board*: in turn, as the chip, which with 7 or
+  8 channels makes the whine the wiki describes (at 17.0 and 14.9 kHz).
+  With 6 or fewer the switching is ultrasonic and the board's output stage
+  must keep it from folding into the audible band: the APU's decimating
+  low-pass (milestone 8) leaves it 20 dB under a 4-channel game's music
+  (*Rolling Thunder*), where a plain box filter left it 3 dB under.
 
 ## Open items
 
@@ -522,3 +544,11 @@ before the board takes a side.
 19. **Milestone 7's open three**: the render-start OAM copy (C32), the M2
     edge of cycle-counting IRQs (C33), the MMC5's in-frame onset (C34). Each
     needs a hardware-corrected test; none was found.
+20. **Expansion-audio recordings.** NewRisingSun's 2018 test ROMs
+    (`VRC6TEST`/`VRC6TESA`, MMC5, `N163TEST`: fifteen volume steps of each
+    chip's square and saw, the MMC5 DAC, N163 one and eight channels) were
+    recorded on hardware (nesdev-forum/16910.html), which would judge the
+    VRC6's and MMC5's volume curves, C36 and C37. On 2026-10-24 the forum
+    answered "not authorised" to every attachment (the pinned `vrctest.zip`
+    too), the recordings' host 404, and archive.org rate-limited the
+    lookup: retry, or download by hand.
