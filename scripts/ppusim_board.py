@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import os
 import sys
 import time
 from pathlib import Path
@@ -32,7 +33,10 @@ from famicom_python.system import System
 from famicom_python.testrom import SIGNATURE, blargg_text, peek, screen_text
 
 ROOT = Path(__file__).resolve().parents[1]
-LIBRARY = ROOT / "reference" / "build-ppusim" / "libppusim.so"
+# PPUSIM_LIBRARY: another build (scripts/build_ppusim.py --out), e.g. a candidate upstream patch.
+LIBRARY = Path(
+    os.environ.get("PPUSIM_LIBRARY", ROOT / "reference" / "build-ppusim" / "libppusim.so")
+)
 M2_RISE, M2_HIGH = 9, 15  # master half-cycles into the CPU cycle; length of M2 high
 ACCESS_TICKS = 8  # board.PPU_ACCESS_TICKS: where the board stops the PPU for an access
 
@@ -107,23 +111,9 @@ class PPUSimPPU:
         return result
 
     def read_register(self, register: int) -> int:
-        value = self._access(1, register, 0)
-        if register == 2:
-            # PPUSim fb7de61 drives $2002 bit 7 as the complement of the VBL
-            # flip-flop: Chips/PPUSim/fsm.cpp (FSM::sim_VBlankInt) latches
-            # INT_FF.get() into db_latch and drives DB7 from db_latch.nget(),
-            # one inversion. The die has two: the Visual2C02 netlist, the wiki's
-            # hv_fsm_int_logic.jpg and the author's HDL/PPU/fsm.v all invert
-            # the flag before the latch (.d(~int_ff_q)) and again on the way out
-            # (nq), so the pad carries the flag itself. Reported and verified as
-            # emu-russia/breaknes#529; the fix proposed there is
-            #   db_latch.set(NOT(INT_FF.get()), NOT(R2_Enable));
-            # with the nget() driver kept. Until a breaknes pin carries that,
-            # correct the bit here. The flag's set, clear and read-race timing
-            # are upstream of the driver and untouched. Remove this XOR when
-            # repinning to a fixed breaknes, or the bit inverts again.
-            value ^= 0x80
-        return value
+        # Breaknes before 54caa4f drove $2002 bit 7 inverted (emu-russia/breaknes#529,
+        # fixed upstream by #530); the pin carries the fix, so PPUSim's pins are read as is.
+        return self._access(1, register, 0)
 
     def end_read(self, register: int, value: int) -> int:
         """The board's M2-fall hook: PPUSim's pins already carry it."""

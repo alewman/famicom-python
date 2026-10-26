@@ -7,10 +7,15 @@ scripts/ppusim/ppusim_shim.cpp, is ours. The result is a build product under
 reference/, never committed. Needs g++ with C++20; about a minute with -j.
 
     python scripts/build_ppusim.py
+    python scripts/build_ppusim.py --source ../breaknes --out reference/build-ppusim-patched
+
+``--source`` builds another breaknes checkout (a candidate upstream patch) into
+``--out``; point the adapter at it with ``PPUSIM_LIBRARY=<out>/libppusim.so``.
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import subprocess
 import sys
@@ -26,17 +31,23 @@ FLAGS = ["-std=c++20", "-O2", "-fPIC", "-w"]
 
 
 def main() -> int:
-    if not BREAKNES.exists():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--source", type=Path, default=BREAKNES, help="a breaknes checkout")
+    parser.add_argument("--out", type=Path, default=OUT, help="the build directory")
+    args = parser.parse_args()
+    breaknes, out = args.source.resolve(), args.out.resolve()
+    if not breaknes.exists():
         print("reference/src/breaknes missing: python scripts/fetch_references.py", file=sys.stderr)
         return 1
-    OUT.mkdir(parents=True, exist_ok=True)
-    ppusim = BREAKNES / "Chips" / "PPUSim"
-    logic = BREAKNES / "Common" / "BaseLogicLib"
+    out.mkdir(parents=True, exist_ok=True)
+    library = out / LIBRARY.name
+    ppusim = breaknes / "Chips" / "PPUSim"
+    logic = breaknes / "Common" / "BaseLogicLib"
     sources = sorted(ppusim.glob("*.cpp")) + sorted(logic.glob("*.cpp"))
     includes = ["-I", str(ppusim), "-I", str(logic)]
 
     def compile_one(source: Path) -> Path:
-        obj = OUT / f"{source.parent.name}_{source.stem}.o"
+        obj = out / f"{source.parent.name}_{source.stem}.o"
         if not obj.exists() or obj.stat().st_mtime < source.stat().st_mtime:
             subprocess.run(
                 ["g++", *FLAGS, *includes, "-c", str(source), "-o", str(obj)], check=True
@@ -45,12 +56,12 @@ def main() -> int:
 
     with ThreadPoolExecutor(max_workers=min(16, os.cpu_count() or 4)) as pool:
         objects = list(pool.map(compile_one, sources))
-    shim = OUT / "ppusim_shim.o"
+    shim = out / "ppusim_shim.o"
     subprocess.run(["g++", *FLAGS, *includes, "-c", str(SHIM), "-o", str(shim)], check=True)
     subprocess.run(
-        ["g++", "-shared", "-o", str(LIBRARY), *map(str, objects), str(shim)], check=True
+        ["g++", "-shared", "-o", str(library), *map(str, objects), str(shim)], check=True
     )
-    print(f"built {LIBRARY}")
+    print(f"built {library}")
     return 0
 
 

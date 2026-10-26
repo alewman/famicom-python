@@ -346,8 +346,9 @@ before the board takes a side.
 - **C23. PPUSim's `$2002` bit 7.** Breaknes PPUSim `fb7de61` drives it as the
   complement of the VBL flag (`fsm.cpp`, `db_latch.nget()`); its own wiki
   drawing, its author's Verilog and the Visual2C02 netlist all show the true
-  flag. Reported as emu-russia/breaknes#529 (with the netlist trace);
-  `scripts/ppusim_board.py` corrects it until a fixed pin.
+  flag. Reported as emu-russia/breaknes#529 (with the netlist trace); fixed
+  upstream by #530 (54caa4f), and the pin is now `215ab82`, so
+  `scripts/ppusim_board.py` no longer corrects it.
 - **C27. The PPU address bus at dot 0.** `PPU_rendering.wiki` "Cycle 0": the
   idle dot's address "appears to be" the CHR address of dot 5's low pattern
   fetch, "possibly calculated during the two unused NT fetches"; the board
