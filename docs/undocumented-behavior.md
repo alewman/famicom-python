@@ -454,8 +454,12 @@ before the board takes a side.
   each other moves: with Mesen2's direction *Akumajou Densetsu*'s VRC6
   alone matches Mesen2 to -7 to -16 dB, near the APU's own floor against
   it (milestone 3), and to -0.3 to -3 dB with the wiki's. *Board*: the
-  wiki's. No judge (NewRisingSun's hardware recordings, which could settle
-  it, are no longer reachable: open item 20).
+  wiki's. No judge, and NewRisingSun's recordings (open item 20) cannot be
+  one: his test plays a VRC6 pulse alone, with nothing to time its phase
+  against, and *Madara*'s music always has APU channels as loud whose phase
+  the game's writes do not set (the triangle, the noise), so neither
+  direction's output maps onto the recording through one fitted filter
+  (validation.md, "Expansion-audio recordings").
 - **C37. The N163's channels: taken in turn, or summed.** Namco_163_audio.wiki:
   the chip outputs one channel at a time, each held 15 CPU cycles, and
   "it is often preferred to simply sum the channel outputs, and divide";
@@ -465,6 +469,22 @@ before the board takes a side.
   must keep it from folding into the audible band: the APU's decimating
   low-pass (milestone 8) leaves it 20 dB under a 4-channel game's music
   (*Rolling Thunder*), where a plain box filter left it 3 dB under.
+  *Settled on hardware* (NewRisingSun's recordings, open item 20): on all
+  ten carts the test's eight channels make a line at 1,789,773 / 120 Hz,
+  39-44 dB over the noise, and *King of Kings*' eight-channel music the same
+  line at +22 dB; summing makes nothing there. One channel and eight sound
+  within 0.22 dB of each other (the board: 0.34), so the chip does not sum
+  without dividing either.
+- **C38. How loud the MMC5's DAC is.** MMC5_audio.wiki: "equivalent in
+  volume to the APU with equivalent input", unmeasured; the board gave a
+  DAC step the DMC's (+1 dB, as the pulses). *Settled on hardware*:
+  NewRisingSun's MMC5 test feeds the same $02/$22 square to the DMC and, by
+  the same loop, to the DAC; on two carts the DAC sounds 3.8 and 5.0 dB under
+  the DMC and 4.3 and 5.1 dB under a full MMC5 square from the same pin,
+  where the board played it 5.0 dB over the DMC. *Board*: a DAC step 0.273
+  of a pulse step, the two carts' geometric mean of the ratio within the
+  chip (which the console's mixing cannot move): 4.7 dB under a full square.
+  Linear outside $02-$22 by assumption.
 
 ## Open items
 
@@ -545,13 +565,13 @@ before the board takes a side.
 19. **Milestone 7's open three**: the render-start OAM copy (C32), the M2
     edge of cycle-counting IRQs (C33), the MMC5's in-frame onset (C34). Each
     needs a hardware-corrected test; none was found.
-20. **Expansion-audio recordings.** NewRisingSun's 2018 test ROMs
-    (`VRC6TEST`/`VRC6TESA`, MMC5, `N163TEST`: fifteen volume steps of each
-    chip's square and saw, the MMC5 DAC, N163 one and eight channels) were
-    recorded on hardware (nesdev-forum/16910.html), which would judge the
-    VRC6's and MMC5's volume curves, C36 and C37. The ROMs are pinned
-    (`ExpAudio_testroms.7z`, `N163TESTv2.7z`); the recordings
-    (`symphoniae.com/nrs/nesdev/2018-08-06_ExpansionAudio.7z`) answer 404,
-    and on 2026-10-24 archive.org was offline: look there again. (The forum
-    refuses curl's default User-Agent with a 403 page, not anonymous
-    downloads: `fetch_references.py` sends its own and gets every file.)
+20. **Expansion-audio recordings.** *Done 2026-10-26*: archive.org kept
+    NewRisingSun's recordings (`2018-08-06_ExpansionAudio.7z`, pinned; the
+    original URL is gone), and `scripts/nrs_recordings.py` compares the
+    board's run of the same test ROMs with them (validation.md,
+    "Expansion-audio recordings"). They settled C37 and C38 and left C36
+    open. Left over: *Namco Classic II*'s N163 sounds 2.1 dB over the APU
+    where nes20db's submapper 3 (11-13 dB) gives it 12.0, with the same 4.7k
+    mixing resistor as the carts that measure 12.7-13.0; one cart, and
+    NewRisingSun found the game "almost inaudible" on his console too. No
+    submapper says so; the board follows nes20db.

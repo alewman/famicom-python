@@ -4236,7 +4236,17 @@
   "size": 2286,
   "kind": "test-rom",
   "license": "Author-distributed test ROM (forum attachment); freely distributable test program, no explicit license",
-  "note": "fetched 2026-10-24: NewRisingSun's 2018 expansion-audio test ROMs (VRC6TEST, VRC6TESA, MMC5TEST, N163TEST), nesdev-forum/16910.html; his hardware recordings of them are not pinned (open item 20)"
+  "note": "fetched 2026-10-24: NewRisingSun's 2018 expansion-audio test ROMs (VRC6TEST, VRC6TESA, MMC5TEST, N163TEST), nesdev-forum/16910.html; his hardware recordings of them: reference/nrs-expansion-audio/"
+ },
+ {
+  "path": "reference/nrs-expansion-audio/2018-08-06_ExpansionAudio.7z",
+  "url": "http://web.archive.org/web/20180817074817id_/http://symphoniae.com/nrs/nesdev/2018-08-06_ExpansionAudio.7z",
+  "sha256": "048a7bb448566530beb9ba76a66cfb7820e610477ca4a1b3c680aa2c4878159d",
+  "size": 217852723,
+  "kind": "hardware-capture",
+  "license": "No stated license (NewRisingSun's recordings, linked from his forum post); fetch, do not commit",
+  "note": "fetched 2026-10-26 from archive.org (the original symphoniae.com URL is gone): NewRisingSun's 2018-08-05 recordings of his expansion-audio test ROMs on a Twin Famicom, 2 MMC5, 10 N163, 1 VRC6 carts, 96 kHz FLAC; nesdev-forum/16910.html; scripts/nrs_recordings.py",
+  "timeout": 1800
  },
  {
   "path": "tests/test_roms/nesdev-forum/N163TESTv2.7z",
