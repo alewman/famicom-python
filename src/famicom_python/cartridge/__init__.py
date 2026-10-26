@@ -12,6 +12,7 @@ source below the winner disagrees is logged in :attr:`Loaded.disagreements`.
 
 from __future__ import annotations
 
+import os
 import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass, fields
@@ -32,6 +33,8 @@ from .discrete import (
     UxROM,
     mapper_34,
 )
+from .fds import FDS
+from .fds_disk import is_fds
 from .ines import BoardInfo, RomImage, parse
 from .irem import G101
 from .jaleco import SS88006
@@ -83,7 +86,16 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     268: AA6023,
 }
 
-__all__ = ["MAPPERS", "BoardInfo", "Cartridge", "Loaded", "RomImage", "load", "read_rom_file"]
+__all__ = [
+    "MAPPERS",
+    "BoardInfo",
+    "Cartridge",
+    "Loaded",
+    "RomImage",
+    "fds_bios",
+    "load",
+    "read_rom_file",
+]
 
 
 @dataclass
@@ -97,16 +109,43 @@ class Loaded:
     mame: dict[str, str]
 
 
-def read_rom_file(path: str | Path) -> bytes:
-    """A ``.nes`` file's bytes, or the one ``.nes`` inside a ``.zip``, read in place."""
+def read_rom_file(path: str | Path, suffixes: tuple[str, ...] = (".nes", ".fds")) -> bytes:
+    """A ``.nes`` or ``.fds`` file's bytes, or the one such file in a ``.zip``, read in place."""
     path = Path(path)
     if path.suffix.lower() == ".zip":
         with zipfile.ZipFile(path) as archive:
-            names = [name for name in archive.namelist() if name.lower().endswith(".nes")]
+            names = [name for name in archive.namelist() if name.lower().endswith(suffixes)]
             if len(names) != 1:
-                raise ValueError(f"{path}: expected one .nes inside, found {len(names)}")
+                raise ValueError(f"{path}: expected one of {suffixes} inside, found {len(names)}")
             return archive.read(names[0])
     return path.read_bytes()
+
+
+#: The FDS BIOS when FAMICOM_FDS_BIOS does not name it: No-Intro's (Rev 1,
+#: CRC32 5E607DCF), under NO_INTRO_DIR as scripts/count_mappers.py reads it.
+FDS_BIOS_IN_NO_INTRO = (
+    "Nintendo - Family Computer Disk System (FDS)/"
+    "[BIOS] Family Computer Disk System (Japan) (En) (Rev 1).zip"
+)
+
+
+def fds_bios() -> bytes:
+    """The 8 KiB disk system BIOS: the file (or zip) FAMICOM_FDS_BIOS names, else
+    No-Intro's under NO_INTRO_DIR. Never shipped: it is Nintendo's."""
+    named = os.environ.get("FAMICOM_FDS_BIOS")
+    no_intro = Path(os.environ.get("NO_INTRO_DIR", "No-Intro"))
+    path = Path(named) if named else no_intro / FDS_BIOS_IN_NO_INTRO
+    if not path.exists():
+        raise FileNotFoundError(f"FDS BIOS not found at {path}: set FAMICOM_FDS_BIOS")
+    data = read_rom_file(path, (".bin", ".rom"))
+    if len(data) != 0x2000:
+        raise ValueError(f"{path}: an FDS BIOS is 8 KiB, this is {len(data)} bytes")
+    return data
+
+
+#: How the loader describes a disk image: the RAM adapter, iNES mapper 20
+#: (historically reserved for the FDS), 32 KiB PRG-RAM, 8 KiB CHR-RAM.
+FDS_BOARD = BoardInfo(mapper=20, mirroring="1", prg_ram=0x8000, chr_ram=0x2000)
 
 
 def _differences(winner: BoardInfo, other: BoardInfo, label: str) -> list[str]:
@@ -127,6 +166,9 @@ def load(
 ) -> Loaded:
     """Identify the cartridge in ``rom`` (a path or a file's bytes) and build its mapper."""
     data = rom if isinstance(rom, bytes) else read_rom_file(rom)
+    if is_fds(data):
+        image = RomImage(b"", b"", fds_bios(), b"", data, FDS_BOARD, False)
+        return Loaded(FDS(image, cpu_cycle_ticks), image, "FDS image", [], {})
     image = parse(data)
     header = image.board
     header_label = "NES 2.0 header" if image.nes2 else "iNES header"

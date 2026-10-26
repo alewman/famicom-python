@@ -1,0 +1,157 @@
+"""The FDS RAM adapter and disk model on synthetic disks: statements of the
+model (``cartridge/fds.py``), not judges; the judges are the test disks of
+``tests/test_fds_test_roms.py``. No BIOS needed: a blank one stands in."""
+
+from __future__ import annotations
+
+from famicom_python.cartridge.fds import FDS, SPIN_UP_BYTES
+from famicom_python.cartridge.fds_disk import (
+    GAP,
+    MARK,
+    PREGAP,
+    SIDE_BYTES,
+    VERIFY,
+    blocks,
+    crc16,
+    fds_side,
+    raw_side,
+)
+from famicom_python.cartridge.ines import BoardInfo, RomImage
+
+TICKS = 12  # master ticks per CPU cycle
+
+
+def side_with_one_file(payload: bytes = b"\xa5" * 32) -> bytes:
+    info = bytes([1]) + VERIFY + bytes(56 - 15)
+    amount = bytes([2, 1])
+    header = bytes([3, 0, 0]) + b"FILENAME" + bytes([0, 0x60, len(payload), 0, 0])
+    data = bytes([4]) + payload
+    return (info + amount + header + data).ljust(SIDE_BYTES, b"\0")
+
+
+def adapter(side: bytes | None = None) -> FDS:
+    image = RomImage(
+        b"", b"", bytes(0x2000), b"", side or side_with_one_file(), BoardInfo(20), False
+    )
+    return FDS(image, TICKS)
+
+
+def cycles(fds: FDS, count: int) -> None:
+    for _ in range(count):
+        fds.cpu_read(0x0000, 0)  # a cycle outside PRG-RAM: it refreshes
+        fds.m2(0)
+
+
+def test_crc_is_kermit() -> None:
+    assert crc16(b"123456789") == 0x2189
+
+
+def test_a_side_round_trips_through_the_disk_stream() -> None:
+    side = side_with_one_file()
+    assert [block[0] for block in blocks(side)] == [1, 2, 3, 4]
+    raw = raw_side(side)
+    assert raw[:PREGAP] == bytes(PREGAP) and raw[PREGAP] == MARK
+    info = raw[PREGAP + 1 : PREGAP + 57]
+    assert crc16(bytes([MARK]) + info + raw[PREGAP + 57 : PREGAP + 59]) == 0
+    assert raw[PREGAP + 59 : PREGAP + 59 + GAP] == bytes(GAP)
+    assert fds_side(raw) == side
+
+
+def test_timer_irq_with_reload_zero_fires_at_once_and_repeats() -> None:
+    fds = adapter()
+    fds.cpu_write(0x4023, 0x83, 0)
+    fds.cpu_write(0x4020, 0, 0)
+    fds.cpu_write(0x4021, 0, 0)
+    fds.cpu_write(0x4022, 0x03, 0)  # enabled, repeat
+    cycles(fds, 1)
+    assert fds.irq and fds.timer_enabled
+    fds.cpu_read(0x4030, 0)  # acknowledges
+    assert not fds.timer_irq
+    cycles(fds, 1)
+    assert fds.timer_irq  # every cycle, as the wiki says
+
+
+def test_timer_counts_reload_plus_one_cycles_and_stops_without_repeat() -> None:
+    fds = adapter()
+    fds.cpu_write(0x4023, 0x83, 0)
+    fds.cpu_write(0x4020, 10, 0)
+    fds.cpu_write(0x4021, 0, 0)
+    fds.cpu_write(0x4022, 0x02, 0)
+    cycles(fds, 10)
+    assert not fds.timer_irq
+    cycles(fds, 1)
+    assert fds.timer_irq and not fds.timer_enabled
+
+
+def test_disabling_disk_io_stops_and_acknowledges_the_timer() -> None:
+    fds = adapter()
+    fds.cpu_write(0x4023, 0x83, 0)
+    fds.cpu_write(0x4022, 0x03, 0)
+    cycles(fds, 1)
+    fds.cpu_write(0x4023, 0x82, 0)
+    assert not fds.timer_irq and not fds.timer_enabled and fds.control == 0x06
+    fds.cpu_write(0x4022, 0x02, 0)  # ignored while disk I/O is off
+    assert not fds.timer_enabled
+
+
+def test_watchdog_fires_on_the_4096th_cycle_without_refresh() -> None:
+    """From reset (4095) to its underflow: the count FDS-4030D1-Addr's first
+    return address, $67FF, pins on hardware."""
+    fds = adapter()
+    fds.cpu_write(0x4023, 0x83, 0)
+    for _ in range(4095):
+        fds.cpu_read(0x6000, 0)  # PRG-RAM: no refresh
+        fds.m2(0)
+        assert not fds.watchdog_irq
+    fds.cpu_read(0x6000, 0)
+    fds.m2(0)
+    assert fds.watchdog_irq and fds.irq
+    assert fds.cpu_read(0x4030, 0) & 0x02  # and the read acknowledges it
+    assert not fds.watchdog_irq
+
+
+def read_block(fds: FDS) -> tuple[list[int], bool]:
+    """Start the motor, wait for ready, then read the first block as the BIOS
+    does: set $4025 D6 inside the gap, take bytes on the transfer flag, set D4
+    after the first CRC byte, and report $4030's CRC error after the second."""
+    fds.cpu_write(0x4023, 0x83, 0)
+    fds.cpu_write(0x4025, 0x2E, 0)  # StopMotor: scan reset
+    fds.cpu_write(0x4025, 0x2D, 0)  # motor on, scanning, read mode
+    while fds.cpu_read(0x4032, 0) & 0x02:
+        cycles(fds, 1)
+    cycles(fds, 150 * 100)  # well into the pre-gap
+    fds.cpu_write(0x4025, 0x6D, 0)  # CRC enable: wait for the gap's end
+    got: list[int] = []
+    while len(got) < 1 + 55 + 2:
+        cycles(fds, 1)
+        if fds.byte_flag:
+            got.append(fds.cpu_read(0x4031, 0))
+            if len(got) == 57:
+                fds.cpu_write(0x4025, 0x7D, 0)  # CRC control before the last byte
+    return got, bool(fds.cpu_read(0x4030, 0) & 0x10)
+
+
+def test_reading_a_block_gives_its_bytes_and_a_good_crc() -> None:
+    side = side_with_one_file()
+    got, crc_error = read_block(adapter(side))
+    assert bytes(got[:56]) == side[:56]
+    assert not crc_error
+
+
+def test_a_damaged_block_fails_its_crc() -> None:
+    fds = adapter()
+    fds.sides[0][PREGAP + 10] ^= 0xFF
+    _, crc_error = read_block(fds)
+    assert crc_error
+
+
+def test_a_stop_pulse_shorter_than_a_byte_resets_the_scan() -> None:
+    fds = adapter()
+    fds.cpu_write(0x4023, 0x83, 0)
+    fds.cpu_write(0x4025, 0x2D, 0)
+    cycles(fds, 150 * (SPIN_UP_BYTES + 500))
+    assert fds.head is not None and fds.head > 400
+    fds.cpu_write(0x4025, 0x2E, 0)  # StopMotor
+    fds.cpu_write(0x4025, 0x2F, 0)
+    fds.cpu_write(0x4025, 0x2D, 0)  # StartMotor, all within a few cycles
+    assert fds.head is None

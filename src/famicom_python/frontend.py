@@ -341,7 +341,9 @@ def main(argv: list[str] | None = None) -> int:
         epilog=HELP,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("rom", type=Path, help="an iNES/NES 2.0 file, or a .zip holding one")
+    parser.add_argument(
+        "rom", type=Path, help="an iNES/NES 2.0 file, an FDS disk, or a .zip holding one"
+    )
     parser.add_argument("--machine", choices=sorted(MACHINES), default="nes")
     parser.add_argument("--palette", type=Path, default=DEFAULT_PALETTE)
     parser.add_argument("--scale", type=int, default=3, help="window scale (default 3)")
