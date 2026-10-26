@@ -146,8 +146,8 @@
  {
   "path": "reference/src/breaknes",
   "url": "https://github.com/emu-russia/breaknes",
-  "rev": "fb7de61b62aeb1dbf710db5edfa1caaa4a4aad20",
-  "date": "2026-09-04T11:32:28+03:00",
+  "rev": "215ab82e5ebaeab59312bbe8b38f03ea5429ce39",
+  "date": "2026-10-13T20:15:58+03:00",
   "sparse": [
    "/Chips/APUSim/",
    "/Chips/M6502Core/",

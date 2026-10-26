@@ -21,6 +21,63 @@ using namespace PPUSim;
 namespace PPUSimUnitTest {
 class UnitTest {
 public:
+    // ppusim_eval_probe: the sprite-evaluation signals the wiki maps to Visual 2C02
+    // nodes (BreakingNESWiki PPU/visual2c02.md), one bit each, in this order:
+    // OSTEP OBJ_READ /H2' OAMCTR2 ORES I/OAM2 /EVAL OMFG H0' PCLK, then the
+    // secondary OAM counter (OAM_Temp 0-4) and OAM8.
+    static int eval(PPU &ppu) {
+        auto one = [](TriState t) { return t == One ? 1 : 0; };
+        auto *e = ppu.eval;
+        return one(e->OSTEP) | one(ppu.fsm.OBJ_READ) << 1 | one(ppu.wire.nH2_Dash) << 2
+               | one(ppu.wire.OAMCTR2) << 3 | one(e->ORES) << 4 | one(ppu.fsm.IOAM2) << 5
+               | one(ppu.fsm.n_EVAL) << 6 | one(e->OMFG) << 7 | one(ppu.wire.H0_Dash) << 8
+               | one(ppu.wire.PCLK) << 9 | (one(e->OAM_Temp[0]) | one(e->OAM_Temp[1]) << 1
+               | one(e->OAM_Temp[2]) << 2 | one(e->OAM_Temp[3]) << 3 | one(e->OAM_Temp[4]) << 4) << 10
+               | one(ppu.wire.OAM8) << 15;
+    }
+    // ppusim_regs_probe: the $2001 path to rendering, in this order (the wiki's
+    // names; compare.py REGS has the Visual 2C02 nodes): /DBE /W1 PPU_CTRL1[3]
+    // BGE BLACK BLNK OBJ_READ PCLK.
+    static int regs(PPU &ppu) {
+        auto one = [](TriState t) { return t == One ? 1 : 0; };
+        return one(ppu.wire.n_DBE) | one(ppu.wire.n_W1) << 1 | one(ppu.regs->PPU_CTRL1[3].get()) << 2
+               | one(ppu.wire.BGE) << 3 | one(ppu.wire.BLACK) << 4 | one(ppu.fsm.BLNK) << 5
+               | one(ppu.fsm.OBJ_READ) << 6 | one(ppu.wire.PCLK) << 7;
+    }
+    // ppusim_fifo_probe: sprite lane 0 against compare.py FIFO, in this order:
+    // #0/H (n_ZH) PCLK, the lane's X down-counter (8 bits), its /ZCOL0 /ZCOL1
+    // outputs, then ZH_FF, the lane's enable (NOT /EN), /VIS and SR_EN.
+    static int fifo(PPU &ppu) {
+        auto one = [](TriState t) { return t == One ? 1 : 0; };
+        auto *lane = ppu.fifo->lane[0];
+        int counter = 0;
+        for (int n = 0; n < 8; n++) counter |= one(lane->down_cnt[n].get()) << n;
+        return one(ppu.wire.n_ZH) | one(ppu.wire.PCLK) << 1 | counter << 2
+               | one(lane->nZ_COL0) << 10 | one(lane->nZ_COL1) << 11 | one(lane->ZH_FF.get()) << 12
+               | (1 - one(lane->n_EN)) << 13 | one(ppu.fsm.nVIS) << 14 | one(lane->SR_EN) << 15;
+    }
+    // ppusim_vis_probe, compare.py VIS's order: VB, /VIS, BLNK, PCLK, V counter bit 0.
+    static int vis(PPU &ppu) {
+        auto one = [](TriState t) { return t == One ? 1 : 0; };
+        return one(ppu.fsm.VB) | one(ppu.fsm.nVIS) << 1 | one(ppu.fsm.BLNK) << 2
+               | one(ppu.wire.PCLK) << 3 | (int)(ppu.GetVCounter() & 1) << 4;
+    }
+    // ppusim_ob_probe, compare.py OB's order: the OAM buffer (OB0-7), OAM8, PCLK,
+    // I/OAM2, /WE.
+    static int ob(PPU &ppu) {
+        auto one = [](TriState t) { return t == One ? 1 : 0; };
+        int bits = 0;
+        for (int n = 0; n < 8; n++) bits |= one(ppu.wire.OB[n]) << n;
+        return bits | one(ppu.wire.OAM8) << 8 | one(ppu.wire.PCLK) << 9 | one(ppu.fsm.IOAM2) << 10
+               | one(ppu.wire.n_WE) << 11;
+    }
+    static int oam(PPU &ppu) {  // ppusim_oam_probe
+        int a = ppu.wire.OAM8 == One ? 0x100 : 0;
+        for (int n = 0; n < 8; n++) a |= (ppu.wire.n_OAM[n] == Zero ? 1 : 0) << n;
+        int ob = 0;
+        for (int n = 0; n < 8; n++) ob |= (ppu.wire.OB[n] == One ? 1 : 0) << n;
+        return a | (ppu.fsm.IOAM2 == One ? 0x200 : 0) | ob << 10;
+    }
     static void inner(PPU &ppu, uint8_t out[5]) {
         auto one = [](TriState t) { return t == One ? 1 : 0; };
         out[0] = (uint8_t)(one(ppu.fsm.BLNK) | one(ppu.fsm.ZHPOS) << 1 | one(ppu.fsm.nVIS) << 2
@@ -121,6 +178,9 @@ struct Board {
     uint8_t clk = 0;
     std::vector<TraceEntry> trace;   // filled while tracing (ppusim_trace)
     bool tracing = false;
+    // RAW video by (V, H), each dot's last half-cycle (ppusim_screen): whole
+    // frames without the trace's cost, for replays (breaknes_regdump.py).
+    uint16_t screen[262 * 341]{};
 
     uint16_t address() const { return (uint16_t)(((ahi & 0x3F) << 8) | latch); }
 
@@ -143,6 +203,10 @@ struct Board {
         if (out[(size_t)OutputPad::n_WR] == Zero) {
             uint16_t a = address();
             if ((a & 0x2000) || chr_writable) *cell(a) = ad;
+        }
+        {
+            int v = ppu.GetVCounter(), hc = ppu.GetHCounter();
+            if (v < 262 && hc < 341) screen[v * 341 + hc] = (uint16_t)(video.RAW.raw & 0x1FF);
         }
         if (tracing) {
             TraceEntry e{};
@@ -245,5 +309,16 @@ int ppusim_temp_oam(void *h, int index) {
     return ((Board *)h)->ppu.Dbg_TempOAMReadByte((size_t)(index & 31));
 }
 int ppusim_raw_video(void *h) { return ((Board *)h)->video.RAW.raw; }
+const void *ppusim_screen(void *h) { return ((Board *)h)->screen; }
+// The OAM address on its pins into the array: OAM8 (secondary OAM) << 8 | OAM0-7,
+// with I_OAM2 << 9 (the buffer forced to $FF) and the OAM buffer << 10.
+int ppusim_fifo_probe(void *h) { return PPUSimUnitTest::UnitTest::fifo(((Board *)h)->ppu); }
+int ppusim_vis_probe(void *h) { return PPUSimUnitTest::UnitTest::vis(((Board *)h)->ppu); }
+int ppusim_ob_probe(void *h) { return PPUSimUnitTest::UnitTest::ob(((Board *)h)->ppu); }
+int ppusim_regs_probe(void *h) { return PPUSimUnitTest::UnitTest::regs(((Board *)h)->ppu); }
+int ppusim_eval_probe(void *h) { return PPUSimUnitTest::UnitTest::eval(((Board *)h)->ppu); }
+int ppusim_oam_probe(void *h) {
+    return PPUSimUnitTest::UnitTest::oam(((Board *)h)->ppu);
+}
 
 }  // extern "C"
