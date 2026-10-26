@@ -51,7 +51,7 @@ them.
 | Damian Yerrick's `volumes.nes` recording on an NES-001 | APU volumes and non-linear mixing | `tests/test_roms/nes-test-roms/volume_tests/recordings/nes-001.ogg` (Vorbis: lossy) |
 | `apu_mixer_recordings/*.mp3` | the mixer tests' audible output | provenance undocumented, lossy: illustrative only |
 | AccuracyCoin README per-console notes; blargg's `power_up_palette` | power-on palette RAM (unique per console), register noise | `tests/test_roms/AccuracyCoin/README.md` |
-| Nintendo factory test cartridges (local, not copied) | functional diagnostics: Control Deck Test Cartridge, NTF2 Test/System Cartridge, HVC Kensa Controller Test, Controller/Joystick/Port/Power Pad tests | `/data/emu/roms/nes/*(Test Program).zip` |
+| Nintendo factory test cartridges (local, not copied) | functional diagnostics: Control Deck Test Cartridge, NTF2 Test/System Cartridge, HVC Kensa Controller Test, Controller/Joystick/Port/Power Pad tests | the author's dumps (`*(Test Program).zip`), not distributed |
 | MMC3 chip photographs, N-K's `mmc3irqtest` hardware photo | MMC3 revision behaviour | `nesdev-forum/p261236-*` |
 
 ## Hardware-corrected (self-checking programs)
@@ -234,7 +234,7 @@ three corrections where a higher tier shows `b9fa69d` wrong.
 | No-Intro `… (Headered) (Private)` | 634 |
 | No-Intro `2024 - … (Headered)` (older snapshot) | 5,836 |
 | No-Intro Famicom Disk System (FDS), (FDS) (Aftermarket), (QD) | present |
-| `/data/emu/roms/nes` | 8,001 (incl. the Nintendo test cartridges above) |
+| the author's own NES collection (GoodNES-named) | 8,001 (incl. the Nintendo test cartridges above) |
 | MAME software lists `/usr/share/games/mame/hash/nes.xml` (+ `famicom_flop`, `famicom_cass`, `nes_ade`, `nes_datach`, `nes_kstudio`, `nes_ntbrom`) | 4,559 entries in `nes.xml` |
 
 The No-Intro sets are read from `NO_INTRO_DIR` (`scripts/count_mappers.py`).
