@@ -237,7 +237,7 @@ three corrections where a higher tier shows `b9fa69d` wrong.
 | `/data/emu/roms/nes` | 8,001 (incl. the Nintendo test cartridges above) |
 | MAME software lists `/usr/share/games/mame/hash/nes.xml` (+ `famicom_flop`, `famicom_cass`, `nes_ade`, `nes_datach`, `nes_kstudio`, `nes_ntbrom`) | 4,559 entries in `nes.xml` |
 
-The No-Intro sets are under `/data/emu/source/myrient.erista.me/files/No-Intro/`.
+The No-Intro sets are read from `NO_INTRO_DIR` (`scripts/count_mappers.py`).
 `nes20db-2026-09-26.7z` (the header database) is in `reference/docs/`.
 
 ## Certification record

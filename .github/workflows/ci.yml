@@ -1,8 +1,8 @@
 name: CI
 
-# Private repository: Actions minutes cost money, so PyPy only (the interpreter
-# the board is certified on), main and pull requests only, superseded runs
-# cancelled. The slow test ROMs run by hand (scripts/run_test_roms.py).
+# Kept minimal: PyPy only (the interpreter the board is certified on), main and
+# pull requests only, superseded runs cancelled. The slow test ROMs run by hand
+# (scripts/run_test_roms.py).
 on:
   push:
     branches: [main]

@@ -4,18 +4,21 @@
 Read-only: opens each zip, streams the first 16 bytes of each .nes member,
 never extracts to disk. Usage: nice python3 scripts/count_mappers.py > coverage.txt
 (also writes coverage.json in the current directory). Results: docs/cartridge.md.
+The sets are read from the directory in NO_INTRO_DIR (default ./No-Intro), one
+subdirectory per set as No-Intro names them; none are fetched or committed.
 """
 
 from __future__ import annotations
 
 import collections
 import json
+import os
 import re
 import sys
 import zipfile
 from pathlib import Path
 
-BASE = Path("/data/emu/source/myrient.erista.me/files/No-Intro")
+BASE = Path(os.environ.get("NO_INTRO_DIR", "No-Intro"))
 SETS = [
     "Nintendo - Nintendo Entertainment System (Headered)",
     "Nintendo - Nintendo Entertainment System (Headered) (Aftermarket)",

@@ -1,5 +1,9 @@
 # Handoff: build `famicom-python`, the Famicom / NES board
 
+*The brief the board was built from (2026-10-05), kept as written as the
+record of what was asked; local paths in it are the author's machine. What
+was done is in [validation.md](validation.md) and the [README](../README.md).*
+
 ## Context you are inheriting
 
 The family's shape is **chips are cores, boards compose cores**. Each core is
@@ -192,7 +196,7 @@ Build the board as `src/famicom_python/`. The module shape in
    for instruction-level CPU questions only (its PPU and DMA are not exact:
    mame-oracle.md).
 7. **Compatibility sweep (detector).** Every licensed No-Intro dump whose mapper
-   is implemented, in place from `/data/emu/source/...` (never copied), for N
+   is implemented, in place from the local No-Intro sets (never copied), for N
    seconds, frame compared with Mesen2's at the same frame; publish the table of
    divergences with causes. Then extend mappers in coverage order (206, 5, 19,
    18, 23, 16, 87, 69, 66, 210, 25, 185, 9, …) to 95 % of licensed dumps
@@ -217,8 +221,8 @@ and AY-3-8910 cores, extracting the APU/PPU, Rust and `-fast` forks.
 - **Never commit ROMs, test ROMs, traces, fetched documents or databases.**
   `reference/`, `tests/test_roms/`, `tests/mame_traces/` are ignored.
   `nes-test-roms` and nes20db carry no licence. Commercial cartridges are read
-  in place from `/data/emu/source/myrient.erista.me/files/No-Intro/...` or
-  `/data/emu/roms/nes`; never hand-fix a romset.
+  in place from the local No-Intro sets or `/data/emu/roms/nes`; never
+  hand-fix a romset.
 - **Never copy GPL code**: Mesen2/MesenCE (GPL-3), puNES, Nestopia, FCEUX
   (GPL-2), MAME's `nes_apu.cpp` (GPL-2+). Read, cite by file and line, write
   our own. The Breaks/Breaknes material is CC0 and AccuracyCoin MIT, but cite
