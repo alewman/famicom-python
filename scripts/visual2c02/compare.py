@@ -244,8 +244,11 @@ def stress2004(key: int) -> Schedule:
     s.write(1, 0x00)
     s.oam(oam)
     s.write(1, 0x18, at(5, 320))
-    for dot in range(int(os.environ.get("STRESS_OFFSET", "0")), 341, 3):
-        s.read(4, at(128, dot))
+    if os.environ.get("STRESS_PROBE"):  # no reads: the OAM address per dot of line 128
+        s.probe = [128]
+    else:
+        for dot in range(int(os.environ.get("STRESS_OFFSET", "0")), 341, 3):
+            s.read(4, at(128, dot))
     s.end = at(129, 8)
     return s
 

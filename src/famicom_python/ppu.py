@@ -614,6 +614,12 @@ class PPU:
             self._copying -= 1
             address = (address + 1) & 0xFF
             if not self._copying:
+                if not 0 <= line - value < height:
+                    # As in a normal copy, the last byte gets the range check and
+                    # out of range masks the address back into alignment: after a
+                    # misaligned find at $9F, $A0 $A1 $A2 then $A0 (AccuracyCoin
+                    # "$2004 Stress Test" 3; PPUSim).
+                    address &= 0xFC
                 self._eval_done = True
         elif 0 <= line - value < height:
             # PPUSTATUS shows it a dot later (PPUSim; AccuracyCoin "$2002 flag
