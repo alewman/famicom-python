@@ -149,6 +149,11 @@ class PPU:
         # Sprite evaluation state (PPU_sprite_evaluation.wiki).
         self.oam_bus = 0xFF  # what a $2004 read returns while rendering
         self._oam2_index = 0
+        # The secondary OAM address during the sprite fetch: a counter that steps
+        # only while rendering (Visual 2C02 spr_ptr), so a toggle mid-fetch leaves
+        # it behind (AccuracyCoin "Misaligned OAM2 Address" 4).
+        self._oam2_fetch = 0
+        self._fetch_y = 0
         self._copying = 0  # bytes of an in-range sprite still to copy
         self._eval_done = False
         self._sprite_count = 0
@@ -415,7 +420,14 @@ class PPU:
                     self._reload_pending = False
                     self._reload()
             self._background_fetch(dot)
-            self.oam_bus = self.oam2[0]
+            if dot == 321 and not self._oam2_frozen:
+                # The last slot's fourth step: 31 wraps to 0 and raises the freeze
+                # (Visual 2C02 spr_ptr_overflow; AccuracyCoin "Frozen OAM2 Increment" 3).
+                self._oam2_fetch += 1
+                if self._oam2_fetch >= 32:
+                    self._oam2_fetch = 0
+                    self._oam2_frozen = True
+            self.oam_bus = self.oam2[self._oam2_fetch & 31]
         else:  # 337-340: the next line's first nametable byte, twice
             if dot == 337 and not self._dark:
                 self._shift()
@@ -632,14 +644,19 @@ class PPU:
         slot = (dot - 257) >> 3
         phase = (dot - 257) & 7
         oam2 = self.oam2
-        # Each slot's four bytes, or index 0 for all of them while the
-        # overflow freeze holds the address there.
-        base, step = (0, 0) if self._oam2_frozen else (slot << 2, 1)
+        # The counter steps on phases 1-3 and on each later slot's phase 0 (and
+        # once more on dot 321), four a slot, unless the overflow freeze holds it
+        # (Visual 2C02 inc_spr_ptr; AccuracyCoin "Frozen OAM2 Increment").
+        if dot == 257:
+            self._oam2_fetch = 0
+        elif phase <= 3 and not self._oam2_frozen:
+            self._oam2_fetch += 1
+        address = self._oam2_fetch & 31
         lane = self._lanes[slot]
         if phase == 0:
             if slot == 0:
                 self._sprite_count = min(self._oam2_index, 32) >> 2 if visible else 8
-            self.oam_bus = oam2[base]
+            self.oam_bus = self._fetch_y = oam2[address]
             self._garbage = 0x2000 | (self.v & 0x0FFF)
             if self._watch:
                 self._ale(self._garbage)
@@ -647,36 +664,34 @@ class PPU:
             # /RD: the octal latch still holds the ALE's low byte, but A8-A13
             # come from v, whose copy from t (dot 257) came between: on dot
             # 258 $2542 reads as $2142 (PPUSim).
-            self._fetch_tile = self.oam_bus = oam2[base + step]
+            self._fetch_tile = self.oam_bus = oam2[address]
             self.nt_latch = self._fetch((0x2000 | (self.v & 0x0F00)) | (self._garbage & 0xFF))
         elif phase == 2:
-            self._fetch_attr = self.oam_bus = lane[2] = oam2[base + 2 * step]
+            self._fetch_attr = self.oam_bus = lane[2] = oam2[address]
             if self._watch:
                 self._ale(0x2000 | (self.v & 0x0FFF))
         elif phase == 3:
             # The fetch's attribute slot: no latch takes its byte, which a
             # restart before dot 321 shows (PPUSim, tests/ppusim_scenes.py lanes).
-            self.oam_bus = x = oam2[base + 3 * step]
+            self.oam_bus = x = oam2[address]
             self._fetch(0x2000 | (self.v & 0x0FFF))
             lane[3] = x
             if lane[4] > self.time:  # still counting: it counts on from X
                 lane[4] = self.time + x * self.dot_ticks
         elif phase == 4:
             if self._watch:
-                self._ale(self._sprite_pattern(line, oam2[base]))
+                self._ale(self._sprite_pattern(line, self._fetch_y))
         elif phase == 5:
-            lo = self._fetch(self._sprite_pattern(line, oam2[base]))
-            lane[0] = self._lane_bits(slot, visible, line, oam2[base], lo)
+            lo = self._fetch(self._sprite_pattern(line, self._fetch_y))
+            lane[0] = self._lane_bits(slot, visible, line, self._fetch_y, lo)
         elif phase == 6:
             if self._watch:
-                self._ale(self._sprite_pattern(line, oam2[base]) | 8)
+                self._ale(self._sprite_pattern(line, self._fetch_y) | 8)
         else:
-            hi = self._fetch(self._sprite_pattern(line, oam2[base]) | 8)
-            lane[1] = self._lane_bits(slot, visible, line, oam2[base], hi)
-            if slot == 7:
-                self._oam2_frozen = True  # the address wraps from 31 to 0
+            hi = self._fetch(self._sprite_pattern(line, self._fetch_y) | 8)
+            lane[1] = self._lane_bits(slot, visible, line, self._fetch_y, hi)
         if phase >= 3:
-            self.oam_bus = oam2[base + 3 * step]
+            self.oam_bus = oam2[address]
 
     def _lane_bits(self, slot: int, visible: bool, line: int, y: int, bits: int) -> int:
         """A pattern byte as its lane takes it: first pixel in bit 7 (the
@@ -795,8 +810,7 @@ class PPU:
             if phase == 3:
                 return 0x2000 | (v & 0x0FFF)
             line = self.line if self.line < HEIGHT else self.line & 0xFF
-            base = ((dot - 257) >> 3) << 2
-            return self._sprite_pattern(line, self.oam2[base]) | (8 if phase == 7 else 0)
+            return self._sprite_pattern(line, self._fetch_y) | (8 if phase == 7 else 0)
         return 0x2000 | (v & 0x0FFF)  # 338, 340
 
     def _settle(self, high: int, low: int, steps: int) -> int:
@@ -840,18 +854,15 @@ class PPU:
         """The secondary OAM address (0-31) at this dot, as AccuracyCoin's "OAM
         Corruption" notes give it (hardware-corrected): every other dot on
         1-64; the evaluation's write index on 65-256, raised to a multiple of 4
-        (0 once full); on 257-320 it restarts and counts slot fetches (+1 on
-        phases 0-2 and 7 of each 8); 0 on 321-340."""
+        (0 once full); from 257 the fetch counter (4 a slot; 0 again after
+        dot 321's wrap)."""
         dot = self.dot
         if 1 <= dot <= 64:
             return (dot - 1) >> 1
         if 65 <= dot <= 256:
             index = self._oam2_index
             return 0 if index >= 32 else ((index + 3) & ~3) & 31
-        if 257 <= dot <= 320:
-            phase = (dot - 257) & 7
-            return (((dot - 257) >> 3) << 2) + min(phase, 3)
-        return 0
+        return self._oam2_fetch & 31  # 257-340: the fetch counter
 
     def _corrupt_oam(self) -> None:
         """Rendering begins at the pre-render line with the secondary OAM
@@ -994,23 +1005,28 @@ class PPU:
         slot = (dot - 257) >> 3
         phase = (dot - 257) & 7
         oam2 = self.oam2
-        base, step = (0, 0) if self._oam2_frozen else (slot << 2, 1)
+        # The fade dot still reads secondary OAM, and the counter still steps.
+        if dot == 257:
+            self._oam2_fetch = 0
+        elif phase <= 3 and not self._oam2_frozen:
+            self._oam2_fetch += 1
+        address = self._oam2_fetch & 31
         lane = self._lanes[slot]
-        if phase == 1:
-            self._fetch_tile = oam2[base + step]
+        if phase == 0:
+            self._fetch_y = oam2[address]
+        elif phase == 1:
+            self._fetch_tile = oam2[address]
         elif phase == 2:
-            self._fetch_attr = lane[2] = oam2[base + 2 * step]
+            self._fetch_attr = lane[2] = oam2[address]
         elif phase == 3:
-            x = oam2[base + 3 * step]
+            x = oam2[address]
             lane[3] = x
             if lane[4] > self.time:
                 lane[4] = self.time + x * self.dot_ticks
         elif phase == 5:
-            lane[0] = self._lane_bits(slot, visible, line, oam2[base], self.v & 0xFF)
+            lane[0] = self._lane_bits(slot, visible, line, self._fetch_y, self.v & 0xFF)
         elif phase == 7:
-            lane[1] = self._lane_bits(slot, visible, line, oam2[base], self.v & 0xFF)
-            if slot == 7:
-                self._oam2_frozen = True
+            lane[1] = self._lane_bits(slot, visible, line, self._fetch_y, self.v & 0xFF)
 
     def _turn_off(self) -> None:
         self._on = False
