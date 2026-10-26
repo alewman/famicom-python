@@ -16,7 +16,7 @@ dumps, every one of the 2,545 swept against Mesen2: 2,463 identical, the
 other 82 each with its cause (docs/validation.md, milestone 7), and
 milestone 8: a window to play in (`famicom-python play`), the Famicom's
 sound path with the VRC6's, MMC5's and Namco 163's sound at their measured
-levels, its microphone and expansion-port pads, and UNROM 512 for homebrew
+levels (checked against NewRisingSun's recordings of thirteen carts), its microphone and expansion-port pads, and UNROM 512 for homebrew
 (34 mappers, 95.8 % of licensed dumps). One master-clock
 timeline with the PPU and APU advanced inside each CPU bus cycle, the memory
 map and open bus, both controller clocking models, OAM and DMC DMA inside the
@@ -183,6 +183,7 @@ by the scripts that use them, not by the test suite.
 | `scripts/mesen_audio.py` | the board's sound against Mesen2's recording, window by window (aligned, gain-fitted, residual) |
 | `scripts/volume_levels.py` | the channels' relative levels in `volume_tests` against its NES-001 recording |
 | `scripts/expansion_levels.py` | each sound chip's level in rainwarrior's `db_*` ROMs against the measured one |
+| `scripts/nrs_recordings.py` | NewRisingSun's expansion-audio test ROMs on the board against his recordings of thirteen carts: volume steps, levels, the N163's switching, the MMC5 DAC |
 | `scripts/build_apusim.py`, `scripts/apusim/` | Breaknes APUSim (gate-level 2A03) built with our shim: a stub board around the whole chip |
 | `scripts/apusim_board.py` | a test ROM on APUSim, `$6000` result and per-cycle channel outputs |
 | `scripts/count_mappers.py` | mapper coverage over the local No-Intro sets, read in place ([docs/cartridge.md](docs/cartridge.md)) |

@@ -43,11 +43,11 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def download(url: str) -> bytes:
+def download(url: str, timeout: int = 120) -> bytes:
     # nesdev.org answers urllib with 403 whatever the User-Agent, and curl with 200
     # (checked 2026-10-05), so curl does the fetching.
     result = subprocess.run(
-        ["curl", "-sSfL", "--max-time", "120", "-A", USER_AGENT, url],
+        ["curl", "-sSfL", "--max-time", str(timeout), "-A", USER_AGENT, url],
         capture_output=True,
         check=False,
     )
@@ -80,7 +80,7 @@ def fetch_files(verify_only: bool) -> int:
             problems += 1
             continue
         try:
-            data = download(entry["url"])
+            data = download(entry["url"], entry.get("timeout", 120))  # seconds; big files say
         except OSError as error:
             print(f"ERROR: {entry['url']}: {error}")
             problems += 1

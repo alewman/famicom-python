@@ -6,12 +6,16 @@ clocked together at a fixed rate: every 7424 M2 cycles, the die's divider
 (about 240 Hz). The PCM DAC takes $5011 writes, or in read mode every byte
 read from $8000-$BFFF; a zero leaves it alone and trips the IRQ.
 
-All of it is inverted against the APU, and equal to it in level: rainwarrior
-measured a full-volume MMC5 square +1.0 dB against the APU's on an AV
-Famicom (``db_mmc5``; James-F +0.05 dB on an HVC-CPU-07), and the PCM is "as
-loud as the APU's DMC with the same input", its eighth bit doubling that (the
-wiki; unmeasured). A mapper module may not import the APU (the connector
-rule), so the pulse's pieces are its own here.
+All of it is inverted against the APU. The pulses equal it in level:
+rainwarrior measured a full-volume MMC5 square +1.0 dB against the APU's on
+an AV Famicom (``db_mmc5``; James-F +0.05 dB on an HVC-CPU-07;
+NewRisingSun's recordings +1.08 and +0.70 dB on a Twin Famicom). The PCM is
+quieter than the wiki's "equivalent in volume to the APU with equivalent
+input": in NewRisingSun's recordings of two carts the same $02/$22 square
+sounds 3.8 and 5.0 dB under the DMC's, and 4.3 and 5.1 dB under a full MMC5
+square from the same chip (``scripts/nrs_recordings.py``; C38 in
+docs/undocumented-behavior.md). A mapper module may not import the APU (the connector rule), so
+the pulse's pieces are its own here.
 """
 
 from __future__ import annotations
@@ -36,9 +40,12 @@ FRAME_CYCLES = 7424  # M2 cycles per envelope and length clock (the die)
 
 MMC5_DB = 1.0  # a full-volume square against the APU's (rainwarrior, AV Famicom)
 PULSE_GAIN = APU_SQUARE * 10 ** (MMC5_DB / 20) / 15
-# The APU's DMC near zero (APU_Mixer.wiki: 159.79 / (22638 / d + 100) per step
-# d, small d), through the same resistors as the pulses.
-PCM_GAIN = 159.79 / 22638 * 10 ** (MMC5_DB / 20)
+# A DAC step against a pulse step, from the same pin: the $02/$22 square (32
+# steps) 4.28 and 5.09 dB under a full square (15 steps) on the two carts
+# recorded, 0.286 and 0.261; their geometric mean. Measured between $02 and
+# $22 only: linear beyond that is the model's assumption.
+PCM_PER_PULSE_STEP = 10 ** (-(4.28 + 5.09) / 2 / 20) * 15 / 32
+PCM_GAIN = PULSE_GAIN * PCM_PER_PULSE_STEP
 
 
 class MMC5Pulse:

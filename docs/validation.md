@@ -1400,3 +1400,65 @@ one-dot alignment, not the board.
 mappers 83 of 83, AccuracyCoin **146 of 146** (127,878,003 CPU cycles,
 4,294 frames, 132 s), the quick suite 105.
 
+
+### Expansion-audio recordings, and speed on an idle machine (2026-10-26)
+
+**Pins.** famicom-python at the commit that adds this record; NewRisingSun's
+`2018-08-06_ExpansionAudio.7z` (archive.org's copy of 2018-08-17, SHA-256
+`048a7bb4…`) and his `ExpAudio_testroms.7z`. PyPy 7.3.20, CPython 3.14.
+
+**The recordings.** NewRisingSun loaded his test ROMs into a Sharp
+AN-505-BK Twin Famicom (C205 removed) from an EverDrive, hot-swapped each
+cartridge in so its own chip played them, and recorded Audio Out at 96 kHz
+with one gain for all (nesdev-forum/16910.html): two MMC5 carts, ten N163,
+one VRC6, each ending with some of the game. The tests play fifteen volume
+steps of a 440 Hz square on the APU, then on the chip (the VRC6 also its
+saw, the N163 eight channels, the MMC5 its DAC). `scripts/nrs_recordings.py`
+runs the same ROMs on the board (Famicom, 96 kHz, before the analogue stage)
+and compares each step's fundamental, which the console's filters scale
+alike at one pitch. Its numbers reproduce NewRisingSun's own N163 column of
+the wiki's mixing table within 0.1 dB.
+
+| Chip | Hardware | Board | |
+| --- | --- | --- | --- |
+| APU square, steps 1-15 | steps 1-7 0.1 dB high against 8-15, on all 13 | the mixer formula | the 2A03's bit 3 a little light on this console; not modelled (one console) |
+| MMC5 square | +1.08, +0.70 dB against the APU's; linear within 0.13 dB | +1.0 dB, linear | agrees |
+| MMC5 DAC, $02/$22 | 4.3, 5.1 dB under a full MMC5 square | was 3.6 dB *over*; now 4.7 under | **fixed** (C38) |
+| N163, one channel | 9 carts within 1 dB of their submapper's level (11-13, 16-17, 18-19.5 dB bands); *Namco Classic II* +2.1 dB | the band's middle | agrees but *Namco Classic II* (open item 20) |
+| N163, eight channels | 0.22 dB under one channel | 0.34 dB under | taken in turn (C37) |
+| N163 switching | a line at 1,789,773 / 120 Hz, +39-44 dB, on every cart; in *King of Kings*' music +22 dB | the same | settles C37 |
+| VRC6 square | -0.35 dB against the APU's; steps 1-7 up to 0.4 dB high against 8-15 | +0.2 dB (rainwarrior's AV Famicom), linear | consoles differ (James-F: -1.1 dB); the DAC's bit 3 light on this cart |
+| VRC6 saw | +2.03 dB against the APU square | +2.83 dB | 0.25 dB against the VRC6's own square: within its DAC's spread |
+
+The VRC6's duty direction (C36) stays open. *Madara*'s music on the board
+(Start, then A, from power-on) lines up with the recording's by its
+loudness envelope (correlation 0.87; the recording is the board plus
+132.81 s), but no filter fitted on 8 s maps either direction's output onto
+the next 30 s (residuals within 2 dB of the recording itself, in the full
+band and in 1.5-8 kHz): the APU's triangle and noise, whose phase the game's
+writes do not set, sound as loud as the VRC6 throughout, and the test ROM
+plays the VRC6's pulse alone.
+
+**Speed.** Milestone 8's follow-up blamed the machine alone for the lost
+frames; on an idle machine (load 4-7 on 32 threads) the code lost some too.
+The 240p Test Suite's menu, CPython, each version pinned to its own
+5.5 GHz P-core, three rounds with the cores rotated (frames/s):
+
+| Milestone 3 | 4 | 5 | 7 | 8 | main |
+| --- | --- | --- | --- | --- | --- |
+| 8.3, 8.5, 8.7 | 7.7, 7.8, 7.9 | 7.7, 7.8, 7.8 | 7.5, 7.1 (5.7) | 6.5, 6.7 (5.0) | 6.5, 6.5, 6.1 |
+
+About 25 % in all, in steps: milestone 4 (AccuracyCoin's fixes) 8 %,
+milestones 5-7 about 4 % (near the noise; not traced), and between 7 and 8
+10 %, where C12 and the expansion-sound path landed: the PPU's per-dot
+`_step` costs 56 % more than at milestone 7 (cProfile; sprite evaluation
+following PPUMASK itself, the wake and fade states checked on every dot).
+Correctness bought it; no one change lost it. PyPy, one run at
+a time on one core, 900 frames after 120 of warm-up, `PYTHONHASHSEED` 0 and
+1: milestone 3 63-78 frames/s, main 57-60 (0.95-1.0x real time). PyPy's
+300-frame windows vary from 32 to 74 frames/s for the same code, so the
+earlier records' PyPy figures carry about that spread.
+
+**Everything again**, on PyPy with the DAC change: CPU 14 of 14, PPU 42 of
+42, APU 38 of 38, mappers 83 of 83, the quick suite 105 (AccuracyCoin, an
+NROM cart, does not reach the change).
