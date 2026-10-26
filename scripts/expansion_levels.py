@@ -36,11 +36,18 @@ MEASURED = {
     # The N163's level is its board's: db_n163 has no submapper (0), which
     # the board takes as the measured games' median.
     "db_n163": 18.0,
+    "db_fds": 6.6,  # a disk: needs the BIOS (FAMICOM_FDS_BIOS or NO_INTRO_DIR)
 }
 
 
+NO_BUZZ = {"db_fds"}
+
+
 def levels(name: str, seconds: float = 16) -> list[float]:
-    system = System.from_rom(BUILD / f"{name}.nes", FAMICOM)
+    path = BUILD / f"{name}.nes"
+    if not path.exists():
+        path = path.with_suffix(".fds")
+    system = System.from_rom(path, FAMICOM)
     system.board.set_sample_rate(RATE)
     samples: list[float] = []
     for _ in range(round(60 * seconds)):
@@ -57,7 +64,10 @@ def main(argv: list[str]) -> int:
         tones = levels(name)
         # The DMC buzz (the second merges with the APU square's run), then
         # APU square, chip square, APU square, ...
-        squares = tones[1:5] if len(tones) >= 5 else tones[1:]
+        # On the disk (db_fds) the buzz falls inside the BIOS's boot and no
+        # tone comes before the APU square.
+        first = 0 if name in NO_BUZZ else 1
+        squares = tones[first : first + 4]
         if len(squares) < 2:
             print(f"| {name} | {len(tones)} | - | {MEASURED.get(name, '-')} |")
             worst = math.inf

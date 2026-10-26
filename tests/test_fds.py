@@ -16,6 +16,7 @@ from famicom_python.cartridge.fds_disk import (
     fds_side,
     raw_side,
 )
+from famicom_python.cartridge.fds_sound import MASTER, FDSSound
 from famicom_python.cartridge.ines import BoardInfo, RomImage
 
 TICKS = 12  # master ticks per CPU cycle
@@ -155,3 +156,73 @@ def test_a_stop_pulse_shorter_than_a_byte_resets_the_scan() -> None:
     fds.cpu_write(0x4025, 0x2F, 0)
     fds.cpu_write(0x4025, 0x2D, 0)  # StartMotor, all within a few cycles
     assert fds.head is None
+
+
+# -- the sound (fds_sound.py) --------------------------------------------
+
+
+def sound(**registers: int) -> FDSSound:
+    unit = FDSSound()
+    unit.set_enabled(True)
+    for address, value in registers.items():
+        unit.write(int(address[1:], 16), value)
+    return unit
+
+
+def test_loopys_mod_example_gives_a_wave_pitch_of_one() -> None:
+    """pitch 1, counter 50, gain 62: "about 0.4Hz wave tick rate" (p232662)."""
+    unit = sound(r4082=1, r4083=0, r4084=0x80 | 62, r4085=50, r4087=0x80)
+    before = unit.accumulator
+    unit._tick()
+    assert unit.accumulator - before == 1
+
+
+def test_unmodulated_pitch_steps_the_wave_by_pitch_times_64() -> None:
+    unit = sound(r4082=0x34, r4083=0x02, r4084=0x80, r4085=0, r4087=0x80)
+    unit._tick()
+    assert unit.accumulator == 0x234 * 0x40
+
+
+def test_mod_table_entries_step_twice_and_reset_counts() -> None:
+    unit = sound(r4087=0x80)
+    for entry in (1, 4) + (0,) * 30:
+        unit.write(0x4088, entry)
+    unit.write(0x4087, 0x40)  # running, a carry every tick
+    steps = []
+    for _ in range(4):
+        unit._tick()
+        steps.append(unit.mod_counter)
+    assert steps == [1, 2, 0, 0]  # +1 twice, then reset twice
+
+
+def test_master_volume_follows_the_ladder() -> None:
+    assert MASTER == (1.0, 2 / 3, 1 / 2, 2 / 5)
+
+
+def test_volume_takes_effect_at_wave_position_zero() -> None:
+    unit = sound(r4089=0x80)
+    for i in range(64):
+        unit.write(0x4040 + i, 63)
+    unit.write(0x4089, 0)
+    unit.write(0x408A, 0xFF)
+    unit.write(0x4080, 0x80 | 20)
+    unit.write(0x4082, 0)
+    unit.write(0x4083, 0x01)  # running (D7 clear), pitch $100
+    unit.clock()
+    assert unit.out_volume == 20  # position 0: latched
+    unit.accumulator = 5 << 18
+    unit.write(0x4080, 0x80 | 30)
+    unit.clock()
+    assert unit.out_volume == 20  # not at position 0: held
+    unit.accumulator = 0
+    unit.clock()
+    assert unit.out_volume == 30
+
+
+def test_audio_reset_holds_the_channel() -> None:
+    unit = sound(r4080=0x80 | 40, r4085=10)
+    unit.accumulator = 7 << 18
+    unit.set_enabled(False)
+    assert (unit.accumulator, unit.mod_counter, unit.volume.gain) == (0, 0, 0)
+    unit.write(0x4085, 5)
+    assert unit.mod_counter == 0  # $4085 is not mapped while reset
