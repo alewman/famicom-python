@@ -104,7 +104,7 @@ analogue stage per console (`--wav`).
 
 The documents in [`docs/`](docs/README.md) hold what the build needs, every
 fact with its source and tier; [docs/handoff-brief.md](docs/handoff-brief.md)
-is the plan.
+is the brief it was built from.
 
 ```sh
 python -m pip install -e '.[dev]'
@@ -154,6 +154,14 @@ python scripts/fetch_references.py --verify   # check what is present
 It needs `git` and `curl`. Wiki and forum pages are live: a changed page is
 reported and kept; everything else must match its hash.
 
+**Game ROMs are not included and not fetched.** The test ROMs above are
+freely distributed homebrew; to play a game, or to run the Mesen2 lockstep
+(`scripts/mesen_lockstep.py`) and the compatibility sweep
+(`scripts/compat_sweep.py`, `scripts/count_mappers.py`, which read No-Intro
+sets from the directory in `NO_INTRO_DIR`), supply your own dumps. The referees (Mesen2, PPUSim and
+APUSim, built locally from their pinned sources; MAME 0.285) are needed only
+by the scripts that use them, not by the test suite.
+
 ## Scripts
 
 | Script | What |
@@ -183,5 +191,7 @@ reported and kept; everything else must match its hash.
 
 ## Licence
 
-MIT (see `LICENSE`), for what is in this repository. The fetched material keeps
-its own terms, recorded per file in the pin lists.
+MIT (see `LICENSE`), for what is in this repository, except
+`scripts/mesen2-detector-fixes.patch`: a patch to Mesen2, whose context lines
+are Mesen2's, so it is under Mesen2's GPL-3.0. The fetched material keeps its
+own terms, recorded per file in the pin lists.
