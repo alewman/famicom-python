@@ -1367,3 +1367,36 @@ pin; every milestone between falls in the same 3-7 band. Nothing in the
 code lost the 53.6 frames/s of milestone 3's record: the machine did (load
 average 76-90 on 32 threads, most of them E-cores), and `perf` is not
 available to count instructions instead. Measure on an idle machine.
+
+### AccuracyCoin 146 of 146 (2026-10-26)
+
+**Pins.** famicom-python at the commit that adds this record; Breaknes
+`215ab82` (`54caa4f` fixed `$2002` bit 7, so `scripts/ppusim_board.py` no
+longer corrects it); AccuracyCoin `6bee919`. PyPy 7.3.20.
+
+**Judges.** Visual 2C02 (Quietust's transistor netlist of the 2C02G, run
+headless by `scripts/visual2c02/v2c02.js`) is a die model independent of
+PPUSim; `scripts/visual2c02/compare.py` drives the board's PPU, PPUSim and
+Visual 2C02 with one register schedule and compares reads, pixels and
+internal signals half-cycle by half-cycle (the BreakingNESWiki maps PPUSim's
+signal names to the netlist's nodes). It found four PPUSim bugs, reported
+with patches as emu-russia/breaknes#535-#538; with them PPUSim scores 145
+of 146 (only OAM Corruption, analogue, fails) and judges the three below.
+Visual 2C02 is not a judge in the sprite overflow scan: there it steps the
+address by 4 where the hardware answer key, PPUSim and the board agree on
+the buggy step.
+
+| Test | Was | Cause | Judge |
+| --- | --- | --- | --- |
+| Misaligned OAM2 Address | 4 | the sprite fetch's secondary OAM address is a counter that steps only while rendering (four a slot, a last step on dot 321 that wraps and raises the freeze); the board derived it from the dot | Visual 2C02 `spr_ptr`; lockstep with patched PPUSim |
+| `$2004` Stress Test | 3 | in the overflow scan the copy's last byte gets the range check, as in a normal copy: out of range, the address is masked back (`$A0 $A1 $A2 $A0 $A4` after a find at `$9F`) | the test's two 341-byte hardware answer keys, now equal on every dot; PPUSim's address probe |
+| Sprites On Scanline 0 | passed as an RGB PPU | after the odd-frame skip a lane still active from the pre-render fetch shifts out its first pixel at x = 0 (the rest at X+1 on): `#0/H` comes a dot late against line 0, `/VIS` at H=1 as always | Visual 2C02 lane 0 per half-cycle; patched PPUSim's pixels for three tile rows; the test now reports a composite PPU |
+
+The study also suspected the board's `$2004` reads around dots 250-256;
+both answer keys cover them and now match, so that was the comparison's
+one-dot alignment, not the board.
+
+**Everything again**, on PyPy: CPU 14 of 14, PPU 42 of 42, APU 38 of 38,
+mappers 83 of 83, AccuracyCoin **146 of 146** (127,878,003 CPU cycles,
+4,294 frames, 132 s), the quick suite 105.
+
