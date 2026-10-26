@@ -171,8 +171,11 @@ phase 1. **FDS** images (fwNES `.fds`, 65,500 bytes per side, with or
 without the 16-byte header; No-Intro's are headerless) load as the RAM
 adapter (`cartridge/fds.py`, milestone 9): the loader recognises the data,
 not the extension, and needs the BIOS (`FAMICOM_FDS_BIOS`, or No-Intro's
-under `NO_INTRO_DIR`; Nintendo's, never fetched or committed). The `.QD`
-format is not read yet.
+under `NO_INTRO_DIR`; Nintendo's, never fetched or committed). `.QD` images
+(Nintendo's re-release format: 65,536 bytes a side, each block's CRC stored)
+load the same way, their stored CRCs kept as they are. Sides a game writes
+are saved beside the image (`<image>.sav`: the written sides, as `.fds`
+sides), the image itself never changed.
 
 ## Identifying the board
 

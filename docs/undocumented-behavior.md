@@ -520,6 +520,12 @@ before the board takes a side.
   differ more: *Doki Doki Panic*'s sweep, to -2 dB, ours louder at its start.
   Mesen2's formula (C42) accounts for none of it, dropping the volume latch
   for about 1 dB; the rest is not traced. No judge. Open.
+- **C44. Clearing `$4025` D6 drops the byte transfer flag.** FDS_Registers.wiki:
+  without D6 the flag "will always return 0". *Board*: clearing D6 clears
+  it. Kept set from a write, the next read's IRQ came at once on a stale byte:
+  *Zelda no Densetsu*'s save failed its read-back with error 24 until this.
+  A hardware answer would be a test that writes, clears D6 and polls $4030.
+  Settled only by the BIOS working.
 
 ## Open items
 
@@ -610,9 +616,7 @@ before the board takes a side.
     mixing resistor as the carts that measure 12.7-13.0; one cart, and
     NewRisingSun found the game "almost inaudible" on his console too. No
     submapper says so; the board follows nes20db.
-21. **The Famicom Disk System, after milestone 9's second part.**
+21. **The Famicom Disk System, after milestone 9's third part.**
     FDS-Audio-Registers' answer (a video, not fetched); the sound's open
-    claims (C42, C43); disk swaps
-    and flips (the frontend, and scripted swaps for sweeps); saving written
-    sides beside the image; `.QD` images; FDS-4023-Test (its answer is a
-    video too); the drive's timing (C39).
+    claims (C42, C43); FDS-4023-Test (its answer is a video too); the drive's
+    timing (C39); a sweep of the FDS sets (smoke first).

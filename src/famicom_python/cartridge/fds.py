@@ -23,7 +23,7 @@ choice) here.
 from __future__ import annotations
 
 from .banked import HORIZONTAL, VERTICAL, Banked
-from .fds_disk import crc16, raw_side, split_sides
+from .fds_disk import SIDE_BYTES, crc16, disk_sides, fds_side, raw_side
 from .fds_sound import GAIN, FDSSound
 from .ines import RomImage
 
@@ -32,6 +32,7 @@ MASTER_HZ = 236_250_000 / 11  # NTSC: the RP2C33 is a Famicom part
 SPIN_UP_BYTES = round(50_000 * 12 / BYTE_TICKS)  # scan start to ready (unmeasured)
 REVOLUTION_BYTES = round(7.0 * MASTER_HZ / BYTE_TICKS)  # "about 7 seconds" a side
 WATCHDOG_RELOAD = 3245  # CPU cycles the DRAM refresh watchdog allows (FDS_Registers.wiki)
+SAVE_MAGIC = b"FDSW"  # a save: the sides written since the image was made, each as a .fds side
 
 # $4025 bits
 SCAN, MOTOR_STOP, READ, ARRANGEMENT, CRC_SEND, CRC_ENABLE, DISK_IRQ = 1, 2, 4, 8, 16, 64, 128
@@ -53,7 +54,7 @@ class FDS(Banked):
         self.map_chr(0, 8, 0)  # unbanked (Banked's windows all start at 0)
         self.bios = image.prg
         self.sound = FDSSound()
-        self.sides = [raw_side(side) for side in split_sides(image.misc)]
+        self.sides = disk_sides(image.misc)
         self.written = [False] * len(self.sides)
         self.side: int | None = 0 if self.sides else None  # the side in the drive
         self.write_protected = False
@@ -95,6 +96,35 @@ class FDS(Banked):
         self.side = side
         self.head = None
         self.spin_up = SPIN_UP_BYTES
+
+    def side_name(self, side: int | None) -> str:
+        return "no disk" if side is None else f"disk {side // 2 + 1} side {'AB'[side & 1]}"
+
+    # -- saves: the written sides beside the image, never the image itself --
+
+    def battery_ram(self) -> bytes | None:
+        written = [i for i, changed in enumerate(self.written) if changed]
+        if not written:
+            return None
+        out = bytearray(SAVE_MAGIC + bytes([len(written)]))
+        for side in written:
+            out += bytes([side]) + fds_side(self.sides[side])
+        return bytes(out)
+
+    def restore_battery(self, data: bytes) -> bool:
+        if data[:4] != SAVE_MAGIC or len(data) < 5:
+            return False
+        record = 1 + SIDE_BYTES  # the side's index, then the side
+        body = data[5:]
+        records = [body[i : i + record] for i in range(0, len(body), record)]
+        if len(records) != data[4] or any(
+            len(r) != record or r[0] >= len(self.sides) for r in records
+        ):
+            return False
+        for r in records:
+            self.sides[r[0]] = raw_side(r[1:])
+            self.written[r[0]] = True
+        return True
 
     @property
     def scanning(self) -> bool:
@@ -257,9 +287,14 @@ class FDS(Banked):
             self.head = None
             self.spin_up = SPIN_UP_BYTES
         if not control & CRC_ENABLE:
+            # D6 clear resets the transfer: no sync, no CRC, and the byte transfer
+            # flag "will always return 0" (FDS_Registers.wiki). Left set from a
+            # write, it would raise the next read's IRQ at once (Zelda's save:
+            # error 24 on the read-back).
             self.synced = False
             self.crc = 0
             self.crc_error = False
+            self.byte_flag = False
         if not control & CRC_SEND:
             self.crc_sent = 0
 

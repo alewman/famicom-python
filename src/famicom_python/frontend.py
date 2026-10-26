@@ -13,9 +13,9 @@ stretched. Where the machine is fast enough, sound sets the pace (SDL's
 audio thread drains a short queue and a frame runs when it runs short), as
 in sms-python's frontend.
 
-Saves: a cartridge's battery memory (or a UNROM 512's flash) is read from
-``<rom>.sav`` beside the file at power-on and written there on quit and on
-power cycle.
+Saves: a cartridge's battery memory (or a UNROM 512's flash, or the disk
+sides an FDS game wrote) is read from ``<rom>.sav`` beside the file at
+power-on and written there on quit and on power cycle.
 """
 
 from __future__ import annotations
@@ -28,6 +28,8 @@ from array import array
 from collections.abc import Callable
 from pathlib import Path
 
+from .cartridge.fds import FDS
+from .fds_auto import AutoDisk
 from .joypad import DOWN, LEFT, RIGHT, SELECT, START, UP, A, B, StandardController
 from .machine import MACHINES
 from .ppu import DOTS, HEIGHT, WIDTH
@@ -45,6 +47,8 @@ M (hold)    the Famicom's microphone (player 2's pad, --machine famicom)
 Backspace   the reset button F5      power cycle  F3   pause
 Tab (hold)  fast forward (no sound)                F11  fullscreen
 F12         screenshot (PNG)                       Esc  quit
+D           FDS: eject the disk, then put the next side in (sides change by
+            themselves unless --manual-disk)
 Gamepads: the first two are players 1 and 2; on a Famicom a third and fourth
 are players 3 and 4 through the expansion port (a four-player adapter)."""
 
@@ -126,9 +130,11 @@ class Frontend:
     """One console in one window. ``pygame`` is imported by :func:`main`."""
 
     def __init__(self, pygame, rom: Path, machine: str, palette: Path, scale: int,
-                 audio: bool, fullscreen: bool) -> None:  # fmt: skip
+                 audio: bool, fullscreen: bool, auto_disk: bool = True) -> None:  # fmt: skip
         self.pg = pygame
         self.rom, self.machine_name = rom, machine
+        self.auto_disk = auto_disk
+        self.last_side = -1  # the FDS side the D key last took out
         self.words = palette_words(load_palette(palette))
         self.palette = load_palette(palette)
         self.system = self._power_on()
@@ -167,7 +173,21 @@ class Frontend:
         if MACHINES[self.machine_name].famicom_audio_through_cart:
             board = system.board
             board.expansion_pads = [StandardController(), StandardController()]
+        if isinstance(system.cartridge, FDS) and self.auto_disk:
+            AutoDisk(system, print)
         return system
+
+    def change_disk(self) -> None:
+        """D: out with the disk; pressed again, the next side in."""
+        fds = self.system.cartridge
+        if not isinstance(fds, FDS) or not fds.sides:
+            return
+        if fds.side is not None:
+            self.last_side = fds.side
+            fds.insert(None)
+        else:
+            fds.insert((self.last_side + 1) % len(fds.sides))
+        print(f"FDS: {fds.side_name(fds.side)}")
 
     def save(self) -> None:
         data = self.system.cartridge.battery_ram()
@@ -273,6 +293,8 @@ class Frontend:
                 self.save()
                 self.system = self._power_on()
                 self.sound.clear()
+            elif event.key == pg.K_d:
+                self.change_disk()
             elif event.key == pg.K_F11:
                 pg.display.toggle_fullscreen()
             elif event.key == pg.K_F12:
@@ -349,6 +371,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--scale", type=int, default=3, help="window scale (default 3)")
     parser.add_argument("--no-audio", action="store_true")
     parser.add_argument("--fullscreen", action="store_true")
+    parser.add_argument(
+        "--manual-disk", action="store_true", help="FDS: change sides only with the D key"
+    )
     args = parser.parse_args(argv)
     try:
         import pygame
@@ -363,7 +388,7 @@ def main(argv: list[str] | None = None) -> int:
     print(HELP)
     frontend = Frontend(
         pygame, args.rom, args.machine, args.palette, max(1, args.scale),
-        not args.no_audio, args.fullscreen,
+        not args.no_audio, args.fullscreen, not args.manual_disk,
     )  # fmt: skip
     try:
         frontend.run()
