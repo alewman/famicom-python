@@ -20,6 +20,7 @@ from pathlib import Path
 from famicom_python.testrom import (
     APU_ROMS,
     CPU_ROMS,
+    FDS_ROMS,
     MAPPER_ROMS,
     PPU_ROMS,
     RomCase,
@@ -30,7 +31,13 @@ from famicom_python.testrom import (
 
 ROOT = Path(__file__).resolve().parents[1]
 ROMS = ROOT / "tests" / "test_roms" / "nes-test-roms"
-SUITES = {"cpu": CPU_ROMS, "ppu": PPU_ROMS, "apu": APU_ROMS, "mappers": MAPPER_ROMS}
+SUITES = {
+    "cpu": CPU_ROMS,
+    "ppu": PPU_ROMS,
+    "apu": APU_ROMS,
+    "mappers": MAPPER_ROMS,
+    "fds": FDS_ROMS,
+}
 
 
 def _run(case: RomCase) -> tuple[RomOutcome, float]:

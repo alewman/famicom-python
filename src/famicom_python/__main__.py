@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
 
         return play(argv[1:])
     parser = argparse.ArgumentParser(prog="famicom-python", description=__doc__.splitlines()[0])
-    parser.add_argument("rom", help="an iNES/NES 2.0 file, or a .zip holding one")
+    parser.add_argument("rom", help="an iNES/NES 2.0 file, an FDS disk, or a .zip holding one")
     parser.add_argument("--machine", choices=sorted(MACHINES), default="nes")
     parser.add_argument("--frames", type=int, default=600, help="frames to run (default 600)")
     parser.add_argument(

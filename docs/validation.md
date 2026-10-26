@@ -1462,3 +1462,52 @@ earlier records' PyPy figures carry about that spread.
 **Everything again**, on PyPy with the DAC change: CPU 14 of 14, PPU 42 of
 42, APU 38 of 38, mappers 83 of 83, the quick suite 105 (AccuracyCoin, an
 NROM cart, does not reach the change).
+
+### Milestone 9, part 1: the FDS RAM adapter and its drive (2026-10-26)
+
+**Pins.** famicom-python at the commit that adds this record; the BIOS is
+No-Intro's "Rev 1" (CRC32 `5E607DCF`, FDS-disksys's Rev 01A), read from the
+local set and never committed; the test disks pinned in
+`scripts/pinned_files.json` (`tests/test_roms/fds/`); Mesen2 2.1.1 as for
+milestone 6 with the same BIOS in its Firmware folder. PyPy 7.3.20.
+
+**What was built.** `cartridge/fds_disk.py` turns a `.fds` side into the
+stream on the disk (FDS_disk_format.wiki: a 28,300-bit pre-gap, each block
+behind a $80 mark with its CRC-16/KERMIT, 976-bit gaps) and back.
+`cartridge/fds.py` is the RAM adapter: 32 KiB PRG-RAM, 8 KiB CHR-RAM, the
+BIOS, the registers as User:TakuikaNinja/FDS_Registers.wiki has them (the
+hardware-verified rewrite), the timer IRQ, the DRAM refresh watchdog, and a
+drive moving a byte every 1,792 master ticks. The loader recognises disk
+images (`.fds` or inside a `.zip`) as mapper 20. The BIOS's own disk code
+(disassembled locally with TakuikaNinja's FDS-disksys configs, not kept)
+fixed the read protocol: `$4025` D6 waits for the gap's 1 bit, D4 after the
+first CRC byte, `$4030` D4 after the second.
+
+**Judges** (`scripts/run_test_roms.py --suite fds`, `tests/test_fds_test_roms.py`):
+
+| Disk | Hardware answer | Board |
+| --- | --- | --- |
+| Sour's FdsIrqTests v7 | rainwarrior's RAM adapter, 2017-09-23 (nesdev-forum 16507): all 21 tests O, with each test's IRQ count | the same 21 lines |
+| TakuikaNinja's FDS-Mirroring-Test v1.1 | Twin Famicom screenshot: three passes | three passes |
+| TakuikaNinja's FDS-4030D1-Addr v1.0 | Twin Famicom screenshot: watchdog IRQs return to $67FF and $6E25 | $67FF and $6E25 (C41) |
+
+The watchdog screenshot also shows grey lines where the test's handler
+switches on greyscale at each IRQ; their spacing in the capture (126 px, 4.07
+to 4.36 px a scanline depending on how the glyphs are measured) puts the
+period at 29 to 31 lines, and the board's is 29.8: within the reading, not a
+judge.
+
+**Against Mesen2** (frames, a detector): 13 games booted from side A,
+compared at frames 600-2400 in a ±40-frame window: *Zelda no Densetsu*,
+*Link no Bouken*, *Metroid*, *Super Mario Bros. 2*, *Hikari Shinwa*,
+*Akumajou Dracula*, *Doki Doki Panic*, *Nazo no Murasamejou*, *Famicom
+Grand Prix*, and the four whose timer IRQs no emulator ran together in 2017
+(*Druid*, *Kaettekita Mario Bros.*, *Lutter*, *Putt Putt Golf*): every frame
+identical, 4-6 frames apart (the byte time is 149 1/3 cycles here, 149 in
+Mesen2; C39). Two board bugs found on the way: CHR-RAM left on `Banked`'s
+default windows (all at 0: every 1 KiB aliased), and a `$4025` stop pulse
+missed between byte times (C40).
+
+**Everything again**, on PyPy: CPU 14 of 14, PPU 42 of 42, APU 38 of 38,
+mappers 83 of 83, FDS 3 of 3, the quick suite 114 (with `tests/test_fds.py`).
+Not reached in this part: open item 21.

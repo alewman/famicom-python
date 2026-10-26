@@ -486,6 +486,26 @@ before the board takes a side.
   chip (which the console's mixing cannot move): 4.7 dB under a full square.
   Linear outside $02-$22 by assumption.
 
+- **C39. How long the drive takes.** The byte time is the RP2C33's (1,792
+  master ticks, FDS_Registers.wiki); nothing measured says how long the drive
+  takes to be ready after the scan starts, or to bring the head back from the
+  end of a side. *Board*: ready 50,000 CPU cycles after the scan starts
+  (Mesen2's figure), the head back at the start once a whole turn has taken
+  7 seconds (the wiki's "about 7 seconds"). Games' frames then follow Mesen2's
+  4-6 frames apart. No judge. Open.
+- **C40. The scan reset is a level, not a sample.** The BIOS stops and
+  restarts the drive with three `$4025` writes a few cycles apart ($2E, $2F,
+  $2D). *Board*: the drive sees the lines as written, so the pulse resets
+  the scan; sampled at byte times it was missed, the head ran on past the
+  first block and every later load failed once before retrying (*Kid Icarus*
+  1.8 s behind Mesen2). Mesen2 sees it too. No hardware test isolates it.
+- **C41. The DRAM refresh watchdog.** FDS_Registers.wiki (SCSR's die
+  analysis): a 7-bit refresh counter advanced by every cycle outside
+  PRG-RAM, a 12-bit timer reset to 4,095 by `$4023` D0, reloaded with 3,245
+  when the counter wraps, and an IRQ on its underflow with `$4023` D7.
+  *Settled on hardware*: FDS-4030D1-Addr's two return addresses ($67FF, $6E25)
+  are the Twin Famicom's. Mesen2 has no watchdog.
+
 ## Open items
 
 1. **Settle on PPUSim (die-derived)**: *done in milestone 2* for C13, C15, C21,
@@ -575,3 +595,9 @@ before the board takes a side.
     mixing resistor as the carts that measure 12.7-13.0; one cart, and
     NewRisingSun found the game "almost inaudible" on his console too. No
     submapper says so; the board follows nes20db.
+21. **The Famicom Disk System, after milestone 9's first part.** Its sound
+    (`$4040`-`$4097`, judged by rainwarrior's `db_fds` level and
+    TakuikaNinja's FDS-Audio-Registers, whose answer is a video); disk swaps
+    and flips (the frontend, and scripted swaps for sweeps); saving written
+    sides beside the image; `.QD` images; FDS-4023-Test (its answer is a
+    video too); the drive's timing (C39).

@@ -17,7 +17,9 @@ other 82 each with its cause (docs/validation.md, milestone 7), and
 milestone 8: a window to play in (`famicom-python play`), the Famicom's
 sound path with the VRC6's, MMC5's and Namco 163's sound at their measured
 levels (checked against NewRisingSun's recordings of thirteen carts), its microphone and expansion-port pads, and UNROM 512 for homebrew
-(34 mappers, 95.8 % of licensed dumps). One master-clock
+(34 mappers, 95.8 % of licensed dumps). Milestone 9, the Famicom Disk
+System, has begun: the RAM adapter and its drive load disks through the
+BIOS, judged by three FDS test disks with hardware answers. One master-clock
 timeline with the PPU and APU advanced inside each CPU bus cycle, the memory
 map and open bus, both controller clocking models, OAM and DMC DMA inside the
 stalled read (get/put cycles, DMC precedence), the cartridge connector

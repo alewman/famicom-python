@@ -671,6 +671,61 @@ MAPPER_ROMS = (
     ),
 )
 
+#: Sour's FdsIrqTests v7 as rainwarrior's RAM adapter ran it (nesdev-forum
+#: 16507-start45.html, 2017-09-23): every test O, and the IRQ count of each.
+_FDS_IRQ_V7 = (
+    ("01", "00", "No Irq At Start"),
+    ("02", "01", "Trigger 1 IRQ"),
+    ("03", "01", "IRQ when rvalue = 0"),
+    ("04", "02", "Reload val not reset"),
+    ("05", "00", "Disable DiskReg Test"),
+    ("06", "00", "No Disk Reg = No IRQ"),
+    ("07", "20", "Can't Ack w/ $4020"),
+    ("08", "20", "Can't Ack w/ $4021"),
+    ("09", "01", "Can Ack w/ W:$4022:0"),
+    ("0A", "20", "Cant w/ W:$4022:2"),
+    ("0B", "01", "Can Ack w/ W:$4023:0"),
+    ("0C", "20", "Cant w/ W:$4023:1"),
+    ("0D", "01", "2x W:4022 Delays IRQ"),
+    ("0E", "00", "Enbl DiskR after 4022"),
+    ("0F", "01", "Set RelVal DskRg Off"),
+    ("10", "00", "4022:0 stops irq ctr"),
+    ("11", "01", "4022:0 not reset rval"),
+    ("12", "04", "RVal=0 4x W:$4022:2"),
+    ("13", "04", "Irq w/ Repeat test"),
+    ("14", "04", "Irq repeat stop test"),
+    ("15", "40", "RVal=0 w/ Repeat"),
+)
+
+#: The Famicom Disk System's judges (milestone 9): disk images under
+#: tests/test_roms/fds, each with a hardware answer. They need the BIOS
+#: (``cartridge.fds_bios``: FAMICOM_FDS_BIOS or No-Intro's under NO_INTRO_DIR).
+FDS_ROMS = (
+    RomCase(
+        "../fds/FdsIrqTests_v7.zip/fdsirqtests.fds",
+        "values",
+        20,
+        expect=("\n".join(f"{n} O {count} {name}" for n, count, name in _FDS_IRQ_V7),),
+        font="rainwarrior",
+    ),
+    # TakuikaNinja's Twin Famicom screenshot (reference/fds-hardware): all pass.
+    RomCase(
+        "../fds/FDS-Mirroring-Test-v1.1.zip/mirroring-test.fds",
+        "values",
+        15,
+        expect=("$4025.D3 W: Pass", "$4030.D3 R: Pass", "$4023.D0=0: Pass"),
+    ),
+    # The DRAM refresh watchdog's first two IRQs, as return addresses into a
+    # NOP slide: the Twin Famicom's screenshot shows 67FF and 6E25.
+    RomCase(
+        "../fds/FDS-4030D1-Addr-v1.0.zip/4030d1-addr.fds",
+        "values",
+        15,
+        expect=("-" * 14 + "67FF" + "-" * 14, "-" * 14 + "6E25" + "-" * 14),
+        font="vrctest",
+    ),
+)
+
 
 @dataclass
 class RomOutcome:

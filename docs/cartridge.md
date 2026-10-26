@@ -167,8 +167,12 @@ Submappers that matter for licensed games (`NES_2.0_submappers.wiki`):
   VRC7b/a.
 
 **UNIF** is deprecated, and the local No-Intro sets contain none: no loader in
-phase 1. **FDS** images (fwNES `.fds`, 65,500 bytes per side) are a later
-milestone.
+phase 1. **FDS** images (fwNES `.fds`, 65,500 bytes per side, with or
+without the 16-byte header; No-Intro's are headerless) load as the RAM
+adapter (`cartridge/fds.py`, milestone 9): the loader recognises the data,
+not the extension, and needs the BIOS (`FAMICOM_FDS_BIOS`, or No-Intro's
+under `NO_INTRO_DIR`; Nintendo's, never fetched or committed). The `.QD`
+format is not read yet.
 
 ## Identifying the board
 

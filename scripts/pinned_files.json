@@ -4256,5 +4256,221 @@
   "kind": "test-rom",
   "license": "Author-distributed test ROM (forum attachment); freely distributable test program, no explicit license",
   "note": "fetched 2026-10-24: NewRisingSun's N163 one- and eight-channel test, v2, nesdev-forum/16910.html"
+ },
+ {
+  "path": "tests/test_roms/fds/FdsIrqTests_v7.zip",
+  "url": "https://forums.nesdev.org/download/file.php?id=10240",
+  "sha256": "f770a60774ee57f898d4d4e3eff79228e04da1218c7944ad907e3b62b5d9759d",
+  "size": 8748,
+  "kind": "test-rom",
+  "license": "Author-distributed test ROM (Sour, forum attachment); freely distributable test program, no explicit license",
+  "note": "fetched 2026-10-26: Sour's FDS timer IRQ tests v7 (21 tests, pass/fail and IRQ count each); rainwarrior's hardware run of v7 (all O, counts) is in nesdev-forum/16507-start45.html (2017-09-23)"
+ },
+ {
+  "path": "tests/test_roms/fds/FDS-Mirroring-Test-v1.1.zip",
+  "url": "https://github.com/TakuikaNinja/FDS-Mirroring-Test/releases/download/v1.1/FDS-Mirroring-Test.zip",
+  "sha256": "5aa1242f928e2c356a3e9705ea29bc98cdfec5e4b5c3037e86a1bd93410dfb29",
+  "size": 4109,
+  "kind": "test-rom",
+  "license": "TakuikaNinja (GitHub; no licence file / NOASSERTION): author-distributed test program; fetch, do not commit",
+  "note": "fetched 2026-10-26: $4025.D3 / $4030.D3 / $4023.D0 nametable arrangement; repo 9bd84ef; hardware screenshot reference/fds-hardware/mirroring-test-twinfc.png"
+ },
+ {
+  "path": "tests/test_roms/fds/FDS-4023-Test-v1.0.zip",
+  "url": "https://github.com/TakuikaNinja/FDS-4023-Test/releases/download/v1.0/FDS-4023-Test.zip",
+  "sha256": "896ff07258ba53e0177923a95489b74c6d17aec565359ff17383fe102399dced",
+  "size": 5363,
+  "kind": "test-rom",
+  "license": "TakuikaNinja (GitHub; no licence file / NOASSERTION): author-distributed test program; fetch, do not commit",
+  "note": "fetched 2026-10-26: $4020-$409F read-back while toggling $4023 bits; repo 08a8a27; hardware recording https://youtu.be/rbvNSA2-kNI (not fetched)"
+ },
+ {
+  "path": "tests/test_roms/fds/audio-registers-v1.2.fds",
+  "url": "https://github.com/TakuikaNinja/FDS-Audio-Registers/releases/download/v1.2/audio-registers.fds",
+  "sha256": "80ccda5443653426f27e6b4b3125c9834e97931c50b9fcdccc00b8367ef9fe28",
+  "size": 65500,
+  "kind": "test-rom",
+  "license": "TakuikaNinja (GitHub; no licence file / NOASSERTION): author-distributed test program; fetch, do not commit",
+  "note": "fetched 2026-10-26: $4090-$4097 read-back with $4023.D1; repo ccf10c2; hardware recording https://youtu.be/25eULocF0Mk (not fetched)"
+ },
+ {
+  "path": "tests/test_roms/fds/FDS-4030D1-Addr-v1.0.zip",
+  "url": "https://github.com/TakuikaNinja/FDS-4030D1-Addr/releases/download/v1.0/FDS-4030D1-Addr.zip",
+  "sha256": "41f1a4025a9a47a87631e5e22bc138cb2db27cc5b6284a3ed3669feb2f0e68d4",
+  "size": 1846,
+  "kind": "test-rom",
+  "license": "TakuikaNinja (GitHub; no licence file / NOASSERTION): author-distributed test program; fetch, do not commit",
+  "note": "fetched 2026-10-26: DRAM refresh watchdog IRQ ($4030.D1) timing; repo 5ef7620; hardware screenshot reference/fds-hardware/4030d1-addr-twinfc.png"
+ },
+ {
+  "path": "reference/fds-hardware/mirroring-test-twinfc.png",
+  "url": "https://raw.githubusercontent.com/TakuikaNinja/FDS-Mirroring-Test/9bd84ef408f5fd7e38a45af662d4425d008033aa/img/FDS-Mirroring-Test_TwinFC.png",
+  "sha256": "b5cbce3f6ded85e424458620fd844b0a573ce397322c332264ffa60d23739c16",
+  "size": 126749,
+  "kind": "hardware-capture",
+  "license": "TakuikaNinja (GitHub; no licence file / NOASSERTION): author-distributed screenshot; fetch, do not commit",
+  "note": "FDS-Mirroring-Test on a Sharp Twin Famicom + FDSKey (all pass)"
+ },
+ {
+  "path": "reference/fds-hardware/4030d1-addr-twinfc.png",
+  "url": "https://raw.githubusercontent.com/TakuikaNinja/FDS-4030D1-Addr/5ef7620dc4176466e94ad93a184dc98f71414af9/img/FDS-4030D1-Addr_TwinFC.png",
+  "sha256": "d21dfed82f7a891306f60b601a9556cd472c0cf414480bce469fa7a520126bae",
+  "size": 93083,
+  "kind": "hardware-capture",
+  "license": "TakuikaNinja (GitHub; no licence file / NOASSERTION): author-distributed screenshot; fetch, do not commit",
+  "note": "FDS-4030D1-Addr on a Sharp Twin Famicom + FDSKey"
+ },
+ {
+  "path": "reference/nesdev-forum/16507.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=16507",
+  "sha256": "13f0f66bf052bcb29aaeabaa4660df7090ab4e63b4662b8405bf3f0939ad2724",
+  "size": 70535,
+  "kind": "live-forum",
+  "license": "NESdev forum thread (authors' copyright)",
+  "note": "FDS IRQ reload/repeat thread: Sour's FdsIrqTests v1-v7, rainwarrior's and Pokun's hardware results"
+ },
+ {
+  "path": "reference/nesdev-forum/16507-start15.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=16507&start=15",
+  "sha256": "cae3488bd4c9b7c517fe0ae6d6330dd89c5497371461049e3747796608b75c20",
+  "size": 82378,
+  "kind": "live-forum",
+  "license": "NESdev forum thread (authors' copyright)",
+  "note": "FDS IRQ reload/repeat thread: Sour's FdsIrqTests v1-v7, rainwarrior's and Pokun's hardware results"
+ },
+ {
+  "path": "reference/nesdev-forum/16507-start30.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=16507&start=30",
+  "sha256": "5acb205757014b0d0442daa290e9d7e40fe46f8b2e84857238cbf1babc34f5e7",
+  "size": 85762,
+  "kind": "live-forum",
+  "license": "NESdev forum thread (authors' copyright)",
+  "note": "FDS IRQ reload/repeat thread: Sour's FdsIrqTests v1-v7, rainwarrior's and Pokun's hardware results"
+ },
+ {
+  "path": "reference/nesdev-forum/16507-start45.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=16507&start=45",
+  "sha256": "f53e60187d429ad15acf5b8d741a02f713b495c15922632233f658b0adfe8f38",
+  "size": 79843,
+  "kind": "live-forum",
+  "license": "NESdev forum thread (authors' copyright)",
+  "note": "FDS IRQ reload/repeat thread: Sour's FdsIrqTests v1-v7, rainwarrior's and Pokun's hardware results"
+ },
+ {
+  "path": "reference/nesdev-forum/16507-start60.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=16507&start=60",
+  "sha256": "0b27e8a11016ec6d2b5a0124f4ce7aad480a73d70674fd37dfb2e67251480579",
+  "size": 76422,
+  "kind": "live-forum",
+  "license": "NESdev forum thread (authors' copyright)",
+  "note": "FDS IRQ reload/repeat thread: Sour's FdsIrqTests v1-v7, rainwarrior's and Pokun's hardware results"
+ },
+ {
+  "path": "reference/nesdev-forum/16507-start75.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=16507&start=75",
+  "sha256": "6f10e6f50ce048e41ffe2eba0ac4b0d586c810b9cb736f23d3965235e29a95f9",
+  "size": 29817,
+  "kind": "live-forum",
+  "license": "NESdev forum thread (authors' copyright)",
+  "note": "FDS IRQ reload/repeat thread: Sour's FdsIrqTests v1-v7, rainwarrior's and Pokun's hardware results"
+ },
+ {
+  "path": "reference/nesdev-forum/26313.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=26313",
+  "sha256": "18a4ab53ebe4572e10a57b7df1b6784ebab53bc60a4338156fab7f898fda5779",
+  "size": 94840,
+  "kind": "live-forum",
+  "license": "NESdev forum thread (authors' copyright)",
+  "note": "FDS $4023 research thread (TakuikaNinja; FDS-4023-Test, FDS-Audio-Registers)"
+ },
+ {
+  "path": "reference/nesdev-forum/26359.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=26359",
+  "sha256": "d7c7b3d4dffa810e3b86b17742c636e53bba544da929fa47279bbefb28fd64cd",
+  "size": 56775,
+  "kind": "live-forum",
+  "license": "NESdev forum thread (authors' copyright)",
+  "note": "FDS DRAM refresh watchdog thread ($4030.D1; SCSR's 2C33 die analysis)"
+ },
+ {
+  "path": "reference/nesdev-forum/p300488.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?p=300488",
+  "sha256": "14ef0cdd2f5b85b004bf6db0f6a0129faff60e56d0d2e26d9d3186c4531d9b8b",
+  "size": 90699,
+  "kind": "live-forum",
+  "license": "NESdev forum thread (authors' copyright)",
+  "note": "FDS-Mirroring-Test post (TakuikaNinja)"
+ },
+ {
+  "path": "reference/nesdev-wiki/User_TakuikaNinja_FDS_Registers.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=User%3ATakuikaNinja/FDS_Registers&action=raw",
+  "sha256": "c31061c74ae92519a5c57c4885710038024dce46bacbac16b2f595a3b0a40442",
+  "size": 13869,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "fetched 2026-10-26 (FDS milestone): User:TakuikaNinja/FDS_Registers"
+ },
+ {
+  "path": "reference/nesdev-wiki/FDS_disk_format.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=FDS_disk_format&action=raw",
+  "sha256": "47eb1dd67dcafcc6e476c65ec71393a3246604cfde4e7597ac4cc7b06491855d",
+  "size": 12150,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "fetched 2026-10-26 (FDS milestone): FDS_disk_format"
+ },
+ {
+  "path": "reference/nesdev-wiki/FDS_BIOS.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=FDS_BIOS&action=raw",
+  "sha256": "797a461e4ef7a2e0db51e55b193ec0261440cd9b784cfb4783afa0f70e19f472",
+  "size": 39798,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "fetched 2026-10-26 (FDS milestone): FDS_BIOS"
+ },
+ {
+  "path": "reference/nesdev-wiki/QD_file_format.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=QD_file_format&action=raw",
+  "sha256": "6387a1cbd9628d5fe19a726567f8da4d04c61fa7be5d58f620a00f38d3eae318",
+  "size": 16,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "fetched 2026-10-26 (FDS milestone): QD_file_format"
+ },
+ {
+  "path": "reference/nesdev-wiki/FDS_RAM_adaptor_cable_pinout.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=FDS_RAM_adaptor_cable_pinout&action=raw",
+  "sha256": "52823d20c3f190d3bbf5816e45294696637239f34e2fa4139a660ec19ee9fff0",
+  "size": 5305,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "fetched 2026-10-26 (FDS milestone): FDS_RAM_adaptor_cable_pinout"
+ },
+ {
+  "path": "reference/nesdev-wiki/FDS_expansion_port_pinout.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=FDS_expansion_port_pinout&action=raw",
+  "sha256": "d8733e53018254f5e5a7f24ac3cf8e6d6f59bdf39905a707bab969317756e35f",
+  "size": 1422,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "fetched 2026-10-26 (FDS milestone): FDS_expansion_port_pinout"
+ },
+ {
+  "path": "reference/nesdev-wiki/Talk_Family_Computer_Disk_System.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=Talk%3AFamily_Computer_Disk_System&action=raw",
+  "sha256": "7ca8a869b9b52a10c80eb2cfa721be38c5ee86ced90ae51f06f0119f5770ddd1",
+  "size": 13475,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "fetched 2026-10-26 (FDS milestone): Talk:Family_Computer_Disk_System"
+ },
+ {
+  "path": "reference/nesdev-wiki/RP2C33_pinout.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=RP2C33_pinout&action=raw",
+  "sha256": "c8afac8884234a84d08952d689f07b1ea8e8fb8c07747270c2a63c98b05c72be",
+  "size": 2943,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "fetched 2026-10-26 (FDS milestone): RP2C33_pinout"
  }
 ]
