@@ -1,4 +1,4 @@
-"""Famicom Disk System disks: a ``.fds`` file's sides as the drive's head meets them.
+"""Famicom Disk System disks: a ``.fds`` or ``.qd`` file's sides as the drive's head meets them.
 
 FDS_file_format.wiki: a ``.fds`` file is an optional 16-byte header ("FDS",
 $1A, the side count) and 65,500 bytes per side holding the blocks of
@@ -9,12 +9,17 @@ byte $80, the bits going out least significant first), then the block and
 its CRC-16/KERMIT (computed by the RP2C33 over the 1 bit and the block). The
 drive model reads and writes that stream a byte at a time
 (:class:`.fds.FDS`); :func:`raw_side` builds it from a ``.fds`` side and
-:func:`fds_side` turns it back into one for a save.
+:func:`fds_side` turns it back into one for a save. A ``.qd`` file (QD.wiki,
+Nintendo's own) has 65,536 bytes a side with each block's CRC stored after
+it and no gaps: those CRCs are kept as they are, right or wrong, since the
+drive reads whatever is on the disk (some Virtual Console images were patched
+without them: error 27, as a real disk would give).
 """
 
 from __future__ import annotations
 
 SIDE_BYTES = 65_500
+QD_SIDE_BYTES = 65_536
 HEADER = b"FDS\x1a"
 VERIFY = b"*NINTENDO-HVC*"
 MARK = 0x80  # the 1 bit that ends a gap
@@ -51,6 +56,19 @@ def is_fds(data: bytes) -> bool:
     if data[:4] == HEADER:
         return True
     return len(data) >= SIDE_BYTES and len(data) % SIDE_BYTES == 0 and data[1:15] == VERIFY
+
+
+def is_qd(data: bytes) -> bool:
+    """A ``.qd`` file: whole 65,536-byte sides starting with a disk info block."""
+    return len(data) >= QD_SIDE_BYTES and len(data) % QD_SIDE_BYTES == 0 and data[1:15] == VERIFY
+
+
+def disk_sides(data: bytes) -> list[bytearray]:
+    """Each side of a ``.fds`` or ``.qd`` file as the stream on the disk."""
+    if is_qd(data) and not is_fds(data):
+        sides = [data[i : i + QD_SIDE_BYTES] for i in range(0, len(data), QD_SIDE_BYTES)]
+        return [_raw(*_qd_blocks(side)) for side in sides if side.strip(b"\0")]
+    return [raw_side(side) for side in split_sides(data)]
 
 
 def split_sides(data: bytes) -> list[bytes]:
@@ -94,13 +112,47 @@ def raw_side(side: bytes) -> bytearray:
     then blank disk to the side's capacity (its 65,500 bytes plus the gaps,
     marks and CRCs its blocks occupy)."""
     found = blocks(side)
-    raw = bytearray(PREGAP)
+    crcs = []
     for block in found:
         crc = crc16(block, crc16(bytes([MARK])))
-        raw += bytes([MARK]) + block + bytes([crc & 0xFF, crc >> 8]) + bytes(GAP)
+        crcs.append(bytes([crc & 0xFF, crc >> 8]))
+    return _raw(found, crcs)
+
+
+def _raw(found: list[bytes], crcs: list[bytes]) -> bytearray:
+    raw = bytearray(PREGAP)
+    for block, crc in zip(found, crcs, strict=True):
+        raw += bytes([MARK]) + block + crc + bytes(GAP)
     capacity = PREGAP + SIDE_BYTES + len(found) * (3 + GAP)
     raw += bytes(max(0, capacity - len(raw)))
     return raw
+
+
+def _qd_blocks(side: bytes) -> tuple[list[bytes], list[bytes]]:
+    """A ``.qd`` side's blocks and the CRCs stored after them."""
+    found: list[bytes] = []
+    crcs: list[bytes] = []
+    pos, size = 0, 0
+    while pos < len(side):
+        code = side[pos]
+        if not found:
+            expected = 1
+        elif len(found) == 1:
+            expected = 2
+        else:
+            expected = 4 if found[-1][0] == 3 else 3
+        if code != expected:
+            break
+        length = 1 + size if code == 4 else BLOCK_LENGTHS[code]
+        if pos + length + 2 > len(side):
+            break
+        block = side[pos : pos + length]
+        if code == 3:
+            size = block[13] | block[14] << 8
+        found.append(block)
+        crcs.append(side[pos + length : pos + length + 2])
+        pos += length + 2
+    return found, crcs
 
 
 def fds_side(raw: bytes | bytearray) -> bytes:

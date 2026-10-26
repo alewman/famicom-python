@@ -9,15 +9,22 @@ from famicom_python.cartridge.fds_disk import (
     GAP,
     MARK,
     PREGAP,
+    QD_SIDE_BYTES,
     SIDE_BYTES,
     VERIFY,
     blocks,
     crc16,
+    disk_sides,
     fds_side,
+    is_fds,
+    is_qd,
     raw_side,
 )
 from famicom_python.cartridge.fds_sound import MASTER, FDSSound
 from famicom_python.cartridge.ines import BoardInfo, RomImage
+from famicom_python.fds_auto import AutoDisk
+from famicom_python.machine import MACHINES
+from famicom_python.system import System
 
 TICKS = 12  # master ticks per CPU cycle
 
@@ -226,3 +233,74 @@ def test_audio_reset_holds_the_channel() -> None:
     assert (unit.accumulator, unit.mod_counter, unit.volume.gain) == (0, 0, 0)
     unit.write(0x4085, 5)
     assert unit.mod_counter == 0  # $4085 is not mapped while reset
+
+
+# -- saves and disk changes -------------------------------------------------
+
+
+def two_sides() -> bytes:
+    side_a = bytearray(side_with_one_file())
+    side_b = bytearray(side_with_one_file(b"\x5a" * 16))
+    side_b[0x15] = 1  # side number: B
+    return bytes(side_a + side_b)
+
+
+def test_written_sides_round_trip_through_the_save() -> None:
+    fds = adapter(two_sides())
+    assert fds.battery_ram() is None  # nothing written: no save
+    raw = fds.sides[1]
+    data_at = PREGAP + 1 + 56 + 2 + GAP + 1 + 2 + 2 + GAP + 1 + 16 + 2 + GAP + 1 + 1
+    raw[data_at] = 0x77  # the file's first byte, as the drive would write it
+    assert fds_side(raw) != two_sides()[SIDE_BYTES:]  # it landed in the file's data
+    fds.written[1] = True
+    save = fds.battery_ram()
+    assert save is not None and save[:4] == b"FDSW" and save[4] == 1
+    fresh = adapter(two_sides())
+    assert fresh.restore_battery(save)
+    assert fds_side(fresh.sides[1]) == fds_side(raw) and fresh.sides[0] == fds.sides[0]
+    assert fresh.battery_ram() == save  # restored sides stay written
+
+
+def test_a_foreign_save_is_refused() -> None:
+    fds = adapter(two_sides())
+    assert not fds.restore_battery(b"not a save")
+    assert not fds.restore_battery(b"FDSW\x01\x05" + bytes(SIDE_BYTES))  # no side 5
+
+
+def test_auto_disk_puts_in_the_side_the_bios_asks_for() -> None:
+    system = System(adapter(two_sides()), MACHINES["famicom"])
+    auto = AutoDisk(system)
+    ram = system.board.ram
+    ram[0], ram[1] = 0x00, 0x03  # CheckDiskHeader's pointer: $0300
+    wanted = bytearray(b"\xff" * 10)
+    wanted[6] = 1  # side B
+    ram[0x300:0x30A] = wanted
+    auto.observe("read", 0xE445, 0, 0)
+    assert system.cartridge.side == 1
+
+
+def test_clearing_d6_drops_a_byte_flag_left_from_writing() -> None:
+    """Writing leaves the transfer flag set at each byte; clearing $4025 D6
+    must drop it, or the next read's IRQ fires on a stale byte (Zelda's save)."""
+    fds = adapter()
+    fds.cpu_write(0x4023, 0x83, 0)
+    fds.cpu_write(0x4025, 0x69, 0)  # write mode, D6 set, motor on, scanning
+    cycles(fds, 150 * 4)
+    assert fds.byte_flag
+    fds.cpu_write(0x4025, 0x2D, 0)  # read mode, D6 clear
+    assert not fds.byte_flag
+
+
+def test_a_qd_side_reads_as_its_fds_side_with_its_stored_crcs() -> None:
+    side = side_with_one_file()
+    qd = bytearray()
+    for block in blocks(side):
+        crc = crc16(block, crc16(bytes([MARK])))
+        qd += block + bytes([crc & 0xFF, crc >> 8])
+    qd = bytes(qd.ljust(QD_SIDE_BYTES, b"\0"))
+    assert is_qd(qd) and not is_fds(qd)
+    assert disk_sides(qd) == [raw_side(side)]
+    damaged = bytearray(qd)
+    damaged[56] ^= 0xFF  # block 1's stored CRC, kept as it is
+    raw = disk_sides(bytes(damaged))[0]
+    assert raw[PREGAP + 1 + 56] == qd[56] ^ 0xFF

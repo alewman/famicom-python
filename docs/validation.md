@@ -1533,3 +1533,31 @@ loss on the 440 Hz square put back), and the four other chips are unchanged.
 
 **Everything again**, on PyPy: FDS 3 of 3, the quick suite 120 (six sound
 tests added to `tests/test_fds.py`); the expansion levels as above.
+
+### Milestone 9, part 3: disk changes, saves and `.QD` images (2026-10-26)
+
+**Disk changes.** `fds_auto.py` (outside the cartridge: it reads console RAM)
+puts in the side the BIOS asks for at CheckDiskHeader ($E445, the 10-byte
+disk ID at the pointer in $00-$01), and ejects when a program polls the drive
+status for a while with nothing read (40 polls, 3 s idle: a game checks the
+disk is in between the accesses of one load, which a quicker rule mistook for
+a request). The window uses it unless `--manual-disk`; D ejects and then puts
+the next side in. *Zelda no Densetsu* asks for side B after its title and
+gets it; Mesen2's frames still match all thirteen games.
+
+**Saves.** The adapter's `battery_ram` is the sides written since loading,
+as `.fds` sides behind an `FDSW` header, beside the image as `<image>.sav`;
+the image is never changed. *Zelda no Densetsu*: registering a name sets
+the file count to 28, appends the save file and reads it back; the file
+select then shows the name. That read-back failed (error 24) until clearing
+`$4025` D6 dropped the byte transfer flag (C44).
+
+**`.QD` images.** Read with each block's stored CRC kept. Across No-Intro's
+QD set (524 sides), 14,015 stored CRCs equal the board's CRC-16/KERMIT over
+the gap's 1 bit and the block, and the 373 that differ are all in 36 Virtual
+Console releases, which QD.wiki says were patched without updating them: a
+second, Nintendo-made confirmation of the CRC. *Akumajou Dracula*'s `.qd`
+gives Mesen2's `.fds` frame 1200, pixel for pixel.
+
+**Everything again**, on PyPy: CPU 14 of 14, PPU 42 of 42, APU 38 of 38,
+mappers 83 of 83, FDS 3 of 3, the quick suite 125.

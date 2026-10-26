@@ -34,7 +34,7 @@ from .discrete import (
     mapper_34,
 )
 from .fds import FDS
-from .fds_disk import is_fds
+from .fds_disk import is_fds, is_qd
 from .ines import BoardInfo, RomImage, parse
 from .irem import G101
 from .jaleco import SS88006
@@ -109,8 +109,8 @@ class Loaded:
     mame: dict[str, str]
 
 
-def read_rom_file(path: str | Path, suffixes: tuple[str, ...] = (".nes", ".fds")) -> bytes:
-    """A ``.nes`` or ``.fds`` file's bytes, or the one such file in a ``.zip``, read in place."""
+def read_rom_file(path: str | Path, suffixes: tuple[str, ...] = (".nes", ".fds", ".qd")) -> bytes:
+    """A ``.nes``, ``.fds`` or ``.qd`` file's bytes, or the one such file in a ``.zip``."""
     path = Path(path)
     if path.suffix.lower() == ".zip":
         with zipfile.ZipFile(path) as archive:
@@ -166,7 +166,7 @@ def load(
 ) -> Loaded:
     """Identify the cartridge in ``rom`` (a path or a file's bytes) and build its mapper."""
     data = rom if isinstance(rom, bytes) else read_rom_file(rom)
-    if is_fds(data):
+    if is_fds(data) or is_qd(data):
         image = RomImage(b"", b"", fds_bios(), b"", data, FDS_BOARD, False)
         return Loaded(FDS(image, cpu_cycle_ticks), image, "FDS image", [], {})
     image = parse(data)
