@@ -118,7 +118,7 @@ class Schedule:
         # (line, from dot, to dot), or a list of them: SIGNALS (or REGS, FIFO) per half-cycle
         self.signals: tuple[int, int, int] | list[tuple[int, int, int]] | None = None
         self.signal_set = "eval"  # or "regs", "fifo": REGS, FIFO instead
-        # PPUSim starts this many frames later, to match Visual 2C02's frame parity.
+        # PPUSim and the board start this many frames later, to match Visual 2C02's frame parity.
         self.ppusim_frames = 0
         self.end = 0
         self.t = 16 * DOT
@@ -186,7 +186,7 @@ def scanline0() -> Schedule:
 
     s = Schedule()
     s.events = schedule(2)
-    s.chr = {TILE * 16 + 5: 0x80}
+    s.chr = {TILE * 16 + 5: int(os.environ.get("S0_ROW", "0x80"), 0)}  # $81: columns 0 and 7
     s.lines = [0]
     s.signals = [(261, 320, 340), (0, 0, 140)]
     s.signal_set = "fifo"
@@ -420,7 +420,7 @@ def run_board(s: Schedule) -> dict:
         chr_data[address] = value
     image = b"NES\x1a\x01\x01\x01\x00" + bytes(8) + bytes(0x4000) + bytes(chr_data)
     ppu = System.from_rom(image).board.ppu
-    for _ in range(2):  # the second pre-render line: the power-on reset flag has cleared
+    for _ in range(2 + s.ppusim_frames):  # past the power-on reset flag (and the parity shift)
         ppu.run_to(ppu.time + 4)
         while not (ppu.line == 261 and ppu.dot == 0):
             ppu.run_to(ppu.time + 1)
@@ -440,7 +440,10 @@ def run_board(s: Schedule) -> dict:
                     skips.append(previous[1] < 340)
                 if position[0] == previous[0] + 1 and previous[0] in s.lines:
                     row = previous[0] * 256
-                    lines[str(previous[0])] = [p & 0x3F for p in ppu.picture[row : row + 256]]
+                    key = str(previous[0])
+                    while key in lines:  # a later frame's same line
+                        key += "+"
+                    lines[key] = [p & 0x3F for p in ppu.picture[row : row + 256]]
                 previous = position
 
     for when, rnw, register, value in s.events:
@@ -510,7 +513,10 @@ def run_ppusim(s: Schedule) -> dict:
                     skips.append(previous[1] == 339)
                 if position[0] == previous[0] + 1 and previous[0] in s.lines:
                     base = previous[0] * 341 + 4
-                    lines[str(previous[0])] = [screen[base + x] & 0x3F for x in range(256)]
+                    key = str(previous[0])
+                    while key in lines:  # a later frame's same line
+                        key += "+"
+                    lines[key] = [screen[base + x] & 0x3F for x in range(256)]
                 previous = position
 
     for when, rnw, register, value in s.events:
@@ -573,7 +579,8 @@ def main() -> int:
         result = {"board": run_board, "ppusim": run_ppusim, "v2c02": run_v2c02}[ppu](s)
         reads = " ".join(f"{v:02X}" for v in result["reads"])
         print(f"{name} {ppu:7}: reads {reads}; skips {result['skips']}", flush=True)
-        for line, row in sorted(result["lines"].items(), key=lambda kv: int(kv[0])):
+        order = sorted(result["lines"], key=lambda key: (int(key.rstrip("+")), key))
+        for line, row in ((key, result["lines"][key]) for key in order):
             backdrop = max(set(row), key=row.count)
             lit = [x for x, c in enumerate(row) if c != backdrop]
             print(f"  line {line}: x not the line's commonest colour: {lit[:24]}", flush=True)

@@ -172,6 +172,7 @@ class PPU:
         self._lanes = [[0, 0, 0, 0, 0] for _ in range(8)]
         self._plan = [WIDTH] * 8  # each lane's first pixel on the line
         self._zh = False  # dot 339 rendered: lanes still counting start counting
+        self._leaking: set[int] = set()  # lanes that shift out a pixel at x = 0 (see _line_start)
         # The sprite pixels of the line being drawn.
         self.sprite_line = [0] * WIDTH
         self._vbl_suppress = False
@@ -298,7 +299,7 @@ class PPU:
             dot = 0
             line = self._next_line(line)
             self.dot = 0
-            self._line_start(line)
+            self._line_start(line, skipped=True)
             return
         self.dot = dot
         if dot == DOTS - 3:
@@ -347,17 +348,26 @@ class PPU:
         self.line = line
         return line
 
-    def _line_start(self, line: int) -> None:
+    def _line_start(self, line: int, skipped: bool = False) -> None:
         """Dot 0: lanes the last line's dot 339 started counting begin, and a
-        rendered visible line plans its sprite pixels."""
+        rendered visible line plans its sprite pixels. ``skipped``: the
+        pre-render line before this line 0 skipped dot 340."""
+        self._leaking = set()
         if self._zh:
             self._zh = False
             now = self.time
             ticks = self.dot_ticks
-            for lane in self._lanes:
+            for n, lane in enumerate(self._lanes):
                 if lane[4] <= now and lane[3]:
                     lane[4] = now + lane[3] * ticks
                     lane[3] = 0
+                    if skipped:
+                        # After the skip #0/H comes a dot later against the line
+                        # and /VIS first: the lane, still active, shifts out its
+                        # first pixel at x = 0 before it stops to count; the rest
+                        # come at X+1 on (Visual 2C02 spr0_active, ++/in_visible...;
+                        # AccuracyCoin "Sprites On Scanline 0" 3, composite).
+                        self._leaking.add(n)
         if line < HEIGHT and self._on:
             self._plan_sprites(0)
 
@@ -752,8 +762,9 @@ class PPU:
                 if x >= WIDTH:
                     break
                 pixel = ((hi >> bit) & 1) << 1 | ((lo >> bit) & 1)
-                if pixel and not buffer[x]:
-                    buffer[x] = flags | pixel
+                at = x1 if bit == 7 and n in self._leaking else x
+                if pixel and not buffer[at]:
+                    buffer[at] = flags | pixel
                 x += 1
         self._plan = plan
 
