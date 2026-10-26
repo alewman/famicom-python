@@ -3,7 +3,7 @@
 On the connector the RAM adapter is a cartridge (Family_Computer_Disk_System.wiki):
 32 KiB of PRG-RAM at $6000-$DFFF, the 8 KiB BIOS at $E000-$FFFF, 8 KiB of
 CHR-RAM, the nametable arrangement, and the RP2C33's registers at
-$4020-$4033 (its sound, $4040-$4097, is milestone 3's). Registers follow
+$4020-$4033, and its sound at $4040-$4097 (``fds_sound.py``). Registers follow
 User:TakuikaNinja/FDS_Registers.wiki, the hardware-verified rewrite of the
 wiki's section (die scan analysis and Twin Famicom tests), where it differs.
 
@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from .banked import HORIZONTAL, VERTICAL, Banked
 from .fds_disk import crc16, raw_side, split_sides
+from .fds_sound import GAIN, FDSSound
 from .ines import RomImage
 
 BYTE_TICKS = 1792  # master-clock ticks per disk byte (FDS_Registers.wiki)
@@ -41,6 +42,7 @@ class FDS(Banked):
 
     snoops_cpu_reads = True  # the DRAM refresh watchdog counts every cycle's address
     counts_m2 = True
+    expansion_audio = True
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
         super().__init__(image, cpu_cycle_ticks)
@@ -50,6 +52,7 @@ class FDS(Banked):
         self.chr_writable = True
         self.map_chr(0, 8, 0)  # unbanked (Banked's windows all start at 0)
         self.bios = image.prg
+        self.sound = FDSSound()
         self.sides = [raw_side(side) for side in split_sides(image.misc)]
         self.written = [False] * len(self.sides)
         self.side: int | None = 0 if self.sides else None  # the side in the drive
@@ -181,6 +184,8 @@ class FDS(Banked):
         if address == 0x4033:
             battery = 0x80 if self.side is not None and not self.control & MOTOR_STOP else 0
             return battery | (self.external & 0x7F)
+        if address >= 0x4040:
+            return self.sound.read(address)
         return None
 
     @property
@@ -194,6 +199,9 @@ class FDS(Banked):
             if address < 0xE000:
                 self._prg_ram_cycle = True
                 self.prg_ram[address - 0x6000] = value
+            return
+        if 0x4040 <= address <= 0x408A:
+            self.sound.write(address, value)
             return
         if address == 0x4020:
             self.reload = (self.reload & 0xFF00) | value
@@ -225,6 +233,7 @@ class FDS(Banked):
     def _write_io_enable(self, value: int) -> None:
         self.disk_io = bool(value & 1)
         self.sound_io = bool(value & 2)
+        self.sound.set_enabled(self.sound_io)
         self.watchdog_enabled = bool(value & 0x80)
         if not self.watchdog_enabled:
             self.watchdog_irq = False
@@ -284,6 +293,7 @@ class FDS(Banked):
                 if self.watchdog_enabled:
                     self.watchdog_irq = True
         self._prg_ram_cycle = False
+        self.audio_out.expansion = self.sound.clock() * GAIN
         self._byte_ticks += self.cpu_cycle_ticks
         if self._byte_ticks >= BYTE_TICKS:
             self._byte_ticks -= BYTE_TICKS

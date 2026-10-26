@@ -1511,3 +1511,25 @@ missed between byte times (C40).
 **Everything again**, on PyPy: CPU 14 of 14, PPU 42 of 42, APU 38 of 38,
 mappers 83 of 83, FDS 3 of 3, the quick suite 114 (with `tests/test_fds.py`).
 Not reached in this part: open item 21.
+
+### Milestone 9, part 2: the FDS's sound (2026-10-26)
+
+**Pins.** As part 1; nes-audio-tests `db_fds.fds` as pinned.
+
+**What was built.** `cartridge/fds_sound.py`, clocked by the RAM adapter
+every cycle. Sources: FDS_audio.wiki with loopy's 2019 test-register findings
+(C42); the master volume from Yuri213212's die schematic of the DAC (an R-2R
+ladder whose switches ground 2R and R: 1, 2/3, 1/2, 2/5, the wiki's ratios);
+rainwarrior's 2 kHz one-pole fit for the RAM adapter's filter
+(nesdev-forum/10233.html: lidnariq's simulation of the circuit gives 1.75 kHz
+and two poles near 20 kHz instead); `$4023` D1 as FDS_Registers.wiki's audio
+reset.
+
+**Level.** `scripts/expansion_levels.py` now runs disks: `db_fds` measures
++6.60 dB against rainwarrior's +6.6 (by construction, the filter's 0.61 dB
+loss on the 440 Hz square put back), and the four other chips are unchanged.
+
+**Against Mesen2** (`mesen_audio.py --expansion-only`, a detector): C43.
+
+**Everything again**, on PyPy: FDS 3 of 3, the quick suite 120 (six sound
+tests added to `tests/test_fds.py`); the expansion levels as above.

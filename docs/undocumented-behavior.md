@@ -505,6 +505,21 @@ before the board takes a side.
   when the counter wraps, and an IRQ on its underflow with `$4023` D7.
   *Settled on hardware*: FDS-4030D1-Addr's two return addresses ($67FF, $6E25)
   are the Twin Famicom's. Mesen2 has no watchdog.
+- **C42. The FDS modulator, as loopy read it.** FDS_audio.wiki now carries
+  loopy's 2019 findings through the chip's test registers ($4091-$4097,
+  nesdev-forum/p232662.html): the pitch is `pitch * ((counter * gain, rounded,
+  + $400) >> 4 & $FF)` with no bits dropped; wave and mod accumulate every 16
+  cycles from one prescaler that `$4083` D7 holds in reset; `$4083` D7 also runs
+  the envelopes 4x faster; volume changes take effect at wave position 0.
+  *Board*: all of it. Mesen2 keeps the 2013 formula (rainwarrior's, from
+  recordings) and applies volume at once. No recording to judge with
+  (ccovell's 2013 Twin Famicom test recording is gone, and not on archive.org).
+- **C43. The FDS channel against Mesen2.** Sustained tones match Mesen2 to
+  -14 to -18 dB, its usual floor (*Metroid*, *Zelda no Densetsu*), and their
+  harmonics within the board's 2 kHz low-pass. Deeply modulated sound effects
+  differ more: *Doki Doki Panic*'s sweep, to -2 dB, ours louder at its start.
+  Mesen2's formula (C42) accounts for none of it, dropping the volume latch
+  for about 1 dB; the rest is not traced. No judge. Open.
 
 ## Open items
 
@@ -595,9 +610,9 @@ before the board takes a side.
     mixing resistor as the carts that measure 12.7-13.0; one cart, and
     NewRisingSun found the game "almost inaudible" on his console too. No
     submapper says so; the board follows nes20db.
-21. **The Famicom Disk System, after milestone 9's first part.** Its sound
-    (`$4040`-`$4097`, judged by rainwarrior's `db_fds` level and
-    TakuikaNinja's FDS-Audio-Registers, whose answer is a video); disk swaps
+21. **The Famicom Disk System, after milestone 9's second part.**
+    FDS-Audio-Registers' answer (a video, not fetched); the sound's open
+    claims (C42, C43); disk swaps
     and flips (the frontend, and scripted swaps for sweeps); saving written
     sides beside the image; `.QD` images; FDS-4023-Test (its answer is a
     video too); the drive's timing (C39).

@@ -4472,5 +4472,32 @@
   "kind": "live-wiki",
   "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
   "note": "fetched 2026-10-26 (FDS milestone): RP2C33_pinout"
+ },
+ {
+  "path": "reference/nesdev-forum/25226.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=25226",
+  "sha256": "bd73c4533f3e0dd113c041811950e51d94d00d63e994acc802eb4a47507f8c44",
+  "size": 28012,
+  "kind": "live-forum",
+  "license": "NESdev forum thread (authors' copyright)",
+  "note": "FDS decap DAC schematics (Yuri213212): the 2C33's sound DAC"
+ },
+ {
+  "path": "reference/nesdev-forum/10233.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=10233",
+  "sha256": "e613425683db63d1862a1c58dabb89113c4a06ef97869ee81cbdab0904193917",
+  "size": 90553,
+  "kind": "live-forum",
+  "license": "NESdev forum thread (authors' copyright)",
+  "note": "FDS output notes: the RAM adapter's sound filter and level"
+ },
+ {
+  "path": "reference/nesdev-forum/p232662.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?p=232662",
+  "sha256": "7bda9e57d5e460cfa8fe61b2230a5584b34549bd6e34c95d3f4a174d56454a7f",
+  "size": 72543,
+  "kind": "live-forum",
+  "license": "NESdev forum thread (authors' copyright)",
+  "note": "loopy's FDS modulator unit notes"
  }
 ]
