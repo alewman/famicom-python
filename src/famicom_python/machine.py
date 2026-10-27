@@ -26,14 +26,46 @@ class Timing:
     lines: int  # scanlines per frame, the pre-render line included
     vblank_line: int  # the line on whose dot 1 the VBL flag sets
     odd_frame_skip: bool  # with rendering on, odd frames are one dot short
+    # PAL video's black border reaches into the picture: its top line and two
+    # pixels at each side, rendering or not, emphasis and greyscale not applied
+    # (PPU_rendering.wiki "PAL", Overscan.wiki "PAL": PAL NES and famiclones;
+    # PPUSim's RP2C07-0 blanks exactly these, scripts/ppusim_compare.py frame).
+    border: bool = False
+    # The 2C07's forced OAM refresh (PPU_OAM.wiki, BreakingNESWiki PPU/pal.md
+    # "EvenOddOut"): on these lines, rendering or not, OAMADDR steps on every
+    # even dot 2-340, 170 a line, as PPUSim's RP2C07-0 does
+    # (scripts/ppusim_compare.py pal_oam). The Dendy's UA6538 has no such
+    # circuit (PPUSim ties its EvenOddOut to 0).
+    oam_refresh: tuple[int, int] | None = None
+    # A $2003 write reaches OAMADDR through a chain of PCLK latches, a few dots
+    # late (ppu.DELAYS "2003_delayed"; BreakingNESWiki PPU/pal.md "W3 Enabler",
+    # PPUSim's RP2C07_0 and UMC_UA6538), where the 2C02 loads it in the access.
+    delayed_oamaddr: bool = False
+    # Master ticks into a CPU cycle at which the PPU sees a register access.
+    # NTSC's 8 is pinned by ppu_vbl_nmi (board.PPU_ACCESS_TICKS). PAL's 9 is
+    # die-derived: the board's pictures equal PPUSim's RP2C07-0 driven with the
+    # 2A07's M2 (docs/validation.md milestone 10); no PAL test ROM pins it.
+    ppu_access_ticks: int = 8
 
 
 # CPU.wiki "Frequencies", Cycle_reference_chart.wiki (specification tier).
 NTSC = Timing("NTSC", 236.25e6 / 11, 12, 4, 262, 241, True)
-PAL = Timing("PAL", 26.601712e6, 16, 5, 312, 241, False)
+PAL = Timing(
+    "PAL",
+    26.601712e6,
+    16,
+    5,
+    312,
+    241,
+    False,
+    border=True,
+    oam_refresh=(265, 310),
+    delayed_oamaddr=True,
+    ppu_access_ticks=9,
+)
 # The Dendy's VBL line (its 51 post-render lines) is UNVERIFIED here: it is a row
 # for later, not a certified machine.
-DENDY = Timing("Dendy", 26.601712e6, 15, 5, 312, 291, False)
+DENDY = Timing("Dendy", 26.601712e6, 15, 5, 312, 291, False, border=True, delayed_oamaddr=True)
 
 
 @dataclass(frozen=True)

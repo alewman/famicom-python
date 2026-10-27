@@ -1,4 +1,4 @@
-// A board around Breaknes's PPUSim (gate-level RP2C02G, CC0) for co-simulation
+// A board around Breaknes's PPUSim (gate-level RP2C02G or RP2C07-0, CC0) for co-simulation
 // with famicom-python's CPU: see scripts/ppusim_board.py and docs/validation.md
 // ("PPUSim as a judge"). Our code; PPUSim itself is fetched, never committed.
 //
@@ -164,7 +164,8 @@ struct TraceEntry {
 static_assert(sizeof(TraceEntry) == 32);
 
 struct Board {
-    PPU ppu{Revision::RP2C02G};
+    explicit Board(Revision revision) : ppu{revision} {}
+    PPU ppu;
     TriState in[(size_t)InputPad::Max]{};
     TriState out[(size_t)OutputPad::Max]{};
     uint8_t ext = 0, db = 0, ad = 0, ahi = 0;
@@ -179,8 +180,9 @@ struct Board {
     std::vector<TraceEntry> trace;   // filled while tracing (ppusim_trace)
     bool tracing = false;
     // RAW video by (V, H), each dot's last half-cycle (ppusim_screen): whole
-    // frames without the trace's cost, for replays (breaknes_regdump.py).
-    uint16_t screen[262 * 341]{};
+    // frames without the trace's cost, for replays (breaknes_regdump.py). 312
+    // lines for the 2C07; a 2C02's 262 fill the start, laid out the same.
+    uint16_t screen[312 * 341]{};
 
     uint16_t address() const { return (uint16_t)(((ahi & 0x3F) << 8) | latch); }
 
@@ -206,7 +208,7 @@ struct Board {
         }
         {
             int v = ppu.GetVCounter(), hc = ppu.GetHCounter();
-            if (v < 262 && hc < 341) screen[v * 341 + hc] = (uint16_t)(video.RAW.raw & 0x1FF);
+            if (v < 312 && hc < 341) screen[v * 341 + hc] = (uint16_t)(video.RAW.raw & 0x1FF);
         }
         if (tracing) {
             TraceEntry e{};
@@ -231,8 +233,10 @@ struct Board {
 
 extern "C" {
 
-void *ppusim_new(const uint8_t *chr, int chr_len, int chr_writable, int vertical) {
-    auto *b = new Board();
+// pal: the RP2C07-0 (PAL) instead of the RP2C02G.
+void *ppusim_new_revision(const uint8_t *chr, int chr_len, int chr_writable, int vertical,
+                          int pal) {
+    auto *b = new Board(pal ? Revision::RP2C07_0 : Revision::RP2C02G);
     b->chr.assign(chr, chr + (chr_len > 0 ? chr_len : 0x2000));
     if (chr_len <= 0) std::memset(b->chr.data(), 0, b->chr.size());
     b->chr_writable = chr_writable != 0;
@@ -242,6 +246,10 @@ void *ppusim_new(const uint8_t *chr, int chr_len, int chr_writable, int vertical
     b->in[(size_t)InputPad::n_DBE] = One;
     b->ppu.SetRAWOutput(true);
     return b;
+}
+
+void *ppusim_new(const uint8_t *chr, int chr_len, int chr_writable, int vertical) {
+    return ppusim_new_revision(chr, chr_len, chr_writable, vertical, 0);
 }
 
 void ppusim_free(void *h) { delete (Board *)h; }

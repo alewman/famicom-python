@@ -85,7 +85,7 @@ class Board:
         self.request_nmi: Callable[[], None] = lambda: None
         self._irq = False
         self._nmi = False
-        self._ppu_access = PPU_ACCESS_TICKS - self.cycle_ticks  # relative to the cycle's end
+        self._ppu_access = timing.ppu_access_ticks - self.cycle_ticks  # relative to the cycle's end
         self._snoop_reads = cartridge.snoops_cpu_reads
         self._counts_m2 = cartridge.counts_m2
         if machine.famicom_audio_through_cart and cartridge.expansion_audio:
@@ -196,8 +196,9 @@ class Board:
         self.data_bus = self.internal_bus = value
         ppu = self.ppu
         if 0x2000 <= address < 0x4000:
-            ppu.run_to(t + self._ppu_access)
-            ppu.write_register(address & 7, value, early)
+            access = t + self._ppu_access
+            ppu.run_to(access)
+            ppu.write_register(address & 7, value, early, ppu.time - access)
         ppu.run_to(t)
         if address < 0x2000:
             self.ram[address & 0x7FF] = value

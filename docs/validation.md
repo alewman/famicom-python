@@ -1613,3 +1613,44 @@ and 41565-41566 in five-step). The Dendy keeps the NTSC tables on PAL timing.
 blargg's `pal_apu_tests`, "tested on a PAL NES and all give a passing result"
 (their readme; hardware-corrected). Before: 3 of 10 on the PAL row (the NTSC tables);
 after: **10 of 10**. The NTSC APU suite is unchanged, 38 of 38.
+
+**Die-derived, too** (`scripts/apu_period_roms.py`, `tests/test_apu_period_roms.py`):
+the noise and DMC period tables both chips use are decoded from the transistor
+masks BreakingNESWiki prints for each decoder (APU/noise.md and APU/dpcm.md for
+the 2A03, APU/pal.md for the 2A07), counted down the LFSRs Breaknes APUSim
+gives (11 bits, taps 0 and 2; 9 bits, taps 0 and 4). The 2A03's documented
+loads and its masks give the NTSC tables; the same decoding of the 2A07's
+masks gives the PAL ones, period for period: the PAL tables are the die's, not
+only the wiki's (`pal_apu_tests` checks the frame sequencer alone).
+
+### Milestone 10, part 2: the 2C07 against PPUSim (2026-10-27)
+
+**Pins.** PPUSim from breaknes `215ab82` (as milestone 2), now built with the
+shim's `ppusim_new_revision` choosing its RP2C07-0; PyPy 7.3.20.
+
+**What PPUSim settled** (`scripts/ppusim_compare.py`; the board PAL row
+against PPUSim driven with the 2A07's M2, high for 19 of 32 half-cycles):
+
+| Question | PPUSim's RP2C07-0 | Board |
+| --- | --- | --- |
+| Vblank (C16) | VBL set on (241, 1), cleared on (311, 1): 70 lines; 312 x 341 dots, no odd-frame skip | the timing row, as it was |
+| The border | blank (no picture) on line 0 and at x 0-1 and 254-255, rendering or not | `Timing.border`: colour $0F, no emphasis, after each line |
+| Emphasis | `$2001` bits 5 and 6 carried as written (RAW TR, TG); the swap is in the colour decoder | the picture keeps the bits as written: a 2C07 palette's business |
+| The OAM refresh (C46) | OAMADDR steps on every even dot 2-340 of lines 265-310, rendering or not | `Timing.oam_refresh` |
+| `$2003` (C46) | lands 3 dots late; in the refresh, lost at one access phase | `Timing.delayed_oamaddr`, `DELAYS["2003_delayed"]` |
+| `$2004` writes in the refresh (C46) | land 3 dots late at the moving address; a step merges | `DELAYS["2004_refresh"]` |
+| The access point (C45) | fitted: 9 master ticks into the 16-tick cycle, PPUSim 1 half-cycle later | `Timing.ppu_access_ticks` |
+
+**Pictures** (`ppusim_compare.py frame ROM 200 pal`, CPU included): *Balloon
+Fight*, *Excitebike*, *Golf*, *Mach Rider*, *Super Mario Bros.* and *Tennis*
+(Europe): **0 of 61,440 pixels differ**, each. `full_palette` (an NTSC-timed
+program writing the palette mid-line): 46 differ, single-pixel transients at
+palette writes, from 746 with NTSC's access point. **OAM probes** (pal_w3:
+`$2003` then four `$2004` reads, 30 sequences over the five CPU/dot phases,
+outside and inside the refresh; pal_oam: reads and writes in and around the
+window, rendering on and off, OAM read back): **0 differ**, except the
+pre-render line's `$2004` reads, where PPUSim returns $FF on NTSC as well
+(open item 22).
+
+**NTSC is unchanged**: the PPU suite 42 of 42, the CPU suite 14 of 14, the
+APU suite 38 of 38, AccuracyCoin 146 of 146.
