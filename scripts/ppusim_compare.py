@@ -588,6 +588,69 @@ def pal_w3(_pair: Pair) -> None:
 
 
 EXPERIMENTS["pal_w3"] = pal_w3
+
+
+def vbl_race(_pair: Pair, machine: str = "pal") -> None:
+    """$2002 read at each CPU cycle around the VBL set (241, 1), then again four
+    cycles later: the flag, its suppression, and the NMI, ours against PPUSim."""
+    bad = 0
+    for k in range(40):
+        pair = Pair(machine=MACHINES[machine])
+        pair.idle(2 * pair.frame_cycles + k)
+        pair.write(0, 0x80)
+        pair.to_line(240, 300)
+        pair.idle(k % 16)
+        start = (pair.ours.line, pair.ours.dot)
+        first = pair.access(2)
+        pair.idle(3)
+        second = pair.access(2)
+        same = first[0] == first[1] and second[0] == second[1]
+        bad += not same
+        print(
+            f"  k {k:2d} from {start}: (ours, PPUSim) {first}, {second}{'' if same else '   <- differ'}"
+        )
+    print(f"vbl_race {machine}: {bad} of 40 differ")
+
+
+EXPERIMENTS["vbl_race"] = vbl_race
+
+
+def pal_fetches(_pair: Pair) -> None:
+    """The PPU bus on PAL: each ALE address of three rendered lines, ours against
+    PPUSim's RP2C07-0, as the spread of (PPUSim time - ours) in master ticks over
+    the addresses both put out. One value: the same sub-dot timing throughout."""
+    from collections import Counter
+
+    pair = Pair(machine=MACHINES["pal"])
+    setup_picture(pair)
+    pair.write(3, 0)
+    oam = [0xF8] * 256
+    oam[0:12] = [39, 0x41, 0x00, 16, 39, 0x42, 0x01, 40, 39, 0x43, 0x02, 64]
+    for value in oam:
+        pair.write(4, value)
+    pair.to_line(pair.ours.prerender_line, 100)
+    scroll_zero(pair)
+    pair.write(1, 0x1E)
+    for line in (39, 43, 60):
+        pair.to_line(line, 0)
+        pair.trace(True)
+        pair.to_line(line + 1, 0)
+        pair.trace(False)
+        sim = pair.sim_ales()
+        spread: Counter[float] = Counter()
+        unmatched = 0
+        for t, address in pair.ales:
+            near = [st for st, sa in sim if sa == address and abs(st - t) < 20]
+            if near:
+                spread[min(near, key=lambda st: abs(st - t)) - t] += 1
+            else:
+                unmatched += 1
+        print(
+            f"  line {line}: {len(pair.ales)} ALEs; PPUSim - ours: {dict(spread)}; unmatched {unmatched}"
+        )
+
+
+EXPERIMENTS["pal_fetches"] = pal_fetches
 EXPERIMENTS["pal_oam"] = pal_oam
 
 

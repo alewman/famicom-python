@@ -40,9 +40,9 @@ import zipfile
 from dataclasses import replace
 from pathlib import Path
 
-from mesen_run import ROOT, run_mesen
+from mesen_run import REGIONS, ROOT, run_mesen
 
-from famicom_python.machine import NES_001
+from famicom_python.machine import MACHINES, NES_001, Machine
 from famicom_python.system import System
 
 MESEN_LINE = re.compile(
@@ -66,7 +66,29 @@ PASSED_OVER = "rows after a rendering-time $2007 read passed over"
 MACHINE = replace(
     NES_001, power_on=replace(NES_001.power_on, ppustatus=0x00, ppu_dot=4, dmc_timer=213)
 )
+# PAL (``--machine pal``): Mesen2's DMC timer at the PAL rate 0's full period
+# (398 CPU cycles, 198 APU cycles), and its PPU 4 dots and 2 master ticks in:
+# swept as NTSC's 4 was (``--ppu-dot``, ``--ppu-ticks``), the only start that
+# keeps Super Mario Bros. (Europe) in step (docs/validation.md milestone 10).
+PAL_POWER_ON = {"ppustatus": 0x00, "dmc_timer": 198, "ppu_dot": 4, "ppu_ticks": 2}
 DOTS, LINES = 341, 262
+
+
+def lockstep_machine(name: str, ppu_dot: int | None, ppu_ticks: int | None = None) -> Machine:
+    """The board as Mesen2 powers on, for ``name`` (a key of MACHINES)."""
+    if name == "nes":
+        machine = MACHINE
+    elif name == "pal":
+        base = MACHINES["pal"]
+        machine = replace(base, power_on=replace(base.power_on, **PAL_POWER_ON))
+    else:
+        raise SystemExit(f"no Mesen2 power-on for {name}")
+    if ppu_dot is not None:
+        machine = replace(machine, power_on=replace(machine.power_on, ppu_dot=ppu_dot))
+    if ppu_ticks is not None:
+        machine = replace(machine, power_on=replace(machine.power_on, ppu_ticks=ppu_ticks))
+    return machine
+
 
 STOP_AFTER_FRAMES = """
 local frames = 0
@@ -151,7 +173,11 @@ def position(line: int, dot: int) -> int:
 
 
 def compare(
-    rom: Path, trace: Path, context: int = 6, tolerate_2007: bool = False
+    rom: Path,
+    trace: Path,
+    context: int = 6,
+    tolerate_2007: bool = False,
+    machine: Machine = MACHINE,
 ) -> tuple[int, str]:
     """Rows that agree before the first divergence, and a report.
 
@@ -161,7 +187,7 @@ def compare(
     board follows PPUSim (C31). Everything else on the row must agree, and so
     must the next row.
     """
-    system = System.from_rom(rom, MACHINE)
+    system = System.from_rom(rom, machine)
     history: list[tuple[tuple, tuple]] = []
     cycle_offset = dot_offset = None
     count = 0
@@ -228,9 +254,15 @@ def main() -> int:
         action="store_true",
         help="pass over a register differing only after a rendering-time $2007 read (C31)",
     )
+    parser.add_argument("--machine", choices=("nes", "pal"), default="nes")
+    parser.add_argument("--ppu-dot", type=int, help="the board's power-on PPU dot (a sweep)")
+    parser.add_argument("--ppu-ticks", type=int, help="... and master ticks into it (PAL)")
     args = parser.parse_args()
+    global LINES
+    machine = lockstep_machine(args.machine, args.ppu_dot, args.ppu_ticks)
+    LINES = machine.timing.lines
     args.trace_dir.mkdir(parents=True, exist_ok=True)
-    trace = args.trace_dir / f"{args.rom.stem}.{args.frames}.trace"
+    trace = args.trace_dir / f"{args.rom.stem}.{args.machine}.{args.frames}.trace"
     if not (args.reuse and trace.exists()):
         lua = STOP_AFTER_FRAMES.replace("{frames}", str(args.frames)).encode()
         code, _, wall = run_mesen(
@@ -242,10 +274,11 @@ def main() -> int:
             home=Path(tempfile.mkdtemp(prefix="mesen-home-", dir=args.trace_dir)),
             trace=trace,
             for_comparison=True,
+            region=REGIONS[machine.timing.name],
         )
         print(f"Mesen2: stop code {code}, {wall:.0f} s, {trace.stat().st_size:,} bytes of trace")
     start = time.perf_counter()
-    _, report = compare(args.rom, trace, tolerate_2007=args.tolerate_2007)
+    _, report = compare(args.rom, trace, tolerate_2007=args.tolerate_2007, machine=machine)
     print(report)
     print(f"compared in {time.perf_counter() - start:.0f} s")
     return 0 if report.startswith("identical") else 1

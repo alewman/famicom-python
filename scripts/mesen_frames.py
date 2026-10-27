@@ -8,7 +8,10 @@ pixel format, and the comparison is exact by index, not by colour. It also
 turns on Mesen2's power-up write-ignore and zero-fills its RAM, to match the
 board (``configure_for_comparison``).
 
-    python scripts/mesen_frames.py ROM --frame 300 [--png diff.png]
+    python scripts/mesen_frames.py ROM --frame 300 [--png diff.png] [--machine pal]
+
+On PAL the border (line 0, x 0-1 and 254-255) is left out: the board's is
+PPUSim's (docs/validation.md milestone 10), and this is a detector.
 
 Mesen2 counts frames from its own power-on; the board's frames within
 ``--window`` either side are tried and the closest reported. Needs the
@@ -21,8 +24,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from mesen_run import ROOT, run_mesen
+from mesen_run import REGIONS, ROOT, run_mesen
 
+from famicom_python.machine import MACHINES, NES_001, Machine
 from famicom_python.ppu import HEIGHT
 from famicom_python.system import System
 from famicom_python.video import load_palette, write_png
@@ -63,7 +67,7 @@ def finished_picture(system: System) -> list[int]:
     return list(ppu.picture)
 
 
-def mesen_frame(rom: Path, frame: int, seconds: float) -> list[list[int]]:
+def mesen_frame(rom: Path, frame: int, seconds: float, region: int = 1) -> list[list[int]]:
     code, log, _ = run_mesen(
         rom,
         lua=(FRAME_LUA % frame).encode(),
@@ -72,6 +76,7 @@ def mesen_frame(rom: Path, frame: int, seconds: float) -> list[list[int]]:
         home=HOME,
         until="DONE",
         for_comparison=True,
+        region=region,
     )
     rows = [line[1:] for line in log.splitlines() if line.startswith("R")]
     if code != 0 or not rows:
@@ -79,20 +84,32 @@ def mesen_frame(rom: Path, frame: int, seconds: float) -> list[list[int]]:
     return [[int(row[i : i + 6], 16) for i in range(0, len(row), 6)] for row in rows]
 
 
-def compare(rom: Path, frame: int, window: int, seconds: float, png: Path | None) -> int:
-    theirs = mesen_frame(rom, frame, seconds)
+def compare(
+    rom: Path,
+    frame: int,
+    window: int,
+    seconds: float,
+    png: Path | None,
+    machine: Machine = NES_001,
+) -> int:
+    theirs = mesen_frame(rom, frame, seconds, REGIONS[machine.timing.name])
     height, width = len(theirs), len(theirs[0])
     if (width, height) != (256, 240):
         print(f"Mesen2's frame is {width}x{height}; expected 256x240 (overscan settings?)")
         return 2
-    system = System.from_rom(rom)
+    system = System.from_rom(rom, machine)
+    border = machine.timing.border
     best = None
     first = max(1, frame - window)
     system.run_frames(first)
     for ours_frame in range(first, frame + window + 1):
         picture = finished_picture(system)
         diffs = [
-            (y, x) for y in range(240) for x in range(256) if picture[y * 256 + x] != theirs[y][x]
+            (y, x)
+            for y in range(240)
+            for x in range(256)
+            if picture[y * 256 + x] != theirs[y][x]
+            and not (border and (y == 0 or x in (0, 1, 254, 255)))
         ]
         if best is None or len(diffs) < len(best[1]):
             best = (ours_frame, diffs, picture)
@@ -124,8 +141,10 @@ def main() -> int:
     parser.add_argument("--window", type=int, default=3, help="our frames tried either side")
     parser.add_argument("--seconds", type=float, default=60)
     parser.add_argument("--png", type=Path, help="Mesen2's frame, differing pixels magenta")
+    parser.add_argument("--machine", choices=sorted(MACHINES), default="nes")
     args = parser.parse_args()
-    return compare(args.rom, args.frame, args.window, args.seconds, args.png)
+    machine = MACHINES[args.machine]
+    return compare(args.rom, args.frame, args.window, args.seconds, args.png, machine)
 
 
 if __name__ == "__main__":

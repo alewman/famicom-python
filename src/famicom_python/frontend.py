@@ -34,7 +34,7 @@ from .joypad import DOWN, LEFT, RIGHT, SELECT, START, UP, A, B, StandardControll
 from .machine import MACHINES
 from .ppu import DOTS, HEIGHT, WIDTH
 from .system import System
-from .video import DEFAULT_PALETTE, load_palette, to_rgb, write_png
+from .video import load_palette, palette_for, to_rgb, write_png
 
 SAMPLE_RATE = 44_100
 #: Frames of sound kept queued ahead of the speaker when the board keeps up.
@@ -129,15 +129,16 @@ class SoundBuffer:
 class Frontend:
     """One console in one window. ``pygame`` is imported by :func:`main`."""
 
-    def __init__(self, pygame, rom: Path, machine: str, palette: Path, scale: int,
+    def __init__(self, pygame, rom: Path, machine: str, palette: Path | None, scale: int,
                  audio: bool, fullscreen: bool, auto_disk: bool = True) -> None:  # fmt: skip
         self.pg = pygame
         self.rom, self.machine_name = rom, machine
         self.auto_disk = auto_disk
         self.last_side = -1  # the FDS side the D key last took out
-        self.words = palette_words(load_palette(palette))
-        self.palette = load_palette(palette)
         self.system = self._power_on()
+        timing = self.system.machine.timing
+        self.palette = load_palette(palette or palette_for(timing), timing.swapped_emphasis)
+        self.words = palette_words(self.palette)
         self.scale, self.fullscreen = scale, fullscreen
         self.window = self._open_window()
         pygame.display.set_caption(f"{rom.stem} — famicom-python")
@@ -165,6 +166,10 @@ class Frontend:
     # -- console --------------------------------------------------------------------
 
     def _power_on(self) -> System:
+        if self.machine_name == "auto":
+            machine = System.machine_for(self.rom)
+            self.machine_name = next(k for k, m in MACHINES.items() if m is machine)
+            print(f"machine: {self.machine_name} ({machine.name})", file=sys.stderr)
         system = System.from_rom(self.rom, MACHINES[self.machine_name])
         system.board.set_sample_rate(SAMPLE_RATE)
         path = save_path(self.rom)
@@ -366,8 +371,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "rom", type=Path, help="an iNES/NES 2.0 file, an FDS disk, or a .zip holding one"
     )
-    parser.add_argument("--machine", choices=sorted(MACHINES), default="nes")
-    parser.add_argument("--palette", type=Path, default=DEFAULT_PALETTE)
+    parser.add_argument(
+        "--machine",
+        choices=["auto", *sorted(MACHINES)],
+        default="auto",
+        help="the console (default: as the cartridge's header or nes20db says)",
+    )
+    parser.add_argument(
+        "--palette", type=Path, help="a .pal file (default: the machine's, from pally)"
+    )
     parser.add_argument("--scale", type=int, default=3, help="window scale (default 3)")
     parser.add_argument("--no-audio", action="store_true")
     parser.add_argument("--fullscreen", action="store_true")

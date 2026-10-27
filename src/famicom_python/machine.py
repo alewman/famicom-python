@@ -41,6 +41,15 @@ class Timing:
     # late (ppu.DELAYS "2003_delayed"; BreakingNESWiki PPU/pal.md "W3 Enabler",
     # PPUSim's RP2C07_0 and UMC_UA6538), where the 2C02 loads it in the access.
     delayed_oamaddr: bool = False
+    # The window's colours: a .pal under reference/nesdev-wiki/images, made by
+    # pally (PPU_palettes.wiki), and whether $2001's bits 5 and 6 tint the other
+    # channels than the palette's index bits 6 and 7 say. The picture keeps the
+    # bits as written (PPUSim's RAW does too); the 2C07 and the Dendy's PPU
+    # swap red and green in their colour decoder (Errata.wiki; BreakingNESWiki
+    # PPU/pal.md "Mixed RG Emphasis"), and pally's 2C07 file indexes by
+    # channel.
+    palette: str = "2C02G_U_wiki.pal"
+    swapped_emphasis: bool = False
     # Master ticks into a CPU cycle at which the PPU sees a register access.
     # NTSC's 8 is pinned by ppu_vbl_nmi (board.PPU_ACCESS_TICKS). PAL's 9 is
     # die-derived: the board's pictures equal PPUSim's RP2C07-0 driven with the
@@ -61,11 +70,25 @@ PAL = Timing(
     border=True,
     oam_refresh=(265, 310),
     delayed_oamaddr=True,
+    palette="2C07_wiki.pal",
+    swapped_emphasis=True,
     ppu_access_ticks=9,
 )
 # The Dendy's VBL line (its 51 post-render lines) is UNVERIFIED here: it is a row
 # for later, not a certified machine.
-DENDY = Timing("Dendy", 26.601712e6, 15, 5, 312, 291, False, border=True, delayed_oamaddr=True)
+DENDY = Timing(
+    "Dendy",
+    26.601712e6,
+    15,
+    5,
+    312,
+    291,
+    False,
+    border=True,
+    delayed_oamaddr=True,
+    palette="2C07_wiki.pal",
+    swapped_emphasis=True,
+)
 
 
 @dataclass(frozen=True)
@@ -114,6 +137,10 @@ class PowerOn:
     )
     ppustatus: int = 0x20
     ppu_dot: int = 0
+    # Master ticks after the CPU's first cycle begins at which the PPU's dot
+    # begins: on PAL (3.2 dots a CPU cycle) the start can fall inside a dot.
+    # 0 by default; scripts/mesen_lockstep.py fits Mesen2's.
+    ppu_ticks: int = 0
     dmc_timer: int = 0
 
 
@@ -173,6 +200,13 @@ class Machine:
     # RP2A07; the Dendy's UMC CPU keeps the NTSC ones on PAL timing
     # (docs/undocumented-behavior.md, CPU revisions).
     apu_tables: str = "NTSC"
+    # DMA (OAM and DMC) halts the CPU only on an opcode fetch, the first read of
+    # an instruction or interrupt entry: the RP2A07's fix for the 2A03's
+    # repeated register reads (APU_DMC.wiki: "forcing DMA to halt on the first
+    # cycle of an instruction"; DMA.wiki: "the mechanism is not yet
+    # understood"; Mesen2 does the same). Specification tier: BreakingNESWiki
+    # leaves the 2A07's RDY "TBD".
+    dma_halts_on_opcode: bool = False
     certified: bool = True
 
 
@@ -237,6 +271,7 @@ PAL_NES = Machine(
     famicom_audio_through_cart=False,
     dmc_unexpected_reload_bug=False,
     apu_tables="PAL",
+    dma_halts_on_opcode=True,
     certified=False,
 )
 

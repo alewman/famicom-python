@@ -52,6 +52,7 @@ class Board:
         self.ppu.palette[:] = power.palette
         self.ppu.status = power.ppustatus & 0xE0
         self.ppu.dot = power.ppu_dot
+        self.ppu.time = power.ppu_ticks
         self.apu = APU(power.apu_put_first, tables=machine.apu_tables)
         self.apu.dmc.timer = power.dmc_timer
         self.apu.set_cpu_rate(timing.master_hz / timing.cpu_divider)
@@ -75,6 +76,10 @@ class Board:
         self._pad_oe = -1
         self._oe_per_cycle = machine.joypad_oe_per_cycle
         self._oam_dma_page: int | None = None
+        # The 2A07 (Machine.dma_halts_on_opcode): System marks each step's first
+        # read, and only that read can be halted for a DMA.
+        self._halts_on_opcode = machine.dma_halts_on_opcode
+        self.opcode_read = False
         self._strobe: bool | None = None  # a $4016 OUT0 write, until the next put
         # The CPU, told when a DMA stretched its read (6502-python's
         # ``dma_stalled``: SHA/SHX/SHY/TAS drop their AND after one). Set by System.
@@ -173,13 +178,16 @@ class Board:
                 cpu.note_stall()
             self._repeat_read(address)
             stalled = True
-        if self._oam_dma_page is not None or self.apu.dmc_request:
+        if (self._oam_dma_page is not None or self.apu.dmc_request) and (
+            not self._halts_on_opcode or self.opcode_read
+        ):
             if cpu is not None and not stalled:
                 cpu.note_stall()
             self._dma(address)
             stalled = True
         if cpu is not None and cpu.dma_stalled != stalled:
             cpu.dma_stalled = stalled
+        self.opcode_read = False
         t = self._begin_cycle(address, True)
         value = self._read(address, t)
         self.internal_bus = value

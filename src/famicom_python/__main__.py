@@ -18,7 +18,7 @@ from array import array
 from .machine import MACHINES
 from .system import System
 from .testrom import SIGNATURE, blargg_text, peek, run_blargg, screen_text
-from .video import DEFAULT_PALETTE, load_palette, to_rgb, write_png
+from .video import load_palette, palette_for, to_rgb, write_png
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -29,7 +29,12 @@ def main(argv: list[str] | None = None) -> int:
         return play(argv[1:])
     parser = argparse.ArgumentParser(prog="famicom-python", description=__doc__.splitlines()[0])
     parser.add_argument("rom", help="an iNES/NES 2.0 file, an FDS disk, or a .zip holding one")
-    parser.add_argument("--machine", choices=sorted(MACHINES), default="nes")
+    parser.add_argument(
+        "--machine",
+        choices=["auto", *sorted(MACHINES)],
+        default="nes",
+        help="the console (default nes; auto: as the cartridge's header or nes20db says)",
+    )
     parser.add_argument("--frames", type=int, default=600, help="frames to run (default 600)")
     parser.add_argument(
         "--blargg", action="store_true", help="run to blargg's $6000 result instead of --frames"
@@ -37,11 +42,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--png", help="save the last frame as a PNG")
     parser.add_argument("--wav", help="save the run's audio as a 16-bit mono WAV")
     parser.add_argument(
-        "--palette", default=str(DEFAULT_PALETTE), help="a 64- or 512-colour .pal file"
+        "--palette", help="a 64- or 512-colour .pal file (default: the machine's, from pally)"
     )
     args = parser.parse_args(argv)
 
-    system = System.from_rom(args.rom, MACHINES[args.machine])
+    machine = System.machine_for(args.rom) if args.machine == "auto" else MACHINES[args.machine]
+    system = System.from_rom(args.rom, machine)
     loaded = system.loaded
     assert loaded is not None
     board = loaded.image.board
@@ -77,7 +83,9 @@ def main(argv: list[str] | None = None) -> int:
     wall = time.perf_counter() - start
     print(f"{system.cycles:,} CPU cycles, {system.instructions:,} instructions, {wall:.1f} s")
     if args.png:
-        write_png(args.png, to_rgb(system.board.ppu.picture, load_palette(args.palette)))
+        timing = machine.timing
+        palette = load_palette(args.palette or palette_for(timing), timing.swapped_emphasis)
+        write_png(args.png, to_rgb(system.board.ppu.picture, palette))
         print(f"frame {system.board.ppu.frame} written to {args.png}")
     return 0
 

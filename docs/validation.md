@@ -1654,3 +1654,49 @@ pre-render line's `$2004` reads, where PPUSim returns $FF on NTSC as well
 
 **NTSC is unchanged**: the PPU suite 42 of 42, the CPU suite 14 of 14, the
 APU suite 38 of 38, AccuracyCoin 146 of 146.
+
+### Milestone 10, part 3: PAL as a player meets it, and against Mesen2 (2026-10-27)
+
+**What was built.**
+- `System.machine_for`, the window's default `--machine auto`: the NES 2.0
+  header's or nes20db's timing picks the PAL NES (1) or the Dendy (3).
+  Otherwise a cartridge with a sound chip, or a disk, gets the Famicom, the
+  one console whose cartridge pins 45-46 carry that sound to the mix (until
+  now VRC7, FDS and the other expansion chips were silent in the window by
+  default); otherwise the NES-001.
+- The PAL palette: pally's `2C07_wiki.pal` (pinned with the wiki images),
+  through `Timing.swapped_emphasis`. The picture keeps `$2001`'s bits as
+  written, as PPUSim's RAW does; pally's file indexes emphasis by channel, so
+  the window exchanges index bits 6 and 7.
+- The 2A07's DMA (`Machine.dma_halts_on_opcode`): OAM and DMC DMA halt the
+  CPU only on an opcode fetch, the first read of an instruction or interrupt
+  entry (APU_DMC.wiki; Mesen2 does the same; specification tier, the die's RDY
+  path being "TBD"). The repeated register reads of the 2A03 go with it.
+
+**Mesen2 2.1.1 in PAL mode** (a detector; `mesen_frames.py --machine pal`,
+`mesen_lockstep.py --machine pal`, its region set by `mesen_run.py`):
+
+- Frames: 24 European releases across the common mappers, among them
+  PAL-only *Elite*, *Asterix*, *Mr. Gimmick* and *The Smurfs*, at frame 600 with
+  no input: **all identical** (the border, PPUSim's, left out).
+- Lockstep, every instruction's registers, CPU cycle and PPU position from
+  power-on, 1,500 frames (30 s), with Mesen2's power-on (its PPU 4 dots and 2
+  master ticks in, swept as NTSC's was; its DMC timer at the PAL rate 0's full
+  period): *Super Mario Bros.* (1,000 frames, 10,818,680 instructions),
+  *Battletoads*, *DuckTales*, *The Legend of Zelda* and *Mega Man 2*:
+  **identical** (15.9-19.7 million instructions each).
+- *Kirby's Adventure*: 306,145 instructions before the 2A07's DMA rule,
+  10,227,863 after. There, and in *Super Mario Bros. 3* (112,379),
+  Mesen2 takes the MMC3's IRQ one instruction earlier; *Castlevania III*
+  (MMC5, 130,476) the same. The board raises the IRQ on the A12 rise it
+  should (line 192, dot 261 in *SMB3*: the counter's own trace). PPUSim's
+  2C07 puts every PPU bus address out 3 master ticks before the board's
+  timestamp, a constant (`ppusim_compare.py pal_fetches`; on NTSC the
+  constant is one whole dot), and the CPU samples the cartridge's IRQ at
+  cycle ends: an A12 rise within 3 ticks of one lands an instruction later
+  here. Moving it means moving the PPU against the CPU on PAL, which C45's
+  fit and Mesen2's dot rows pin from two sides; no hardware answer. Open.
+- *Elite*: a `$2002` poll lands on the VBL set; Mesen2 suppresses the flag
+  and the board does not. The board and PPUSim agree on the race at every
+  one of 40 phases (`ppusim_compare.py vbl_race`): Mesen2's PAL race is not
+  the die's.

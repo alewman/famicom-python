@@ -42,7 +42,8 @@ NES_CONFIG_PORT1_TYPE = 988  # ControllerType (int32) of Port1
 NES_CONFIG_PORT2_TYPE = 1980
 NES_CONTROLLER = 6  # ControllerType::NesController
 NES_CONFIG_AUTO_CONFIGURE_INPUT = 11908  # bool, default true
-NES_CONFIG_REGION = 11912  # ConsoleRegion (int32): 0 auto, 1 NTSC
+NES_CONFIG_REGION = 11912  # ConsoleRegion (int32): 0 auto, 1 NTSC, 2 PAL, 3 Dendy
+REGIONS = {"NTSC": 1, "PAL": 2, "Dendy": 3}  # by machine.Timing.name
 NES_CONFIG_SPRITES_ENABLED = 11932  # bool, default true
 NES_CONFIG_OAM_ROW_CORRUPTION = 11982  # bool: EnablePpuOamRowCorruption, default false
 NES_CONFIG_RESTRICT_FIRST_FRAME = 11989  # bool: RestrictPpuAccessOnFirstFrame
@@ -76,7 +77,7 @@ def load_library() -> ctypes.CDLL:
     return m
 
 
-def configure_for_comparison(m: ctypes.CDLL) -> None:
+def configure_for_comparison(m: ctypes.CDLL, region: int = 1) -> None:
     """Make Mesen2's frames comparable with the board's, pixel value for pixel value.
 
     - A 512-entry identity palette: headless, nothing loads a palette (the UI
@@ -91,8 +92,8 @@ def configure_for_comparison(m: ctypes.CDLL) -> None:
       configured from Mesen2's game database (which plugs a Zapper into
       port 2 for The Adventures of Bayou Billy, and the Zapper's light
       sense reads 1 on $4017 D3); headless, the ports are otherwise empty.
-    - NTSC whatever the dump's region: the board runs one machine (NES-001,
-      NTSC), and Mesen2 would otherwise run a PAL dump on a PAL console.
+    - The board's region whatever the dump's (``region``, NTSC by default):
+      Mesen2 would otherwise run a PAL dump on a PAL console.
     - OAM row corruption on (rendering re-enabled with the secondary OAM
       address frozen), which the board always models (C26, AccuracyCoin's
       hardware answer key); off by default in Mesen2. Found by lockstep:
@@ -108,7 +109,7 @@ def configure_for_comparison(m: ctypes.CDLL) -> None:
         != 241
     ):
         raise SystemExit("NesConfig layout does not match Mesen2 2.1.1; re-measure the offsets")
-    raw[NES_CONFIG_REGION : NES_CONFIG_REGION + 4] = [1, 0, 0, 0]
+    raw[NES_CONFIG_REGION : NES_CONFIG_REGION + 4] = [region, 0, 0, 0]
     raw[NES_CONFIG_AUTO_CONFIGURE_INPUT] = 0
     for port in (NES_CONFIG_PORT1_TYPE, NES_CONFIG_PORT2_TYPE):
         raw[port : port + 4] = [NES_CONTROLLER, 0, 0, 0]
@@ -133,6 +134,7 @@ def run_mesen(
     until: str | None = None,
     max_speed: bool = True,
     for_comparison: bool = False,
+    region: int = 1,
 ) -> tuple[int, str, float]:
     """Run ``rom`` at maximum speed until the Lua script stops it or ``seconds`` pass.
 
@@ -148,7 +150,7 @@ def run_mesen(
     m.Pause()
     m.SetEmulationFlag(CONSOLE_MODE, True)
     if for_comparison:
-        configure_for_comparison(m)
+        configure_for_comparison(m, region)
     if not m.LoadRom(str(rom.resolve()).encode(), b""):
         raise SystemExit("LoadRom failed")
     m.InitializeDebugger()
