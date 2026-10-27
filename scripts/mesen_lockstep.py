@@ -142,7 +142,7 @@ def mesen_path(rom: Path) -> Path:
     if rom.suffix.lower() != ".zip":
         return rom
     with zipfile.ZipFile(rom) as archive:
-        (member,) = [n for n in archive.namelist() if n.lower().endswith(".nes")]
+        (member,) = [n for n in archive.namelist() if n.lower().endswith((".nes", ".fds"))]
     return Path(f"{rom.resolve()}\x01{member}")
 
 
