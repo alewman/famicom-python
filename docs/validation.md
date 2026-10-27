@@ -1561,3 +1561,25 @@ gives Mesen2's `.fds` frame 1200, pixel for pixel.
 
 **Everything again**, on PyPy: CPU 14 of 14, PPU 42 of 42, APU 38 of 38,
 mappers 83 of 83, FDS 3 of 3, the quick suite 125.
+
+### Milestone 9, part 4: the FDS sweep (2026-10-26)
+
+**Method.** `scripts/compat_sweep.py --fds --frames 1200,2400 --slack 12`:
+every licensed dump of No-Intro's FDS set (299; betas, prototypes and the
+like left out as in milestone 7), Mesen2 and the board from power with the
+BIOS, no input and no disk changes on either side (Mesen2's automatic
+insertion is off by default), frames 20 and 40 seconds in, each matched
+against the board's frames within 12 either side (a load's timing is not
+judged, C39). The dumps that differ go to `failures.txt`, which `--list`
+re-runs: the quick sweep.
+
+| Result | Dumps | Cause |
+| --- | ---: | --- |
+| identical | 290 | |
+| identical within 60 frames | 2 | *Ultraman Club* (both revisions): loads further apart |
+| game state after the timing moved | 6 | attract demos and wandering characters (*Donkey Kong*, *Donkey Kong Jr.*, *Galaxian*, *Dig Dug II*, *Apple Town Monogatari*), a clock hand two pixels on (*Famimaga Disk Vol. 4 - Clocks*) |
+| a mid-line `$2000` write | 1 | *Kattobi! Douji*: the background pattern table switched at line 80, dot 38; one tile differs (8 pixels), Mesen2 against the board's PPUSim-settled timing, the class of milestone 7's register writes during rendering (not checked on PPUSim for this dump) |
+
+**Milestone 9 so far**: the RAM adapter, its drive, sound, disk changes,
+saves and `.QD` images (parts 1-3), three hardware-answered test disks
+passing, 299 games swept. Open: item 21.

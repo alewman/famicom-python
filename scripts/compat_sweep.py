@@ -17,6 +17,16 @@ board's frame either side is tried as well and reported if it is closer.
 ``--aftermarket`` sweeps the Aftermarket set (homebrew, every dump) instead of
 the licensed ones; ``--every N`` keeps one dump in N, in name order.
 
+    nice pypy3 scripts/compat_sweep.py --fds --frames 1200,2400 --slack 12 --jobs 12
+
+``--fds`` sweeps the licensed Famicom Disk System dumps (milestone 9): both
+sides get the BIOS (FAMICOM_FDS_BIOS or No-Intro's) and neither changes disks
+(Mesen2's automatic insertion is off by default), so each runs its first side.
+A disk load's timing is not judged (C39): ``--slack N`` searches N of the
+board's frames either side. Every run lists its dumps that differ in
+``failures.txt`` beside ``--out``; ``--list FILE`` runs only the dumps named
+there, the quick sweep while fixing.
+
 One line of JSON per dump in ``--out`` (appended; dumps already there are
 skipped, so an interrupted sweep resumes), and Mesen2's first differing frame
 as a PNG, differing pixels magenta, beside it. Nothing it writes is committed.
@@ -39,7 +49,7 @@ from count_mappers import BASE, classify
 from mesen_lockstep import MACHINE, mesen_path
 from mesen_run import ROOT, run_mesen
 
-from famicom_python.cartridge import MAPPERS
+from famicom_python.cartridge import MAPPERS, fds_bios
 from famicom_python.ppu import HEIGHT
 from famicom_python.system import System
 from famicom_python.video import load_palette, write_png
@@ -49,6 +59,7 @@ SETS = [
     "2024 - Nintendo - Nintendo Entertainment System (Headered)",
 ]
 AFTERMARKET = "Nintendo - Nintendo Entertainment System (Headered) (Aftermarket)"
+FDS_SET = "Nintendo - Family Computer Disk System (FDS)"
 OUT = ROOT / "tests" / "mame_traces" / "sweep"
 WIDTH, PIXELS = 256, 256 * HEIGHT
 
@@ -67,6 +78,17 @@ emu.addEventCallback(function()
   if frame == last then emu.log("DONE") end
 end, emu.eventType.endFrame)
 """
+
+
+def disk_dumps(only: str | None) -> list[Path]:
+    """Every licensed dump of the FDS set (the BIOS left out)."""
+    return [
+        path
+        for path in sorted((BASE / FDS_SET).glob("*.zip"))
+        if not path.stem.startswith("[BIOS]")
+        and classify(path.stem) == "licensed"
+        and not (only and not re.search(only, path.stem))
+    ]
 
 
 def licensed_dumps(
@@ -101,6 +123,9 @@ def licensed_dumps(
 
 
 def mesen_frames(rom: Path, frames: list[int], home: Path) -> dict[int, list[int]]:
+    if rom.name.lower().endswith((".fds", ".fds.zip")) or rom.parent.name == FDS_SET:
+        (home / "Firmware").mkdir(exist_ok=True)
+        (home / "Firmware" / "disksys.rom").write_bytes(fds_bios())
     lua = FRAMES_LUA % (", ".join(f"[{f}]=true" for f in frames), max(frames))
     _, log, _ = run_mesen(
         mesen_path(rom),
@@ -127,7 +152,7 @@ def finished_picture(system: System) -> list[int]:
     return list(ppu.picture)
 
 
-def check(rom: Path, frames: list[int]) -> dict:
+def check(rom: Path, frames: list[int], slack: int = 1) -> dict:
     result: dict = {"rom": rom.name, "set": rom.parent.name}
     began = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="mesen-home-") as home:
@@ -153,7 +178,7 @@ def check(rom: Path, frames: list[int]) -> dict:
     try:
         for frame in frames:
             same = frame - 1  # the board's number for Mesen2's frame
-            candidates = (same - 1, same, same + 1)
+            candidates = tuple(range(same - slack, same + slack + 1))
             for candidate in candidates:
                 if candidate not in ours:
                     system.run_frames(candidate - system.board.ppu.frame)
@@ -176,11 +201,14 @@ def check(rom: Path, frames: list[int]) -> dict:
     result["frames"] = report
     result["instructions"] = system.instructions
     if "status" not in result:
-        differing = [e for e in report if e.get("diff", 1)]
+        # A frame matches if any board frame within the slack does.
+        differing = [e for e in report if e.get("closest_diff", e.get("diff", 1))]
         result["status"] = "differs" if differing else "identical"
         if differing and "diff" in differing[0]:
-            frame = differing[0]["frame"]
-            save_diff(OUT / f"{rom.stem}.f{frame}.png", ours[frame - 1], theirs[frame])
+            first = differing[0]
+            frame = first["frame"]
+            best = frame - 1 + first.get("closest", 0)
+            save_diff(OUT / f"{rom.stem}.f{frame}.png", ours[best], theirs[frame])
     return result
 
 
@@ -195,10 +223,10 @@ def save_diff(path: Path, ours: list[int], theirs: list[int]) -> None:
     )
 
 
-def worker(job: tuple[str, list[int]]) -> str:
-    rom, frames = job
+def worker(job: tuple[str, list[int], int]) -> str:
+    rom, frames, slack = job
     try:
-        return json.dumps(check(Path(rom), frames))
+        return json.dumps(check(Path(rom), frames, slack))
     except BaseException as error:  # recorded; the sweep goes on
         return json.dumps({"rom": Path(rom).name, "status": "error", "error": repr(error)})
 
@@ -212,6 +240,9 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=OUT / "results.jsonl")
     parser.add_argument("--aftermarket", action="store_true", help="the Aftermarket set instead")
     parser.add_argument("--every", type=int, default=1, help="keep one dump in N")
+    parser.add_argument("--fds", action="store_true", help="the licensed FDS set instead")
+    parser.add_argument("--slack", type=int, default=1, help="board frames tried either side")
+    parser.add_argument("--list", type=Path, help="only the dumps named in this file")
     args = parser.parse_args()
     frames = sorted(int(f) for f in args.frames.split(","))
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -219,18 +250,28 @@ def main() -> int:
     if args.out.exists():
         done = {json.loads(line)["rom"] for line in args.out.read_text().splitlines() if line}
     mappers = {int(m) for m in args.mappers.split(",")} if args.mappers else None
-    roms = licensed_dumps(args.only, mappers, args.aftermarket)[:: args.every]
+    if args.fds:
+        roms = disk_dumps(args.only)[:: args.every]
+    else:
+        roms = licensed_dumps(args.only, mappers, args.aftermarket)[:: args.every]
+    if args.list:
+        wanted = {line.strip() for line in args.list.read_text().splitlines() if line.strip()}
+        roms = [r for r in roms if r.name in wanted]
     roms = [r for r in roms if r.name not in done]
     print(f"{len(roms)} dumps to run ({len(done)} already in {args.out})", flush=True)
     # One process per dump: MesenCore keeps global state between loads.
     context = multiprocessing.get_context("spawn")
     with context.Pool(args.jobs, maxtasksperchild=1) as pool, args.out.open("a") as out:
-        jobs = [(str(r), frames) for r in roms]
+        jobs = [(str(r), frames, args.slack) for r in roms]
         for count, line in enumerate(pool.imap_unordered(worker, jobs), 1):
             out.write(line + "\n")
             out.flush()
             entry = json.loads(line)
             print(f"[{count}/{len(roms)}] {entry['status']:10} {entry['rom']}", flush=True)
+    results = [json.loads(line) for line in args.out.read_text().splitlines() if line]
+    failing = sorted(r["rom"] for r in results if r["status"] != "identical")
+    (args.out.parent / "failures.txt").write_text("".join(f"{name}\n" for name in failing))
+    print(f"{len(failing)} of {len(results)} not identical: {args.out.parent / 'failures.txt'}")
     return 0
 
 
