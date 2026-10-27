@@ -1583,3 +1583,20 @@ re-runs: the quick sweep.
 **Milestone 9 so far**: the RAM adapter, its drive, sound, disk changes,
 saves and `.QD` images (parts 1-3), three hardware-answered test disks
 passing, 299 games swept. Open: item 21.
+
+### The VRC7 and its FM sound (2026-10-27, branch `vrc7`)
+
+**Pins.** ym2413-python @ 5a826ac (local; not yet on GitHub), its DS1001 judged there
+against Nuked-OPLL on every internal cycle (rungs 0-3, including three minutes of
+*Lagrange Point*'s music recorded from this branch).
+
+**Mapper 85** (VRC7.wiki): *Lagrange Point* and *Tiny Toon Adventures 2* (J) give
+Mesen2's frames at 10 and 30 seconds, pixel for pixel. **Sound**: the DS1001 runs
+lazily, two of its clocks per CPU cycle (its resonator is 3.58 MHz, not locked to the
+CPU), and the expansion level is its MO words averaged over its last sample;
+`$E000` D6 holds it in reset. rainwarrior's `db_vrc7` measures +11.30 dB against his
++11.3 (by construction). Against Mesen2's VRC7 (`mesen_audio.py --expansion-only`,
+`patch_vrc7`): residuals of -1.3 to -2.5 dB, the window's best lag moving; Mesen2's
+VRC7 is emu2413, a different model, where the core's judge is the die's. *Lagrange
+Point* in game runs at 23.4 frames/s on PyPy (0.39x real time): the FM chip, run
+cycle by cycle, is most of it.
