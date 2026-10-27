@@ -40,6 +40,7 @@ The interface is pin-shaped so the APU can later leave as its own core:
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 OVERSAMPLE = 4  # the box filter's rate, in host samples
 TAPS = 96  # the decimating low-pass's length, at the box filter's rate
@@ -82,6 +83,9 @@ TRIANGLE = tuple(range(15, -1, -1)) + tuple(range(16))
 # timers count APU cycles, half as many.
 NOISE_PERIODS = (4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068)
 DMC_RATES = (428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54)
+# The RP2A07's (PAL), the same pages.
+PAL_NOISE_PERIODS = (4, 8, 14, 30, 60, 88, 118, 148, 188, 236, 354, 472, 708, 944, 1890, 3778)
+PAL_DMC_RATES = (398, 354, 316, 298, 276, 236, 210, 198, 176, 148, 132, 118, 98, 78, 66, 50)
 
 # Frame counter events, in CPU cycles after it resets (APU_Frame_Counter.wiki;
 # docs/timing.md "Frame counter").
@@ -100,6 +104,40 @@ STEPS_5 = {
     22371: QUARTER,
     37281: QUARTER | HALF,
     37282: WRAP,
+}
+# The RP2A07's: the same wiki table; blargg's pal_apu_tests readme (hardware-
+# corrected, "tested on a PAL NES") gives these + 2 counted from the $4017 write,
+# as his 2005 readme does the NTSC ones.
+PAL_STEPS_4 = {
+    8313: QUARTER,
+    16627: QUARTER | HALF,
+    24939: QUARTER,
+    33252: IRQ,
+    33253: QUARTER | HALF | IRQ,
+    33254: IRQ | WRAP,
+}
+PAL_STEPS_5 = {
+    8313: QUARTER,
+    16627: QUARTER | HALF,
+    24939: QUARTER,
+    41565: QUARTER | HALF,
+    41566: WRAP,
+}
+
+
+@dataclass(frozen=True)
+class APUTables:
+    """The tables that differ between the RP2A03 and the RP2A07."""
+
+    noise_periods: tuple[int, ...]
+    dmc_rates: tuple[int, ...]
+    steps_4: dict[int, int]
+    steps_5: dict[int, int]
+
+
+TABLES = {
+    "NTSC": APUTables(NOISE_PERIODS, DMC_RATES, STEPS_4, STEPS_5),
+    "PAL": APUTables(PAL_NOISE_PERIODS, PAL_DMC_RATES, PAL_STEPS_4, PAL_STEPS_5),
 }
 
 
@@ -314,11 +352,12 @@ class Triangle:
 class Noise:
     """APU_Noise.wiki: a 15-bit LFSR clocked by a timer counting APU cycles."""
 
-    def __init__(self) -> None:
+    def __init__(self, periods: tuple[int, ...] = NOISE_PERIODS) -> None:
+        self.periods = periods
         self.envelope = Envelope()
         self.length = LengthCounter()
         self.mode_bit = 1  # the feedback tap: 1, or 6 in periodic mode
-        self.period = NOISE_PERIODS[0] // 2 - 1
+        self.period = periods[0] // 2 - 1
         self.timer = 0
         self.shift = 1
         self.output = 0
@@ -329,7 +368,7 @@ class Noise:
             self.length.write_halt(bool(value & 0x20))
         elif register == 2:
             self.mode_bit = 6 if value & 0x80 else 1
-            self.period = NOISE_PERIODS[value & 0x0F] // 2 - 1
+            self.period = self.periods[value & 0x0F] // 2 - 1
         elif register == 3:
             self.length.write_load(value >> 3)
             self.envelope.start = True
@@ -359,10 +398,11 @@ class DMC:
     The reader's fetches are the board's DMA; see :meth:`APU.dmc_fill`.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, rates: tuple[int, ...] = DMC_RATES) -> None:
+        self.rates = rates
         self.irq_enabled = False
         self.loop = False
-        self.period = DMC_RATES[0] // 2 - 1
+        self.period = rates[0] // 2 - 1
         self.timer = 0
         self.output = 0  # the 7-bit output level
         self.sample_address = 0xC000
@@ -382,7 +422,7 @@ class DMC:
             if not self.irq_enabled:
                 self.irq = False
             self.loop = bool(value & 0x40)
-            self.period = DMC_RATES[value & 0x0F] // 2 - 1
+            self.period = self.rates[value & 0x0F] // 2 - 1
             if self.reloaded:
                 # A rate written in the cycle the timer reloads is the one it
                 # reloads with (AccuracyCoin "DMC Reload Timing", hardware).
@@ -427,20 +467,23 @@ class DMC:
 
 
 class APU:
-    def __init__(self, put_first: bool = False, sample_rate: int = 44100) -> None:
+    def __init__(
+        self, put_first: bool = False, sample_rate: int = 44100, tables: str = "NTSC"
+    ) -> None:
+        self.tables = TABLES[tables]
         # Whether the current CPU cycle is an APU put; clock() flips it first.
         self.put = not put_first
         self.pulse1 = Pulse(ones_complement=True)
         self.pulse2 = Pulse(ones_complement=False)
         self.triangle = Triangle()
-        self.noise = Noise()
-        self.dmc = DMC()
+        self.noise = Noise(self.tables.noise_periods)
+        self.dmc = DMC(self.tables.dmc_rates)
         self.channels = (self.pulse1, self.pulse2, self.triangle, self.noise)
         self.lengths = tuple(channel.length for channel in self.channels)
         self.frame_irq = False
         self._frame_irq_clear = False  # a $4015 read's clear, pending
         self.irq = False
-        self.steps = STEPS_4
+        self.steps = self.tables.steps_4
         self.mode5 = False
         self.inhibit = False
         self.frame_cycle = 0
@@ -612,7 +655,7 @@ class APU:
 
     def _apply_frame_write(self, value: int) -> None:
         self.mode5 = bool(value & 0x80)
-        self.steps = STEPS_5 if self.mode5 else STEPS_4
+        self.steps = self.tables.steps_5 if self.mode5 else self.tables.steps_4
         self.frame_cycle = 0
         if self.mode5:  # bit 7 clocks quarter and half at once
             self._quarter_frame()
