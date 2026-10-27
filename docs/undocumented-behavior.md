@@ -280,6 +280,8 @@ before the board takes a side.
   (dot 257) goes out before hori(v) is copied, so its address is v's from the
   end of the line; the board had it after (fixed in milestone 2).
 - **C16. 2C07 vblank length.** 70 lines (cycle chart) vs 71 (variants page).
+  *Settled on PPUSim* (milestone 10): the RP2C07-0 sets VBL on (241, 1) and
+  clears it on (311, 1), 70 lines; the 71 counts the pre-render line too.
 - **C17. MMC3 revision names.** The wiki says the IRQ behaviour splits Sharp vs
   NEC, not by letter; blargg's `mmc3_irq_tests` call the old behaviour "rev A",
   `mmc3_test_2` calls it "MMC3_alt" and notes a chip marked MMC3B behaving that
@@ -526,6 +528,28 @@ before the board takes a side.
   *Zelda no Densetsu*'s save failed its read-back with error 24 until this.
   A hardware answer would be a test that writes, clears D6 and polls $4030.
   Settled only by the BIOS working.
+- **C45. The PAL CPU/PPU alignment.** The PPU sees a register access at
+  `Timing.ppu_access_ticks`: 8 master ticks into NTSC's 12-tick cycle, pinned
+  by `ppu_vbl_nmi`. No PAL test ROM pins it. *Board (milestone 10)*: 9 into
+  PAL's 16, with PPUSim's RP2C07-0 driven by the 2A07's M2 (CPU_pinout.wiki:
+  high for 19 of 32 half-cycles) and started 1 half-cycle later
+  (`ppusim_compare.py` PAL_SKEW): the pair where the board's pictures come
+  closest to PPUSim's (six PAL games identical; `full_palette`, an NTSC-timed
+  program, 46 pixels of 61,440). Reads alone accept 8 or 9; 10 or more
+  moves `full_palette`'s VBL sync. Die-derived and fitted: a real console
+  powers on in one of several alignments, and nothing here says which.
+- **C46. The 2C07's OAM circuit.** PPU_OAM.wiki: a forced refresh on lines
+  265-310, "during which OAM cannot be written". *Settled on PPUSim*
+  (`ppusim_compare.py` pal_oam, pal_w3, every access four cycles apart): on
+  lines 265-310, rendering or not, OAMADDR steps on every even dot 2-340
+  (BreakingNESWiki PPU/pal.md: the V decoder's line-265 output drives the
+  OAM counter's step); a `$2003` write lands 3 dots late (the W3 Enabler
+  delay line) and, in the window, is lost when its access falls 1 tick
+  before a dot boundary; a `$2004` write in the window lands 3 dots late, at
+  the address the refresh has reached, and its own step merges with a
+  refresh step on the same dot. So OAM *can* be written then, at a moving
+  address. Accesses on consecutive cycles, which no 6502 instruction makes,
+  behave otherwise again and are not modelled.
 
 ## Open items
 
@@ -620,3 +644,13 @@ before the board takes a side.
     FDS-Audio-Registers' answer (a video, not fetched); the sound's open
     claims (C42, C43); FDS-4023-Test (its answer is a video too); the drive's
     timing (C39); a sweep of the FDS sets (smoke first).
+22. **PAL, after milestone 10's second part.** The 2A07's DMA, which "fixes
+    these extra read problems, but the mechanism is not yet understood"
+    (DMA.wiki; APU_DMC.wiki: halting only on an opcode fetch): not modelled,
+    and BreakingNESWiki's 2A07 page leaves RDY "TBD". The alignment (C45) has
+    no hardware answer. `full_palette` on PAL keeps 46 single-pixel
+    transients against PPUSim, at palette-write instants. A `$2004` read on
+    the pre-render line's dots 1-64 with rendering on returns $FF on PPUSim
+    (NTSC and PAL alike) and the OAM bus here; no test ROM looks, and Visual
+    2C02 would judge it for NTSC. A PAL palette (the 2C07 tints its other
+    channels, BreakingNESWiki PPU/pal.md "Mixed RG Emphasis").

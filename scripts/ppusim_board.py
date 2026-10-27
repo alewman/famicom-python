@@ -28,7 +28,7 @@ import sys
 import time
 from pathlib import Path
 
-from famicom_python.machine import NES_001
+from famicom_python.machine import NES_001, Machine
 from famicom_python.system import System
 from famicom_python.testrom import SIGNATURE, blargg_text, peek, screen_text
 
@@ -38,6 +38,9 @@ LIBRARY = Path(
     os.environ.get("PPUSIM_LIBRARY", ROOT / "reference" / "build-ppusim" / "libppusim.so")
 )
 M2_RISE, M2_HIGH = 9, 15  # master half-cycles into the CPU cycle; length of M2 high
+# The RP2A07's: a 32-half-cycle CPU cycle, M2 high for 19 (CPU_pinout.wiki,
+# "1.9 out of 3.2 pixels").
+PAL_M2_RISE, PAL_M2_HIGH = 13, 19
 ACCESS_TICKS = 8  # board.PPU_ACCESS_TICKS: where the board stops the PPU for an access
 
 
@@ -45,6 +48,8 @@ def _library() -> ctypes.CDLL:
     lib = ctypes.CDLL(str(LIBRARY))
     lib.ppusim_new.restype = ctypes.c_void_p
     lib.ppusim_new.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+    lib.ppusim_new_revision.restype = ctypes.c_void_p
+    lib.ppusim_new_revision.argtypes = [ctypes.c_char_p] + [ctypes.c_int] * 4
     for name in ("ppusim_reset",):
         getattr(lib, name).argtypes = [ctypes.c_void_p, ctypes.c_int]
     lib.ppusim_run.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
@@ -59,9 +64,26 @@ def _library() -> ctypes.CDLL:
 class PPUSimPPU:
     """The parts of famicom_python.ppu.PPU the board and harness use, backed by PPUSim."""
 
-    def __init__(self, chr_data: bytes, chr_writable: bool, vertical: bool, skew: int) -> None:
+    def __init__(
+        self,
+        chr_data: bytes,
+        chr_writable: bool,
+        vertical: bool,
+        skew: int,
+        pal: bool = False,
+        access_ticks: int = ACCESS_TICKS,
+    ) -> None:
         self.lib = lib = _library()
-        self.h = lib.ppusim_new(chr_data, len(chr_data), int(chr_writable), int(vertical))
+        self.h = lib.ppusim_new_revision(
+            chr_data, len(chr_data), int(chr_writable), int(vertical), int(pal)
+        )
+        # Master ticks per CPU cycle and M2's half-cycles, the CPU's (2A03 or 2A07).
+        self.cycle = 16 if pal else 12
+        self.m2 = (PAL_M2_RISE, PAL_M2_HIGH) if pal else (M2_RISE, M2_HIGH)
+        self.prerender_line = 311 if pal else 261
+        # The board's access point (Timing.ppu_access_ticks): only to find the
+        # cycle's start; PPUSim sees the access through M2 itself.
+        self.access_ticks = access_ticks
         lib.ppusim_reset(self.h, 64)
         lib.ppusim_run(self.h, skew)
         self.time = 0  # master ticks simulated since the CPU's power-on
@@ -94,19 +116,19 @@ class PPUSimPPU:
             self._update()
 
     def run_to(self, time: int) -> None:
-        if time % 12:  # the board's access point: the access itself runs this cycle
+        if time % self.cycle:  # the board's access point: the access itself runs this cycle
             self._target = time
             return
         self._settle(time)
 
     def _access(self, rnw: int, register: int, value: int) -> int:
-        start = self._target - ACCESS_TICKS
+        start = self._target - self.access_ticks
         self._settle(start)
         early = value if self.early_value is None else self.early_value
         result = self.lib.ppusim_access(
-            self.h, rnw, register, value, early, self.early_halves, M2_RISE, M2_HIGH
+            self.h, rnw, register, value, early, self.early_halves, *self.m2
         )
-        self.time = start + 12
+        self.time = start + self.cycle
         self._update()
         return result
 
@@ -119,7 +141,9 @@ class PPUSimPPU:
         """The board's M2-fall hook: PPUSim's pins already carry it."""
         return value
 
-    def write_register(self, register: int, value: int, early: int | None = None) -> None:
+    def write_register(
+        self, register: int, value: int, early: int | None = None, phase: int = 0
+    ) -> None:
         # The early-write value is this class's own model (early_value,
         # early_halves), so a comparison drives both PPUs alike.
         self._access(0, register, value)
@@ -140,8 +164,8 @@ class PPUSimPPU:
         return self.lib.ppusim_chr(self.h, address)
 
 
-def system_with_ppusim(rom: Path, skew: int) -> System:
-    system = System.from_rom(rom, NES_001)
+def system_with_ppusim(rom: Path, skew: int, machine: Machine = NES_001) -> System:
+    system = System.from_rom(rom, machine)
     loaded = system.loaded
     assert loaded is not None
     board = loaded.image.board
@@ -149,7 +173,15 @@ def system_with_ppusim(rom: Path, skew: int) -> System:
         raise SystemExit(f"mapper {board.mapper}: the PPUSim shim models NROM only")
     vertical = board.mirroring == "V"
     chr_data = loaded.image.chr or bytes(0x2000)
-    ppu = PPUSimPPU(chr_data, not loaded.image.chr, vertical, skew)
+    timing = machine.timing
+    ppu = PPUSimPPU(
+        chr_data,
+        not loaded.image.chr,
+        vertical,
+        skew,
+        timing.name == "PAL",
+        timing.ppu_access_ticks,
+    )
     ppu._a10_bit = 10 if vertical else 11
     system.board.ppu = ppu
     return system

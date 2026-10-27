@@ -61,7 +61,15 @@ DELAYS = {
     "2007_write": 3,  # a $2007 write reaches palette RAM or the bus
     "2007_increment": 4,  # ... and v increments (after a $2007 read too)
     "2007_read_ale": 2,  # a $2007 read's ALE (PPUSim tmp_2), 2 dots before its /RD
+    # The 2C07 (and the Dendy's UA6538) delays a $2003 write through a chain of
+    # PCLK latches (BreakingNESWiki PPU/pal.md "W3 Enabler"; PPUSim obj_eval.cpp
+    # RP2C07_0), where the 2C02 loads OAMADDR during the access.
+    # Fitted: 3 matches PPUSim on every phase where the write lands (pal_w3).
+    "2003_delayed": 3,
+    # A $2004 write inside the 2C07's refresh commits this late (fitted, pal_oam).
+    "2004_refresh": 3,
 }
+
 # A $2007 read's buffer refill lands with its increment, and a second read
 # before then is ignored: it returns the buffer and starts nothing. PPUSim at
 # the board's skew prints blargg's hardware results for both reads one CPU
@@ -70,6 +78,8 @@ DELAYS = {
 
 DOTS = 341
 WIDTH, HEIGHT = 256, 240
+BORDER = 0x0F  # PAL's border in the picture: colour $0F, no emphasis
+_BORDER_LINE = array("H", [BORDER] * WIDTH)
 REVERSE = bytes(int(f"{i:08b}"[::-1], 2) for i in range(256))  # a byte's bits mirrored
 VBL, SPRITE0, OVERFLOW = 0x80, 0x40, 0x20
 # Sprite line-buffer entries: palette index (0x10-0x1F), then these flags.
@@ -228,6 +238,10 @@ class PPU:
                         continue
                 if line < HEIGHT:
                     self._fill_backdrop(line, dot + 1, dot + dots)
+                elif (refresh := self.timing.oam_refresh) and refresh[0] <= line <= refresh[1]:
+                    # The even dots in (dot, dot + dots], all of them 2-337 here.
+                    steps = (dot + dots) // 2 - dot // 2
+                    self.oam_addr = (self.oam_addr + steps) & 0xFF
                 self.dot = dot + dots
                 self.time += dots * ticks
                 continue
@@ -304,6 +318,9 @@ class PPU:
         self.dot = dot
         if dot == DOTS - 3:
             self._skip_sample = self.mask & 0x18
+        refresh = self.timing.oam_refresh
+        if refresh and not dot & 1 and dot and refresh[0] <= line <= refresh[1]:
+            self.oam_addr = (self.oam_addr + 1) & 0xFF
         if dot == 1:
             if line == self.vblank_line:
                 if not self._vbl_suppress:
@@ -341,12 +358,25 @@ class PPU:
             self._fading = 0
 
     def _next_line(self, line: int) -> int:
+        if line < HEIGHT and self.timing.border:
+            self._blank_border(line)
         line += 1
         if line == self.lines:
             line = 0
             self.frame += 1
         self.line = line
         return line
+
+    def _blank_border(self, line: int) -> None:
+        """PAL's border over the finished line: all of line 0, x 0-1 and 254-255
+        of the others, black ($0F) without emphasis (machine.Timing.border)."""
+        base = line * WIDTH
+        picture = self.picture
+        if line == 0:
+            picture[base : base + WIDTH] = _BORDER_LINE
+        else:
+            picture[base] = picture[base + 1] = BORDER
+            picture[base + WIDTH - 2] = picture[base + WIDTH - 1] = BORDER
 
     def _line_start(self, line: int, skipped: bool = False) -> None:
         """Dot 0: lanes the last line's dot 339 started counting begin, and a
@@ -881,6 +911,26 @@ class PPU:
             return 0 if index >= 32 else ((index + 3) & ~3) & 31
         return self._oam2_fetch & 31  # 257-340: the fetch counter
 
+    def _set_oam_addr(self, value: int) -> None:
+        self.oam_addr = value
+
+    def _write_oam_refreshing(self, value: int) -> None:
+        """A $2004 write landing inside the 2C07's refresh: the write and the
+        refresh step one counter, so on a dot that steps anyway (the next, even
+        one) the write's own step is lost in it."""
+        address = self.oam_addr
+        self._write_oam(value)
+        if not (self.dot + 1) & 1:
+            self.oam_addr = address
+
+    def _write_oam(self, value: int) -> None:
+        # Attribute bytes have no bits 4-2 in the array itself, so every reader
+        # sees them missing, sprite evaluation's included (AccuracyCoin "$2004
+        # Stress Test" 2).
+        address = self.oam_addr
+        self.oam[address] = value & 0xE3 if address & 3 == 2 else value
+        self.oam_addr = (address + 1) & 0xFF
+
     def _corrupt_oam(self) -> None:
         """Rendering begins at the pre-render line with the secondary OAM
         address still frozen at row n: the OAMADDR row (row 0 after a DMA) is
@@ -1182,11 +1232,15 @@ class PPU:
             if self._watch:
                 self._ale(self.v & 0x3FFF)
 
-    def write_register(self, register: int, value: int, early: int | None = None) -> None:
+    def write_register(
+        self, register: int, value: int, early: int | None = None, phase: int = 0
+    ) -> None:
         """A CPU write; ``early`` is the open-bus value the data bus holds at
         the start of the write cycle, before the CPU drives ``value``
         (PPU_glitches.wiki "Early Writes"; None: valid for the whole cycle).
-        On the 2C02G only PPUMASK's greyscale bit sees it (below)."""
+        On the 2C02G only PPUMASK's greyscale bit sees it (below). ``phase``:
+        master ticks from the access to the start of the dot the PPU is in,
+        always 0 on NTSC (3 dots a CPU cycle), any of 0-4 on PAL (3.2)."""
         self._drive(value)
         if register == 0:
             if self.resetting:
@@ -1239,19 +1293,31 @@ class PPU:
                     index = self._last_pixel
                     picture[index] = (self._last_value & first) | (picture[index] & 0x1C0)
         elif register == 3:
-            self.oam_addr = value
+            if not self.timing.delayed_oamaddr:
+                self.oam_addr = value
+            elif (
+                not (refresh := self.timing.oam_refresh)
+                or not refresh[0] <= self.line <= refresh[1]
+                or phase != 1
+            ):
+                self._schedule(DELAYS["2003_delayed"], lambda: self._set_oam_addr(value))
+            # else lost: during the 2C07's refresh, a write at this phase meets a
+            # refresh step with its delayed load, and the step wins (PPUSim's
+            # RP2C07-0 blocks OMOUT while OMSTEP is active; ppusim_compare.py
+            # pal_w3: lost at exactly this phase, and only inside the window).
         elif register == 4:
             if self.rendering_now:
                 # Not written; OAMADDR's high six bits bump (PPU_registers.wiki)
                 # and the low two clear (AccuracyCoin "Address $2004 behavior" A).
                 self.oam_addr = (self.oam_addr + 4) & 0xFC
+            elif (refresh := self.timing.oam_refresh) and refresh[0] <= self.line <= refresh[1]:
+                # The write commits a little after the access, by when the 2C07's
+                # refresh has moved the address on (PPUSim, ppusim_compare.py
+                # pal_oam); elsewhere the address holds still and the delay is
+                # invisible.
+                self._schedule(DELAYS["2004_refresh"], lambda: self._write_oam_refreshing(value))
             else:
-                # Attribute bytes have no bits 4-2 in the array itself, so every
-                # reader sees them missing, sprite evaluation's included
-                # (AccuracyCoin "$2004 Stress Test" 2).
-                address = self.oam_addr
-                self.oam[address] = value & 0xE3 if address & 3 == 2 else value
-                self.oam_addr = (address + 1) & 0xFF
+                self._write_oam(value)
         elif register == 5:
             if self.resetting:
                 return

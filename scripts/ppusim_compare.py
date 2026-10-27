@@ -16,7 +16,7 @@ address, RAW video, /INT per master half-cycle). Times are master ticks since
 power-on in both.
 
     python scripts/ppusim_compare.py [experiment ...]
-    python scripts/ppusim_compare.py frame ROM N   # a whole frame, CPU included
+    python scripts/ppusim_compare.py frame ROM N [MACHINE]   # a whole frame, CPU included
 
 NROM only, through scripts/ppusim_board.py; builds nothing (run
 scripts/build_ppusim.py first).
@@ -29,11 +29,11 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from ppusim_board import ACCESS_TICKS, LIBRARY, PPUSimPPU, system_with_ppusim
+from ppusim_board import LIBRARY, PPUSimPPU, system_with_ppusim
 
 from famicom_python.cartridge import Cartridge
-from famicom_python.machine import NES_001
-from famicom_python.ppu import HEIGHT
+from famicom_python.machine import MACHINES, NES_001, Machine
+from famicom_python.ppu import BORDER, HEIGHT
 from famicom_python.system import System
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,6 +48,15 @@ ROM = (
     / "01-vbl_basics.nes"
 )
 SKEW = 3  # the one skew where PPUSim passes all of ppu_vbl_nmi
+# PAL's: where the board, with Timing.ppu_access_ticks 9, comes closest to
+# PPUSim's RP2C07-0 (docs/validation.md milestone 10); no PAL ROM pins it.
+PAL_SKEW = 1
+
+
+def skew_for(machine: Machine) -> int:
+    return PAL_SKEW if machine.timing.name == "PAL" else SKEW
+
+
 RESET_HALVES = 64  # PPUSimPPU holds /RES for 64 half-cycles before time 0
 CYCLE = 12  # master ticks per CPU cycle
 FRAME_CYCLES = 29781  # a little over one frame of CPU cycles
@@ -69,8 +78,16 @@ class TraceEntry(ctypes.Structure):
 class Pair:
     """Our PPU and PPUSim, fed the same CPU cycles."""
 
-    def __init__(self, rom: Path = ROM, skew: int = SKEW) -> None:
-        ours = System.from_rom(rom, NES_001)
+    def __init__(
+        self, rom: Path = ROM, skew: int | None = None, machine: Machine = NES_001
+    ) -> None:
+        ours = System.from_rom(rom, machine)
+        skew = skew_for(machine) if skew is None else skew
+        timing = machine.timing
+        self.cycle = timing.cpu_divider  # master ticks per CPU cycle
+        self.frame_cycles = timing.lines * 341 * timing.dot_divider // timing.cpu_divider + 1
+        self.lines = timing.lines
+        self.dots_per_cycle = timing.cpu_divider / timing.dot_divider
         self.ours = ours.board.ppu
         self.cartridge: Cartridge = ours.board.cartridge
         self.ours._watch = True  # report ALE addresses too
@@ -89,8 +106,14 @@ class Pair:
         assert image is not None and image.board.mapper == 0
         self.skew = skew
         self.sim = PPUSimPPU(
-            image.chr or bytes(0x2000), not image.chr, image.board.mirroring == "V", skew
+            image.chr or bytes(0x2000),
+            not image.chr,
+            image.board.mirroring == "V",
+            skew,
+            timing.name == "PAL",
+            timing.ppu_access_ticks,
         )
+        self.access_ticks = timing.ppu_access_ticks
         self.sim._a10_bit = 10 if image.board.mirroring == "V" else 11
         _trace_api(self.sim.lib)
         self.t = 0  # master ticks at the end of the last CPU cycle
@@ -99,20 +122,21 @@ class Pair:
     # -- driving ----------------------------------------------------------
 
     def idle(self, cycles: int) -> None:
-        self.t += cycles * CYCLE
+        self.t += cycles * self.cycle
         for ppu in (self.ours, self.sim):
             ppu.run_to(self.t)
 
     def access(self, register: int, value: int | None = None) -> tuple[int, int]:
         """One CPU cycle accessing $2000 + register (a read if value is None)."""
-        self.t += CYCLE
+        self.t += self.cycle
         results = []
         for ppu in (self.ours, self.sim):
-            ppu.run_to(self.t + ACCESS_TICKS - CYCLE)
+            ppu.run_to(self.t + self.access_ticks - self.cycle)
             if value is None:
                 results.append(ppu.read_register(register))
             elif ppu is self.ours:
-                ppu.write_register(register, value, self.sim.early_value)
+                access = self.t + self.access_ticks - self.cycle
+                ppu.write_register(register, value, self.sim.early_value, ppu.time - access)
                 results.append(value)
             else:
                 ppu.write_register(register, value)
@@ -138,10 +162,10 @@ class Pair:
         while (ours.line, ours.dot) != (line, dot):
             target = line * 341 + dot
             now = ours.line * 341 + ours.dot
-            gap = (target - now) % (262 * 341)
-            if gap < 3:
+            gap = (target - now) % (self.lines * 341)
+            if gap < self.dots_per_cycle:
                 break
-            self.idle(max(1, gap // 3 - 1))
+            self.idle(max(1, int(gap / self.dots_per_cycle) - 1))
 
     # -- observing --------------------------------------------------------
 
@@ -482,6 +506,91 @@ EXPERIMENTS: dict[str, Callable[[Pair], None]] = {
 }
 
 
+def oam_vblank(machine: str, lines: tuple[int, ...]) -> None:
+    """$2004 in vblank and on the pre-render line, rendering on and off, then OAM
+    read back the next frame: the 2C07's forced OAM refresh (lines 265-310,
+    PPU_OAM.wiki) against the PAL row, or the same probes on NTSC. Every access
+    is four cycles after the last, as LDA/STA $2004 make them."""
+
+    def read(pair: Pair) -> tuple[int, int]:
+        pair.idle(3)
+        return pair.access(4)
+
+    for mask in (0x18, 0x00):
+        pair = Pair(machine=MACHINES[machine])
+        pair.idle(2 * pair.frame_cycles)  # the power-up wait
+        pair.to_line(242)
+        pair.write(1, 0x00)
+        pair.write(3, 0x00)
+        for i in range(256):
+            pair.write(4, i)
+        pair.write(1, mask)
+        report = []
+        for line in lines:
+            pair.to_line(line, 10)
+            pair.write(3, 0x40)
+            reads = [read(pair) for _ in range(4)]
+            pair.write(4, 0xA5)
+            pair.write(4, 0x5A)
+            reads.append(read(pair))
+            report.append((line, reads))
+        pair.to_line(245)
+        pair.write(1, 0x00)
+        oam = []
+        for i in range(256):
+            pair.write(3, i)
+            oam.append(read(pair))
+        print(f"{machine}, $2001 = ${mask:02X}:")
+        for line, reads in report:
+            mark = "" if all(o == s_ for o, s_ in reads) else "   <- differ"
+            print(f"  line {line}: (ours, PPUSim) {reads}{mark}")
+        bad = [(i, o, s_) for i, (o, s_) in enumerate(oam) if o != s_]
+        filled = [i & 0xE3 if i & 3 == 2 else i for i in range(256)]  # as the fill left it
+        written = [(i, s_) for i, (_, s_) in enumerate(oam) if s_ != filled[i]]
+        print(f"  OAM after: {len(bad)} bytes differ {bad[:10]}; changed in PPUSim {written[:10]}")
+
+
+def pal_oam(_pair: Pair) -> None:
+    oam_vblank("pal", (250, 270, 300, 311))
+
+
+def ntsc_oam(_pair: Pair) -> None:
+    oam_vblank("nes", (250, 261))
+
+
+EXPERIMENTS["ntsc_oam"] = ntsc_oam
+
+
+def pal_w3(_pair: Pair) -> None:
+    """The 2C07's delayed $2003 write and its OAM refresh, as a 6502 meets them:
+    OAM filled with its own indices, then $2003 = $40 and five $2004 reads four
+    cycles apart (LDA $2004), from start dots spread over the five CPU/dot
+    phases, outside the refresh (line 250) and inside (270, 300)."""
+    pair = Pair(machine=MACHINES["pal"])
+    pair.idle(2 * pair.frame_cycles)
+    pair.to_line(242)
+    pair.write(3, 0x00)
+    for i in range(256):
+        pair.write(4, i)
+    bad = 0
+    for line in (250, 270, 300):
+        for k in range(10):
+            pair.to_line(line, 10 + 23 * k)
+            pair.write(3, 0x40)
+            reads = []
+            for _ in range(5):
+                pair.idle(3)
+                reads.append(pair.access(4))
+            if any(o != s_ for o, s_ in reads):
+                bad += 1
+                print(f"  line {line} dot {10 + 23 * k}: (ours, PPUSim) {reads}   <- differ")
+    print(f"pal_w3: {bad} of 30 sequences differ")
+
+
+EXPERIMENTS["pal_w3"] = pal_w3
+EXPERIMENTS["pal_oam"] = pal_oam
+
+
 def finished_picture(system: System) -> list[int]:
     """The frame just begun, once its 240 rows are drawn.
 
@@ -494,13 +603,14 @@ def finished_picture(system: System) -> list[int]:
     return list(ppu.picture)
 
 
-def compare_frame(rom: Path, frame: int) -> int:
+def compare_frame(rom: Path, frame: int, machine: Machine = NES_001) -> int:
     """Frame ``frame`` of ``rom`` on the board with PPUSim (CPU and all) against ours.
 
     Ours is tried at frames ``frame`` - 2 to + 2 (the two count frames from
-    different points); the closest is reported.
+    different points); the closest is reported. ``machine`` "pal" puts the
+    RP2C07-0 against the PAL row.
     """
-    system = system_with_ppusim(rom, SKEW)
+    system = system_with_ppusim(rom, skew_for(machine), machine)
     sim_ppu = system.board.ppu
     lib = sim_ppu.lib
     _trace_api(lib)
@@ -522,7 +632,13 @@ def compare_frame(rom: Path, frame: int) -> int:
             # The dot's last half-cycle: RAW settles during the dot.
             pixels[(e.v, e.h - SIM_PIXEL_H)] = e.video
     sim = [pixels.get((y, x), -1) for y in range(240) for x in range(256)]
-    ours = System.from_rom(rom)
+    if machine.timing.border:
+        # PPUSim's RAW is 0 where the picture is blanked ("no picture"); the
+        # board draws PAL's border as BORDER there. Map only where RAW is 0.
+        for i in range(256 * 240):
+            if (i < 256 or i % 256 in (0, 1, 254, 255)) and sim[i] == 0:
+                sim[i] = BORDER
+    ours = System.from_rom(rom, machine)
     ours.run_frames(frame - 2)
     best: tuple[int, list[int], list[int]] | None = None
     for ours_frame in range(frame - 2, frame + 3):
@@ -556,7 +672,8 @@ def main() -> int:
         print("build PPUSim first: python scripts/build_ppusim.py", file=sys.stderr)
         return 1
     if sys.argv[1:2] == ["frame"]:
-        return compare_frame(Path(sys.argv[2]), int(sys.argv[3]))
+        machine = MACHINES[sys.argv[4]] if len(sys.argv) > 4 else NES_001
+        return compare_frame(Path(sys.argv[2]), int(sys.argv[3]), machine)
     names = sys.argv[1:] or list(EXPERIMENTS)
     for name in names:
         print(f"== {name}")
