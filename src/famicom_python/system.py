@@ -17,7 +17,7 @@ from sixfiveohtwo import RP2A03
 from .board import Board
 from .cartridge import BoardInfo, Loaded, load
 from .cartridge.connector import Cartridge
-from .machine import NES_001, Machine
+from .machine import MACHINES, NES_001, Machine
 
 
 class System:
@@ -28,6 +28,16 @@ class System:
         self.cartridge = cartridge
         self.board = board = Board(machine, cartridge)
         self.cpu = cpu = RP2A03(board.read_byte, board.write_byte)
+        if machine.dma_halts_on_opcode:
+            # Each step begins with an opcode fetch or an interrupt entry's
+            # first read: mark it for the board (Machine.dma_halts_on_opcode).
+            step = cpu.step
+
+            def marked_step() -> int:
+                board.opcode_read = True
+                return step()
+
+            cpu.step = marked_step  # type: ignore[method-assign]
         board.request_irq = cpu.request_maskable_interrupt
         board.clear_irq = cpu.clear_maskable_interrupt
         board.request_nmi = cpu.request_non_maskable_interrupt
@@ -39,6 +49,23 @@ class System:
         cpu.ane_constant = machine.ane_constant
         cpu.lxa_constant = machine.lxa_constant
         self.power()
+
+    @staticmethod
+    def machine_for(rom: str | Path | bytes) -> Machine:
+        """The console a cartridge asks for: the NES 2.0 header's or nes20db's
+        timing (1 PAL, 3 Dendy), else a Famicom when the cartridge carries a
+        sound chip or is a disk (its sound reaches the mix only through the
+        Famicom's cartridge pins 45 and 46), else the NES-001. Neither source
+        tells a Famicom cartridge from an NES one otherwise."""
+        loaded = load(rom)
+        timing = loaded.image.board.timing
+        if timing == 1:
+            return MACHINES["pal"]
+        if timing == 3:
+            return MACHINES["dendy"]
+        if loaded.cartridge.expansion_audio:
+            return MACHINES["famicom"]
+        return NES_001
 
     @classmethod
     def from_rom(

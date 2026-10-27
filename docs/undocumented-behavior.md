@@ -644,13 +644,13 @@ before the board takes a side.
     FDS-Audio-Registers' answer (a video, not fetched); the sound's open
     claims (C42, C43); FDS-4023-Test (its answer is a video too); the drive's
     timing (C39); a sweep of the FDS sets (smoke first).
-22. **PAL, after milestone 10's second part.** The 2A07's DMA, which "fixes
-    these extra read problems, but the mechanism is not yet understood"
-    (DMA.wiki; APU_DMC.wiki: halting only on an opcode fetch): not modelled,
-    and BreakingNESWiki's 2A07 page leaves RDY "TBD". The alignment (C45) has
+22. **PAL, after milestone 10.** The 2A07's DMA halts only on opcode fetches
+    (part 3), at the specification tier: BreakingNESWiki's 2A07 page leaves
+    RDY "TBD". Mapper IRQs land one instruction after Mesen2's at some
+    phases (part 3: PPUSim's bus is 3 master ticks ahead of the board's
+    timestamps on PAL). The alignment (C45) has
     no hardware answer. `full_palette` on PAL keeps 46 single-pixel
     transients against PPUSim, at palette-write instants. A `$2004` read on
     the pre-render line's dots 1-64 with rendering on returns $FF on PPUSim
     (NTSC and PAL alike) and the OAM bus here; no test ROM looks, and Visual
-    2C02 would judge it for NTSC. A PAL palette (the 2C07 tints its other
-    channels, BreakingNESWiki PPU/pal.md "Mixed RG Emphasis").
+    2C02 would judge it for NTSC.
