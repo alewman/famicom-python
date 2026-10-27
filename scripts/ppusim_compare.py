@@ -606,9 +606,8 @@ def vbl_race(_pair: Pair, machine: str = "pal") -> None:
         second = pair.access(2)
         same = first[0] == first[1] and second[0] == second[1]
         bad += not same
-        print(
-            f"  k {k:2d} from {start}: (ours, PPUSim) {first}, {second}{'' if same else '   <- differ'}"
-        )
+        mark = "" if same else "   <- differ"
+        print(f"  k {k:2d} from {start}: (ours, PPUSim) {first}, {second}{mark}")
     print(f"vbl_race {machine}: {bad} of 40 differ")
 
 
@@ -645,9 +644,8 @@ def pal_fetches(_pair: Pair) -> None:
                 spread[min(near, key=lambda st: abs(st - t)) - t] += 1
             else:
                 unmatched += 1
-        print(
-            f"  line {line}: {len(pair.ales)} ALEs; PPUSim - ours: {dict(spread)}; unmatched {unmatched}"
-        )
+        counts = f"{len(pair.ales)} ALEs; PPUSim - ours: {dict(spread)}"
+        print(f"  line {line}: {counts}; unmatched {unmatched}")
 
 
 EXPERIMENTS["pal_fetches"] = pal_fetches
