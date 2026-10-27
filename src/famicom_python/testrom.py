@@ -23,6 +23,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .cartridge import load
+from .machine import MACHINES
 from .system import System
 
 SIGNATURE = bytes((0xDE, 0xB0, 0x61))
@@ -225,10 +226,13 @@ class RomCase:
     expect: tuple[str, ...] = ()
     font: str = "ascii"
     sprites: bool = False  # "values": read sprite tiles as text too
+    machine: str = "nes"  # a key of machine.MACHINES
 
     @property
     def label(self) -> str:
         changes = ", ".join(f"{field} {value}" for field, value in self.board)
+        if self.machine != "nes":
+            changes = ", ".join(filter(None, (self.machine, changes)))
         return self.path + (f" ({changes})" if changes else "")
 
 
@@ -697,6 +701,26 @@ _FDS_IRQ_V7 = (
     ("15", "40", "RVal=0 w/ Repeat"),
 )
 
+#: The PAL NES's judges (milestone 10): blargg's PAL frame-sequencer tests,
+#: "tested on a PAL NES and all give a passing result" (their readme).
+PAL_ROMS = tuple(
+    RomCase(
+        f"pal_apu_tests/{name}.nes", "screen", 20, passed="PASSED", failed="FAILED", machine="pal"
+    )
+    for name in (
+        "01.len_ctr",
+        "02.len_table",
+        "03.irq_flag",
+        "04.clock_jitter",
+        "05.len_timing_mode0",
+        "06.len_timing_mode1",
+        "07.irq_flag_timing",
+        "08.irq_timing",
+        "10.len_halt_timing",
+        "11.len_reload_timing",
+    )
+)
+
 #: The Famicom Disk System's judges (milestone 9): disk images under
 #: tests/test_roms/fds, each with a hardware answer. They need the BIOS
 #: (``cartridge.fds_bios``: FAMICOM_FDS_BIOS or No-Intro's under NO_INTRO_DIR).
@@ -791,7 +815,7 @@ def run_case(case: RomCase, root: Path) -> RomOutcome:
     if case.protocol == "6000" and not board.prg_ram + board.prg_nvram:
         board = replace(board, prg_ram=0x2000)
     board = replace(board, **dict(case.board))
-    system = System.from_rom(data, override=board)
+    system = System.from_rom(data, MACHINES[case.machine], override=board)
     system.board.pads[0].buttons = case.buttons
     if case.protocol == "6000":
         result = run_blargg(system, max_seconds=case.seconds)

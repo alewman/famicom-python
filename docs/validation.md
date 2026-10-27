@@ -1584,7 +1584,7 @@ re-runs: the quick sweep.
 saves and `.QD` images (parts 1-3), three hardware-answered test disks
 passing, 299 games swept. Open: item 21.
 
-### The VRC7 and its FM sound (2026-10-27, branch `vrc7`)
+### The VRC7 and its FM sound (2026-10-27)
 
 **Pins.** ym2413-python @ 5a826ac (local; not yet on GitHub), its DS1001 judged there
 against Nuked-OPLL on every internal cycle (rungs 0-3, including three minutes of
@@ -1600,3 +1600,16 @@ CPU), and the expansion level is its MO words averaged over its last sample;
 VRC7 is emu2413, a different model, where the core's judge is the die's. *Lagrange
 Point* in game runs at 23.4 frames/s on PyPy (0.39x real time): the FM chip, run
 cycle by cycle, is most of it.
+
+### Milestone 10, part 1: the RP2A07's APU tables (2026-10-27)
+
+**What was built.** The tables that differ between the RP2A03 and the RP2A07,
+as one value per CPU (`apu.TABLES`, `Machine.apu_tables`): the PAL noise periods
+(APU_Noise.wiki), DMC rates (APU_DMC.wiki) and frame-counter steps
+(APU_Frame_Counter.wiki: 8313, 16627, 24939, then 33252-33254 in four-step mode
+and 41565-41566 in five-step). The Dendy keeps the NTSC tables on PAL timing.
+
+**Judge** (`scripts/run_test_roms.py --suite pal`, `tests/test_pal_test_roms.py`):
+blargg's `pal_apu_tests`, "tested on a PAL NES and all give a passing result"
+(their readme; hardware-corrected). Before: 3 of 10 on the PAL row (the NTSC tables);
+after: **10 of 10**. The NTSC APU suite is unchanged, 38 of 38.

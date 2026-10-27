@@ -137,6 +137,10 @@ class Machine:
     # to 0 when nothing drives them (Controller_reading.wiki "Unconnected data
     # lines"): the Famicom's $4016 D3-D4, the NES-101's $4016 D2.
     pad_open_bus: tuple[int, int] = (0, 0)
+    # The APU's noise, DMC and frame-counter tables (apu.TABLES): "PAL" on the
+    # RP2A07; the Dendy's UMC CPU keeps the NTSC ones on PAL timing
+    # (docs/undocumented-behavior.md, CPU revisions).
+    apu_tables: str = "NTSC"
     certified: bool = True
 
 
@@ -200,6 +204,7 @@ PAL_NES = Machine(
     joypad_oe_per_cycle=False,
     famicom_audio_through_cart=False,
     dmc_unexpected_reload_bug=False,
+    apu_tables="PAL",
     certified=False,
 )
 

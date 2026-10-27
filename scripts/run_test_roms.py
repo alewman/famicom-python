@@ -22,6 +22,7 @@ from famicom_python.testrom import (
     CPU_ROMS,
     FDS_ROMS,
     MAPPER_ROMS,
+    PAL_ROMS,
     PPU_ROMS,
     RomCase,
     RomOutcome,
@@ -37,6 +38,7 @@ SUITES = {
     "apu": APU_ROMS,
     "mappers": MAPPER_ROMS,
     "fds": FDS_ROMS,
+    "pal": PAL_ROMS,
 }
 
 
