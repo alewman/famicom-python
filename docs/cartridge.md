@@ -283,6 +283,7 @@ nf = `tests/test_roms/nesdev-forum/`.
 | **9 / 10** MMC2 / MMC4 | CHR 4K×2 latched pairs | H/V | — | latch flips *after* the trigger read | HM (no latch-timing ROM) |
 | **118** TxSROM | MMC3 | CHR A17 → CIRAM A10 | MMC3 | | HM |
 | **24/26** VRC6 | PRG 16K + 8K + fixed; CHR 1K×8 | H/V/1sc | VRC IRQ | 26 swaps A0/A1; sound (milestone 8) | NewRisingSun's `VRC6TEST`/`VRC6TESA` with hardware recordings (nesdev-forum/16910.html; archive.org's copy pinned 2026-10-26, `scripts/nrs_recordings.py`); rainwarrior's `db_vrc6a`/`b` for the level |
+| **85** VRC7 | PRG 8K×3 + fixed; CHR 1K×8 | H/V/1sc | VRC IRQ | 85.1 VRC7b (A3), 85.2 VRC7a (A4); FM sound (ym2413-python's DS1001) | rainwarrior's `db_vrc7` for the level |
 | **85** VRC7 | PRG 8K×3 + fixed; CHR 1K×8 | H/V/1sc | VRC IRQ | 85.1 A3, 85.2 A4; OPLL audio | none for banking |
 | **30** UNROM-512 (homebrew) | 16K + fixed; CHR-RAM 8K×4 | header/register | — | self-flash save; submappers redefined 2026-09-26 | none |
 

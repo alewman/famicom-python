@@ -17,7 +17,7 @@ other 82 each with its cause (docs/validation.md, milestone 7), and
 milestone 8: a window to play in (`famicom-python play`), the Famicom's
 sound path with the VRC6's, MMC5's and Namco 163's sound at their measured
 levels (checked against NewRisingSun's recordings of thirteen carts), its microphone and expansion-port pads, and UNROM 512 for homebrew
-(34 mappers, 95.8 % of licensed dumps). Milestone 9, the Famicom Disk
+(35 mappers with the VRC7 and its FM sound from ym2413-python, 96.0 % of licensed dumps). Milestone 9, the Famicom Disk
 System: the RAM adapter, its drive, sound, disk changes and saves, `.fds` and
 `.qd` images through Nintendo's BIOS (yours: `FAMICOM_FDS_BIOS`), judged by
 three FDS test disks with hardware answers; 290 of 299 licensed disks give

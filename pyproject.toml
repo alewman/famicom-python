@@ -16,6 +16,8 @@ authors = [{ name = "alewman" }]
 # per-CPU ANE/LXA constants #6, dma_stalled and note_stall #7, CPUFrame #8).
 dependencies = [
     "6502-python @ git+https://github.com/alewman/6502-python@9dc34bd74ca86773fe5c1df8d2a16b87a2ad0c29",
+    # The VRC7's sound (mapper 85). Not yet on GitHub: installed from a local checkout.
+    "ym2413-python @ git+https://github.com/alewman/ym2413-python@5a826ac",
 ]
 
 [project.optional-dependencies]

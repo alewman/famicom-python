@@ -8,6 +8,8 @@ against Mesen2, a detector. The VRC6's sound level is rainwarrior's
 
 from __future__ import annotations
 
+from ym2413_python import DS1001, OPLL
+
 from .banked import HORIZONTAL, SCREEN_A, SCREEN_B, VERTICAL, Banked
 from .connector import expansion_gain
 from .ines import RomImage
@@ -431,3 +433,107 @@ class VRC6(VRCIrq, Banked):
                 self.map_chr(window, 1, r[window])
             two(4, r[4])
             two(6, r[5])
+
+
+#: The VRC7's level, measured: a full-volume square-like custom instrument +11.3 dB
+#: against a full-volume APU square (rainwarrior's db_vrc7 on an AV Famicom,
+#: nesdev-forum/17741.html; James-F +10.88 dB on an HVC-CPU-07). The gain below is
+#: fitted so db_vrc7 measures that through the board (scripts/expansion_levels.py):
+VRC7_DB = 11.3
+#: 468.8: db_vrc7's tone in summed MO words (one sample's 18), in RMS terms.
+VRC7_GAIN = expansion_gain(VRC7_DB, 1) / 468.8
+#: The sound's own resonator runs at 3.58 MHz, twice the NTSC CPU clock but not
+#: locked to it (VRC7_audio.wiki): taken here as two of its clocks per CPU cycle.
+FM_CLOCKS_PER_CPU_CYCLE = 2
+FM_CPU_CYCLES_PER_SAMPLE = 72 // FM_CLOCKS_PER_CPU_CYCLE
+
+#: The address line that selects a VRC7 register's second half, by submapper
+#: (VRC7.wiki): VRC7b A3 ($x008, *Tiny Toon Adventures 2*), VRC7a A4 ($x010,
+#: *Lagrange Point*); submapper 0 answers both.
+VRC7_SELECT = {1: 0x08, 2: 0x10, 0: 0x18}
+
+
+class VRC7(VRCIrq, Banked):
+    """Mapper 85: the VRC7's banking and IRQ (VRC7.wiki).
+
+    - $8000, $8008/$8010, $9000: 8 KiB PRG at $8000, $A000, $C000; the last 8 KiB fixed.
+    - $A000-$D008/$D010: the eight 1 KiB CHR banks, two per $x000 page.
+    - $E000: D7 PRG-RAM enable, D6 sound silenced, D1-D0 vertical, horizontal,
+      one-screen lower, upper.
+    - $E008/$E010 IRQ latch, $F000 control, $F008/$F010 acknowledge (VRC_IRQ.wiki).
+    - $9010 and $9030: the sound chip's address and data ports (VRC7_audio.wiki):
+      the DS1001, a YM2413 derivative, from ym2413-python. It is run lazily, a
+      sample's 72 clocks at a time and before each write, and drives the expansion
+      level with the average of its MO words over its last sample, which the
+      multiplexed DAC's output averages to. $E000 D6 holds it in reset (rainwarrior's
+      db_vrc7: "disable audio (resets LFO)").
+
+    Power-on registers unspecified: 0 here.
+    """
+
+    counts_m2 = True
+    expansion_audio = True
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.select = VRC7_SELECT.get(image.board.submapper, 0x18)
+        self.fm = OPLL(DS1001)
+        self.fm_pending = 0  # CPU cycles the chip has not run yet
+        self.fm_words = [0] * 18  # its last sample's MO words
+        self.prg_ram_enabled = False
+        self.sound_silenced = False
+        self.irq_reset()
+        for window in range(3):
+            self.map_prg(window, 8, 0)
+        self.map_prg(3, 8, len(self.prg) // 0x2000 - 1)
+        for window in range(8):
+            self.map_chr(window, 1, 0)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+            return
+        region, second = address & 0xF000, bool(address & self.select)
+        if region == 0x8000:
+            self.map_prg(1 if second else 0, 8, value & 0x3F)
+        elif region == 0x9000:
+            if not second and not address & 0x30:
+                self.map_prg(2, 8, value & 0x3F)
+            elif address & 0x20 or second:
+                self._run_fm()
+                self.fm.write(1 if address & 0x20 else 0, value)
+        elif 0xA000 <= region <= 0xD000:
+            self.map_chr(((region - 0xA000) >> 11) | second, 1, value)
+        elif region == 0xE000:
+            if second:
+                self.irq_latch = value
+            else:
+                self.prg_ram_enabled = bool(self.prg_ram) and bool(value & 0x80)
+                self._run_fm()
+                if value & 0x40 and not self.sound_silenced:
+                    self.fm.reset()
+                    self.fm_words = [0] * 18
+                    self.audio_out.expansion = 0.0
+                self.sound_silenced = bool(value & 0x40)
+                self.set_mirroring((VERTICAL, HORIZONTAL, SCREEN_A, SCREEN_B)[value & 3])
+        elif region == 0xF000:
+            if second:
+                self.irq_acknowledge()
+            else:
+                self.irq_control(value)
+
+    def m2(self, t: int) -> None:
+        VRCIrq.m2(self, t)
+        self.fm_pending += 1
+        if self.fm_pending >= FM_CPU_CYCLES_PER_SAMPLE:
+            self._run_fm()
+
+    def _run_fm(self) -> None:
+        """Bring the sound chip up to this CPU cycle and the expansion level with it."""
+        pending, self.fm_pending = self.fm_pending, 0
+        if self.sound_silenced or not pending:
+            return
+        self.fm.run(pending * FM_CLOCKS_PER_CPU_CYCLE)
+        words = [mo for mo, _ in self.fm.take_outputs()]
+        self.fm_words = (self.fm_words + words)[-18:]
+        self.audio_out.expansion = sum(self.fm_words) * VRC7_GAIN

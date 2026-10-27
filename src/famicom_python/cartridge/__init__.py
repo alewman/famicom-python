@@ -38,7 +38,7 @@ from .fds_disk import is_fds, is_qd
 from .ines import BoardInfo, RomImage, parse
 from .irem import G101
 from .jaleco import SS88006
-from .konami import VRC1, VRC6, VRC24
+from .konami import VRC1, VRC6, VRC7, VRC24
 from .mmc1 import MMC1, MMC1A
 from .mmc2 import MMC2, MMC4
 from .mmc3 import AA6023, TxSROM, mmc3_for
@@ -75,6 +75,7 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     66: GxROM,
     69: FME7,
     75: VRC1,
+    85: VRC7,
     87: J87,
     118: TxSROM,
     155: MMC1A,
