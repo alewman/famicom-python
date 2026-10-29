@@ -55,6 +55,12 @@ end, emu.eventType.endFrame)
 """
 
 
+def unswap_emphasis(value: int) -> int:
+    """Mesen2 reports PAL emphasis by channel (bits 6 and 7 exchanged); the board's
+    picture keeps $2001's bits as written (machine.Timing.swapped_emphasis)."""
+    return (value & ~0xC0) | (value & 0x40) << 1 | (value & 0x80) >> 1
+
+
 def finished_picture(system: System) -> list[int]:
     """The frame just begun, once its 240 rows are drawn.
 
@@ -93,6 +99,8 @@ def compare(
     machine: Machine = NES_001,
 ) -> int:
     theirs = mesen_frame(rom, frame, seconds, REGIONS[machine.timing.name])
+    if machine.timing.swapped_emphasis:
+        theirs = [[unswap_emphasis(v) for v in row] for row in theirs]
     height, width = len(theirs), len(theirs[0])
     if (width, height) != (256, 240):
         print(f"Mesen2's frame is {width}x{height}; expected 256x240 (overscan settings?)")

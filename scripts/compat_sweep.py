@@ -150,6 +150,12 @@ def mesen_frames(rom: Path, frames: list[int], home: Path, region: int = 1) -> d
     return pictures
 
 
+def unswap_emphasis(value: int) -> int:
+    """Mesen2 reports PAL emphasis by channel (bits 6 and 7 exchanged); the board's
+    picture keeps $2001's bits as written (machine.Timing.swapped_emphasis)."""
+    return (value & ~0xC0) | (value & 0x40) << 1 | (value & 0x80) >> 1
+
+
 def finished_picture(system: System) -> list[int]:
     """The frame just begun, once its 240 rows are drawn (as scripts/mesen_frames.py)."""
     ppu = system.board.ppu
@@ -173,6 +179,8 @@ def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "nes
         os.dup2(null, 1), os.dup2(null, 2)
         try:
             theirs = mesen_frames(rom, frames, Path(home), REGIONS[machine.timing.name])
+            if machine.timing.swapped_emphasis:
+                theirs = {f: [unswap_emphasis(v) for v in p] for f, p in theirs.items()}
         finally:
             os.dup2(saved[0], 1), os.dup2(saved[1], 2)
     result["mesen_seconds"] = round(time.monotonic() - began, 1)

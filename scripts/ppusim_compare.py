@@ -602,12 +602,16 @@ def vbl_race(_pair: Pair, machine: str = "pal") -> None:
         pair.idle(k % 16)
         start = (pair.ours.line, pair.ours.dot)
         first = pair.access(2)
-        pair.idle(3)
+        nmi = []  # /NMI low, each of the next 8 CPU cycles: ours, PPUSim
+        for _ in range(8):
+            pair.idle(1)
+            nmi.append((int(pair.ours.nmi), int(pair.sim.nmi)))
         second = pair.access(2)
-        same = first[0] == first[1] and second[0] == second[1]
+        same = first[0] == first[1] and second[0] == second[1] and all(a == b for a, b in nmi)
         bad += not same
         mark = "" if same else "   <- differ"
-        print(f"  k {k:2d} from {start}: (ours, PPUSim) {first}, {second}{mark}")
+        lines = "".join(str(a) for a, _ in nmi), "".join(str(b) for _, b in nmi)
+        print(f"  k {k:2d} from {start}: (ours, PPUSim) {first}, {second}, NMI {lines}{mark}")
     print(f"vbl_race {machine}: {bad} of 40 differ")
 
 
