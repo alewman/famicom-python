@@ -1713,3 +1713,24 @@ secondary OAM must survive to line 0 (AccuracyCoin "Sprites On Scanline 0").
 `ppusim_compare.py ntsc_oam` and `pal_oam` now agree on every read, the
 pre-render lines (261, 311) included. AccuracyCoin 146 of 146 and the PPU
 suite 42 of 42 are unchanged.
+
+### Milestone 10, part 4: the PAL sweep (2026-10-29)
+
+`compat_sweep.py --machine pal --only Europe`: every licensed No-Intro dump
+with "Europe" in its name whose mapper the board implements, 397 of them, run
+on the PAL row from Mesen2's power-on and compared with Mesen2 2.1.1 in PAL
+mode at frames 60, 300 and 600 (PAL's border, PPUSim's, not compared).
+**382 of 397 identical (96.2 %), no crash.** The 15 that differ, each run to
+its first divergence with `mesen_lockstep.py --machine pal --frames 620`:
+
+| Cause | Dumps | Who is right |
+| --- | --- | --- |
+| Mesen2 reports PAL emphasis by channel (bits 6 and 7 exchanged); the board keeps `$2001`'s bits as written | *Hudson Hawk* | a representation: the comparison now exchanges Mesen2's bits back (`unswap_emphasis`); identical since |
+| The VBL race at (241, 1): a `$2002` poll in the second frame (CPU cycle 58,936 from power-on in all of them) reads the flag set here and clear in Mesen2; later, the NMI entered where the board's was suppressed | *Bayou Billy*, *Blue Shadow*, *Burai Fighter*, *Guerrilla War*, *Krusty's Fun House*; *Bigfoot*, *Airwolf*, *Kickle Cubicle* | the board: it matches PPUSim's 2C07 on the read and on /NMI, cycle by cycle, at all 40 phases (`ppusim_compare.py vbl_race`) |
+| `$2002`'s open-bus bits (the I/O latch, C1): the CPU's control flow agrees, the low bits read differ | *Pizza Pop!*, *IronSword* | neither judged here: Mesen2 decays the latch after 3 frames, the board after blargg's 0.6 s (`ppu_open_bus`, hardware-corrected on NTSC); Mesen2's 3 frames does not reproduce Mesen2's trace either |
+| A `$2007` read during rendering (C31) | *Little Ninja Brothers* | the board follows PPUSim (milestone 6) |
+| The MMC3's IRQ one instruction after Mesen2's (part 3) | *Terminator 2* | open (PPUSim's bus 3 ticks ahead of the board's timestamps) |
+| A few pixels of a mid-frame effect, the CPU in lockstep throughout | *Ice Hockey* (8 pixels of one sprite row, line 54), *North & South* (MMC3, 3 pixels) | open: on *Ice Hockey* PPUSim, at its own alignment, differs from both on the same line, so the line is alignment-sensitive (C45) |
+
+None of the 15 differs on NTSC. `tests/mame_traces/sweep-pal/failures.txt` is
+the PAL quick-sweep list.
