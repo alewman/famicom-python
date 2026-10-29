@@ -653,6 +653,18 @@ MAPPER_ROMS = (
     _vrctest("25s3", "VRC2", "351948", 25, 3),
     _holy("M1_P128K", ("prg_ram", 0x2000)),
     *_RAINWARRIOR,
+    # rainwarrior's 31_test (nesdev-forum t=13120), one build per PRG size: the
+    # power-on bank of $F000 is the last, and every $5FF8-$5FFF register and
+    # its mirrors switch its slot.
+    *(
+        _values(
+            f"31_test_roms.zip/31_test_{kib}.nes",
+            "rainwarrior",
+            f"STARTUP BANK: {kib // 4 - 1:02X}\nHIGHEST BANK: {kib // 4 - 1:02X}",
+            "\n".join(f"$5FF{r:X}: PASS / PASS" for r in range(8, 16)),
+        )
+        for kib in (16, 32, 64, 128, 256, 512, 1024)
+    ),
     *(
         _values("bntest.zip/" + name, "tall", "0123456789ABCDEF", nametables)
         for name, nametables in (

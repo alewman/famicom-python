@@ -1812,3 +1812,28 @@ eyes, so they confirm the board runs its maker's diagnostics end to end
 rather than judging timing. The 240p suite tells the regions apart by
 counting CPU cycles in a frame, which a real console answers by its
 clocks: all three rows answer as theirs.
+
+### Mappers 28 and 31 (2026-10-29)
+
+Two homebrew boards, from their NESdev wiki pages (`Action_53_mapper.wiki`,
+`INES_Mapper_031.wiki`, newly pinned), in `cartridge/homebrew.py`.
+
+- **31, the NSF subset**: rainwarrior's `31_test` (nesdev-forum t=13120) at
+  all seven PRG sizes, 16 KiB to 1 MiB: every register $5FF8-$5FFF and its
+  mirrors PASS, the startup bank the last ($03-$FF). In the mapper suite.
+- **28, Action 53**: tepples's `test28` v0.04 boots through its sanity checks
+  (bus conflicts, the CHR-RAM size, mirroring, warm boot), runs its automated
+  test of all 131,072 combinations of mode, outer bank and inner bank against
+  the mapper's specification and its CHR and mirroring test, and after the
+  reset it asks for prints "PASS! Reset leaves bank unchanged."
+  (`tests/test_mappers_homebrew.py`, slow: the frame pinned by CRC, its
+  proportional font being past the harness's text readers). The 2012
+  `test28` in nes-test-roms reports a bus conflict the 2018 test's own check
+  does not see: an earlier test, superseded.
+- **Against Mesen2**, every Aftermarket dump on 28 or 31 (`compat_sweep.py
+  --aftermarket --mappers 28,31`): **40 of 43 identical**. *Filthy Kitchen*:
+  at its first NMI Mesen2 fetches the vector from a different bank ($0000)
+  after the same register writes; the board passes test28's exhaustive check
+  against the specification. *Kart Racer '86*: the CPU in lockstep for 620
+  frames, a picture-only difference not yet looked at. *Super Strife*: Mesen2
+  takes an interrupt at line 248 the board does not; not yet traced.

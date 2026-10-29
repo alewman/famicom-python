@@ -4499,5 +4499,23 @@
   "kind": "live-forum",
   "license": "NESdev forum thread (authors' copyright)",
   "note": "loopy's FDS modulator unit notes"
+ },
+ {
+  "path": "reference/nesdev-wiki/Action_53_mapper.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=Action_53_mapper&action=raw",
+  "sha256": "681f164fef6b79b90238eca967676150e9d06491e0e4472afefe471f1df0410c",
+  "size": 11241,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: Action_53_mapper (mappers 28 and 31)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_031.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_031&action=raw",
+  "sha256": "d559f4f105de0c0b0e7e135eee9bacc55cc75db9cd8be9d2886537c167cddfbf",
+  "size": 2537,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_031 (mappers 28 and 31)"
  }
 ]
