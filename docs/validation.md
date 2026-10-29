@@ -1788,3 +1788,27 @@ NTSC, against Mesen2, which writes at v) found 248 identical; all 8 that
 differ differ the same way with the old rule restored, so the change moved
 no game in the sample. Rerun on the latch model (1150bf0): the same 248
 identical and the same 8 differing.
+
+### The test carts (2026-10-29)
+
+No-Intro's "(Program)" and "(Test Program)" dumps had been left out of every
+sweep (`classify` files them apart from the licensed ones).
+`compat_sweep.py --programs`: the 92 whose mapper the board implements
+(Nintendo's service carts, the 240p Test Suite's builds, homebrew tools) against
+Mesen2 at frames 60, 300 and 600: **90 identical**; *NESOS* `[b]` (a bad dump)
+and *Demo Vision* (a kiosk BIOS) differ, not yet looked at.
+
+The self-checking ones, driven through their screens with the pads
+(scratch scripts; screenshots not kept):
+
+| Cart | Its own verdict on the board |
+| --- | --- |
+| Nintendo NTF2 Test Cartridge v1.1, AUTO TEST | PCB test: VIDEO RAM **PASS**, WORK RAM **PASS**; the controller test sees every button of both pads and steps on; sound and colour tests for eyes and ears |
+| Nintendo World Class Service Control Deck Test Cartridge | VIDEO RAM (U4) **OK**, WORK RAM (U1) **OK**; controller, sprite, colour bars, grid and dot screens, then END OF TEST |
+| 240p Test Suite v0.21 | its menu names the console it measured: **NTSC** on the NES-001, **PAL** on the PAL row, **Dendy** on the Dendy row |
+
+Nintendo's carts check RAM and wiring and leave the rest to a technician's
+eyes, so they confirm the board runs its maker's diagnostics end to end
+rather than judging timing. The 240p suite tells the regions apart by
+counting CPU cycles in a frame, which a real console answers by its
+clocks: all three rows answer as theirs.
