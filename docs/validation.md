@@ -1786,4 +1786,5 @@ nametable untouched where the idealised latch would. AccuracyCoin 146 of
 Games: a sample sweep (`compat_sweep.py --every 10`, 256 licensed dumps,
 NTSC, against Mesen2, which writes at v) found 248 identical; all 8 that
 differ differ the same way with the old rule restored, so the change moved
-no game in the sample.
+no game in the sample. Rerun on the latch model (1150bf0): the same 248
+identical and the same 8 differing.
