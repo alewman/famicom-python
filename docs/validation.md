@@ -1767,4 +1767,11 @@ board's write, at the address the bus holds then, the fetch in progress:
 `$1FFC` (a sprite fetch's), not v. The board wrote at v; it now writes at
 `_fetch_address` of that dot (the next even one), 15 of 15 with PPUSim.
 AccuracyCoin 146 of 146, the PPU suite 42 of 42, the mapper suite 83 of 83
-unchanged. Visual 2C02 has not been asked.
+unchanged. Visual 2C02 (`scripts/visual2c02/compare.py write2007`, `WRITE_DOT`
+162, 166, 170 on line 1, $2000-$203F and $23C0-$23C7 read back): it and
+PPUSim agree there, $AB in neither the nametable nor the attributes (the bus
+held a pattern fetch's address, into CHR), where the board's write in that
+harness hit a nametable byte at 162 and 170. That harness times the CPU's
+access its own way (the /DBE window of Visual 2C02's cpucmd.js) and the
+board's CHR is ROM there, so this neither confirms nor refutes the rule; it
+needs a scenario whose write lands in CIRAM on all three. Open.
