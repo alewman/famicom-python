@@ -653,6 +653,45 @@ def pal_fetches(_pair: Pair) -> None:
 
 
 EXPERIMENTS["pal_fetches"] = pal_fetches
+
+
+def write2007(_pair: Pair) -> None:
+    """Open item 8: a $2007 write while rendering. At dots spread along line 50
+    (rendering on), $2007 = $AB; where each PPU's /WR lands (address, and in
+    which dot), ours against PPUSim."""
+    for start in range(4, 340, 23):
+        pair = Pair()
+        setup_picture(pair)
+        pair.to_line(261, 100)
+        scroll_zero(pair)
+        pair.write(1, 0x1E)
+        writes: list[tuple[int, int, int]] = []
+        ppu = pair.ours
+        inner = ppu.bus_write
+
+        def logged(address: int, value: int, inner=inner, ppu=ppu, writes=writes) -> None:
+            writes.append((ppu.time, address & 0x3FFF, value))
+            inner(address, value)
+
+        ppu.bus_write = logged  # type: ignore[method-assign]
+        pair.to_line(50, start)
+        pair.trace(True)
+        pair.write(7, 0xAB)
+        pair.idle(6)
+        pair.trace(False)
+        sim, low = [], False
+        for e in pair.sim_trace():
+            wr = bool(e.pins & 4)
+            if wr and not low:
+                sim.append((pair.half_to_time(e.half), e.address, e.v, e.h))
+            low = wr
+        ours = [(t, f"{a:04X}") for t, a, _ in writes]
+        theirs = [(t, f"{a:04X}", f"({v},{h})") for t, a, v, h in sim]
+        same = [a for _, a in ours] == [a for _, a, _ in theirs]
+        print(f"  dot {start:3d}: ours {ours} PPUSim {theirs}{'' if same else '   <- differ'}")
+
+
+EXPERIMENTS["write2007"] = write2007
 EXPERIMENTS["pal_oam"] = pal_oam
 
 

@@ -583,7 +583,11 @@ before the board takes a side.
    care.
 7. The palette-read corruption alignment, and whether 2C02G's "two variants"
    (PCLK distribution, `PPUSim ppu.h` l.149) change anything modelled.
-8. What a $2007 *write* during rendering writes, and where.
+8. What a $2007 *write* during rendering writes, and where: *settled on
+   PPUSim* (2026-10-29): the value, at the address the fetch in progress puts
+   on the bus (nametable, attribute, pattern, or a sprite fetch's), not at v,
+   in the same dot as before (`ppusim_compare.py write2007`, 15 dots along a
+   rendered line, all agreeing). Visual 2C02 not yet asked.
 9. 2C02H differences from G; the E-and-earlier OAM evaluation bugs.
 10. PAL/Dendy VBL clear timing: *settled on PPUSim* (milestone 10: the
     2C07 and the UA6538 both clear VBL on (311, 1)). PAL APU beyond the
