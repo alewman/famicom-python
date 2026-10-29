@@ -1775,3 +1775,8 @@ harness hit a nametable byte at 162 and 170. That harness times the CPU's
 access its own way (the /DBE window of Visual 2C02's cpucmd.js) and the
 board's CHR is ROM there, so this neither confirms nor refutes the rule; it
 needs a scenario whose write lands in CIRAM on all three. Open.
+
+Games: a sample sweep (`compat_sweep.py --every 10`, 256 licensed dumps,
+NTSC, against Mesen2, which writes at v) found 248 identical; all 8 that
+differ differ the same way with the old rule restored, so the change moved
+no game in the sample.
