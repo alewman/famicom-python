@@ -18,6 +18,11 @@ board's frame either side is tried as well and reported if it is closer.
 the licensed ones; ``--every N`` keeps one dump in N, in name order.
 
     nice pypy3 scripts/compat_sweep.py --fds --frames 1200,2400 --slack 12 --jobs 12
+    nice pypy3 scripts/compat_sweep.py --machine pal --only Europe --out PAL.jsonl
+
+``--machine pal`` runs both on PAL (Mesen2's region, the board's PAL row on
+Mesen2's power-on, ``mesen_lockstep.lockstep_machine``), PAL's border left out
+of the comparison (the board's is PPUSim's, docs/validation.md milestone 10).
 
 ``--fds`` sweeps the licensed Famicom Disk System dumps (milestone 9): both
 sides get the BIOS (FAMICOM_FDS_BIOS or No-Intro's) and neither changes disks
@@ -46,8 +51,8 @@ import zipfile
 from pathlib import Path
 
 from count_mappers import BASE, classify
-from mesen_lockstep import MACHINE, mesen_path
-from mesen_run import ROOT, run_mesen
+from mesen_lockstep import lockstep_machine, mesen_path
+from mesen_run import REGIONS, ROOT, run_mesen
 
 from famicom_python.cartridge import MAPPERS, fds_bios
 from famicom_python.ppu import HEIGHT
@@ -122,7 +127,7 @@ def licensed_dumps(
     return found
 
 
-def mesen_frames(rom: Path, frames: list[int], home: Path) -> dict[int, list[int]]:
+def mesen_frames(rom: Path, frames: list[int], home: Path, region: int = 1) -> dict[int, list[int]]:
     if rom.name.lower().endswith((".fds", ".fds.zip")) or rom.parent.name == FDS_SET:
         (home / "Firmware").mkdir(exist_ok=True)
         (home / "Firmware" / "disksys.rom").write_bytes(fds_bios())
@@ -135,6 +140,7 @@ def mesen_frames(rom: Path, frames: list[int], home: Path) -> dict[int, list[int
         home=home,
         until="DONE",
         for_comparison=True,
+        region=region,
     )
     pictures = {}
     for line in log.splitlines():
@@ -152,8 +158,12 @@ def finished_picture(system: System) -> list[int]:
     return list(ppu.picture)
 
 
-def check(rom: Path, frames: list[int], slack: int = 1) -> dict:
+def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "nes") -> dict:
     result: dict = {"rom": rom.name, "set": rom.parent.name}
+    machine = lockstep_machine(machine_name, None)
+    border = machine.timing.border
+    # PAL's border (line 0, x 0-1 and 254-255) is not compared.
+    keep = [i for i in range(PIXELS) if not (border and (i < 256 or i % 256 in (0, 1, 254, 255)))]
     began = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="mesen-home-") as home:
         # A fresh home each run: Mesen2 keeps battery saves there. Its own log
@@ -162,12 +172,12 @@ def check(rom: Path, frames: list[int], slack: int = 1) -> dict:
         null = os.open(os.devnull, os.O_WRONLY)
         os.dup2(null, 1), os.dup2(null, 2)
         try:
-            theirs = mesen_frames(rom, frames, Path(home))
+            theirs = mesen_frames(rom, frames, Path(home), REGIONS[machine.timing.name])
         finally:
             os.dup2(saved[0], 1), os.dup2(saved[1], 2)
     result["mesen_seconds"] = round(time.monotonic() - began, 1)
     try:
-        system = System.from_rom(rom, MACHINE)
+        system = System.from_rom(rom, machine)
     except NotImplementedError as error:
         return result | {"status": "unsupported", "error": str(error)}
     board = system.loaded.image.board
@@ -187,9 +197,7 @@ def check(rom: Path, frames: list[int], slack: int = 1) -> dict:
                 report.append({"frame": frame, "error": "Mesen2 gave no 256x240 frame"})
                 continue
             want = theirs[frame]
-            counts = {
-                c: sum(a != b for a, b in zip(ours[c], want, strict=True)) for c in candidates
-            }
+            counts = {c: sum(ours[c][i] != want[i] for i in keep) for c in candidates}
             best = min(counts, key=lambda c: (counts[c], c != same))
             entry = {"frame": frame, "diff": counts[same]}
             if counts[best] < counts[same]:
@@ -223,10 +231,10 @@ def save_diff(path: Path, ours: list[int], theirs: list[int]) -> None:
     )
 
 
-def worker(job: tuple[str, list[int], int]) -> str:
-    rom, frames, slack = job
+def worker(job: tuple[str, list[int], int, str]) -> str:
+    rom, frames, slack, machine = job
     try:
-        return json.dumps(check(Path(rom), frames, slack))
+        return json.dumps(check(Path(rom), frames, slack, machine))
     except BaseException as error:  # recorded; the sweep goes on
         return json.dumps({"rom": Path(rom).name, "status": "error", "error": repr(error)})
 
@@ -243,6 +251,7 @@ def main() -> int:
     parser.add_argument("--fds", action="store_true", help="the licensed FDS set instead")
     parser.add_argument("--slack", type=int, default=1, help="board frames tried either side")
     parser.add_argument("--list", type=Path, help="only the dumps named in this file")
+    parser.add_argument("--machine", choices=("nes", "pal"), default="nes")
     args = parser.parse_args()
     frames = sorted(int(f) for f in args.frames.split(","))
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -262,7 +271,7 @@ def main() -> int:
     # One process per dump: MesenCore keeps global state between loads.
     context = multiprocessing.get_context("spawn")
     with context.Pool(args.jobs, maxtasksperchild=1) as pool, args.out.open("a") as out:
-        jobs = [(str(r), frames, args.slack) for r in roms]
+        jobs = [(str(r), frames, args.slack, args.machine) for r in roms]
         for count, line in enumerate(pool.imap_unordered(worker, jobs), 1):
             out.write(line + "\n")
             out.flush()
