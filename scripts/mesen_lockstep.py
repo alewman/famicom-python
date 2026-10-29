@@ -71,6 +71,8 @@ MACHINE = replace(
 # swept as NTSC's 4 was (``--ppu-dot``, ``--ppu-ticks``), the only start that
 # keeps Super Mario Bros. (Europe) in step (docs/validation.md milestone 10).
 PAL_POWER_ON = {"ppustatus": 0x00, "dmc_timer": 198, "ppu_dot": 4, "ppu_ticks": 2}
+# The Dendy: NTSC's DMC table (its UMC CPU's), the PPU start swept the same way.
+DENDY_POWER_ON = {"ppustatus": 0x00, "dmc_timer": 213, "ppu_dot": 4, "ppu_ticks": 0}
 DOTS, LINES = 341, 262
 
 
@@ -81,6 +83,9 @@ def lockstep_machine(name: str, ppu_dot: int | None, ppu_ticks: int | None = Non
     elif name == "pal":
         base = MACHINES["pal"]
         machine = replace(base, power_on=replace(base.power_on, **PAL_POWER_ON))
+    elif name == "dendy":
+        base = MACHINES["dendy"]
+        machine = replace(base, power_on=replace(base.power_on, **DENDY_POWER_ON))
     else:
         raise SystemExit(f"no Mesen2 power-on for {name}")
     if ppu_dot is not None:
@@ -254,7 +259,7 @@ def main() -> int:
         action="store_true",
         help="pass over a register differing only after a rendering-time $2007 read (C31)",
     )
-    parser.add_argument("--machine", choices=("nes", "pal"), default="nes")
+    parser.add_argument("--machine", choices=("nes", "pal", "dendy"), default="nes")
     parser.add_argument("--ppu-dot", type=int, help="the board's power-on PPU dot (a sweep)")
     parser.add_argument("--ppu-ticks", type=int, help="... and master ticks into it (PAL)")
     args = parser.parse_args()

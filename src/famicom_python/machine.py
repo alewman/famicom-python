@@ -74,8 +74,10 @@ PAL = Timing(
     swapped_emphasis=True,
     ppu_access_ticks=9,
 )
-# The Dendy's VBL line (its 51 post-render lines) is UNVERIFIED here: it is a row
-# for later, not a certified machine.
+# The Dendy's VBL line (its 51 post-render lines): PPUSim's UMC UA6538 sets VBL
+# on (291, 1) and clears it on (311, 1), 20 lines (docs/validation.md
+# milestone 10, part 5). Not a certified machine: its DMC timing and pad
+# clocking are unverified (docs/undocumented-behavior.md open item 22).
 DENDY = Timing(
     "Dendy",
     26.601712e6,
