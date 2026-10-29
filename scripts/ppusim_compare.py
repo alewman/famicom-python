@@ -656,39 +656,32 @@ EXPERIMENTS["pal_fetches"] = pal_fetches
 
 
 def write2007(_pair: Pair) -> None:
-    """Open item 8: a $2007 write while rendering. At dots spread along line 50
-    (rendering on), $2007 = $AB; where each PPU's /WR lands (address, and in
-    which dot), ours against PPUSim."""
-    for start in range(4, 340, 23):
+    """Open item 8: a $2007 write while rendering. $2007 = $AB on line 50
+    (rendering on), from 24 consecutive start dots (every CPU/fetch phase); the
+    bytes it changed in $2000-$2FFF, ours against PPUSim. Pattern-table
+    landings are not seen: the CHR is ROM."""
+    bad = 0
+    for start in range(100, 124):
         pair = Pair()
         setup_picture(pair)
         pair.to_line(261, 100)
         scroll_zero(pair)
         pair.write(1, 0x1E)
-        writes: list[tuple[int, int, int]] = []
-        ppu = pair.ours
-        inner = ppu.bus_write
-
-        def logged(address: int, value: int, inner=inner, ppu=ppu, writes=writes) -> None:
-            writes.append((ppu.time, address & 0x3FFF, value))
-            inner(address, value)
-
-        ppu.bus_write = logged  # type: ignore[method-assign]
         pair.to_line(50, start)
-        pair.trace(True)
-        pair.write(7, 0xAB)
+        pair.idle(3)
+        before = {a: (pair.ours.bus_read(a), pair.sim.bus_read(a)) for a in range(0x2000, 0x3000)}
+        pair.access(7, 0xAB)
+        access = (pair.ours.line, pair.ours.dot)
         pair.idle(6)
-        pair.trace(False)
-        sim, low = [], False
-        for e in pair.sim_trace():
-            wr = bool(e.pins & 4)
-            if wr and not low:
-                sim.append((pair.half_to_time(e.half), e.address, e.v, e.h))
-            low = wr
-        ours = [(t, f"{a:04X}") for t, a, _ in writes]
-        theirs = [(t, f"{a:04X}", f"({v},{h})") for t, a, v, h in sim]
-        same = [a for _, a in ours] == [a for _, a, _ in theirs]
-        print(f"  dot {start:3d}: ours {ours} PPUSim {theirs}{'' if same else '   <- differ'}")
+        changed = [
+            [(f"{a:04X}", ppu.bus_read(a)) for a in before if ppu.bus_read(a) != before[a][i]]
+            for i, ppu in enumerate((pair.ours, pair.sim))
+        ]
+        ours, sim = changed
+        bad += ours != sim
+        mark = "" if ours == sim else "   <- differ"
+        print(f"  access {access}: ours {ours} PPUSim {sim}{mark}")
+    print(f"write2007: {bad} of 24 differ")
 
 
 EXPERIMENTS["write2007"] = write2007

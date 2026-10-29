@@ -584,10 +584,16 @@ before the board takes a side.
 7. The palette-read corruption alignment, and whether 2C02G's "two variants"
    (PCLK distribution, `PPUSim ppu.h` l.149) change anything modelled.
 8. What a $2007 *write* during rendering writes, and where: *settled on
-   PPUSim* (2026-10-29): the value, at the address the fetch in progress puts
-   on the bus (nametable, attribute, pattern, or a sprite fetch's), not at v,
-   in the same dot as before (`ppusim_compare.py write2007`, 15 dots along a
-   rendered line, all agreeing). Visual 2C02 not yet asked.
+   PPUSim with the board's octal latch* (2026-10-29). /WR goes out while the
+   fetches run, and the 74LS373, open while ALE is high, takes whatever AD
+   carries: landing on a fetch's ALE dot, that fetch's address gets its own
+   low byte; on a /RD dot, the next ALE latches the CPU's data as the low byte
+   under the next fetch's high byte, and the data goes there (`$20AB`,
+   `$23AB` for `$AB`). The board models it (`PPU._write_2007`,
+   `_ale_address`); PPUSim agrees at all 336 start dots of a rendered line
+   (`ppusim_compare.py write2007`). Visual 2C02 cannot judge it: its CHR bus
+   (macros.js `handleChrBus`) latches the internal address at ALE's rising
+   edge rather than modelling a transparent latch on AD.
 9. 2C02H differences from G; the E-and-earlier OAM evaluation bugs.
 10. PAL/Dendy VBL clear timing: *settled on PPUSim* (milestone 10: the
     2C07 and the UA6538 both clear VBL on (311, 1)). PAL APU beyond the

@@ -416,12 +416,14 @@ def write2007() -> Schedule:
     """Open item 8: $2007 = $AB at line 1, dot 170, rendering on from the
     pre-render line (scroll 0): the bus then holds a nametable fetch's address
     in row 0, where v points into CHR. Rendering off on line 2, then
-    $2000-$203F and $23C0-$23C7 read back: where did $AB land?"""
+    $20A8-$20AF, $23A8-$23AF and $23C0-$23C7 read back: where did $AB land?
+    (On PPUSim it lands at the next fetch's high byte | $AB: the octal latch
+    takes the CPU's data off AD while /WR is low.)"""
     s = Schedule()
     s.write(1, 0x0A)
     s.write(7, 0xAB, at(1, int(os.environ.get("WRITE_DOT", "170"))))
     s.write(1, 0x00, at(2, 10))
-    for high, low, count in ((0x20, 0x00, 64), (0x23, 0xC0, 8)):
+    for high, low, count in ((0x20, 0xA8, 8), (0x23, 0xA8, 8), (0x23, 0xC0, 8)):
         s.write(6, high)
         s.write(6, low)
         s.read(7)  # the buffer's stale byte

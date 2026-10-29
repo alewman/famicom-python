@@ -1760,21 +1760,28 @@ the PAL quick-sweep list.
 
 ### A `$2007` write while rendering (2026-10-29)
 
-Open item 8, put to PPUSim (`ppusim_compare.py write2007`): `$2007 = $AB` at 15
-dots spread along a rendered line. PPUSim's /WR lands in the same dot as the
-board's write, at the address the bus holds then, the fetch in progress:
-`$23C9` (an attribute), `$014C` (a background pattern), `$20D8` (a nametable),
-`$1FFC` (a sprite fetch's), not v. The board wrote at v; it now writes at
-`_fetch_address` of that dot (the next even one), 15 of 15 with PPUSim.
-AccuracyCoin 146 of 146, the PPU suite 42 of 42, the mapper suite 83 of 83
-unchanged. Visual 2C02 (`scripts/visual2c02/compare.py write2007`, `WRITE_DOT`
-162, 166, 170 on line 1, $2000-$203F and $23C0-$23C7 read back): it and
-PPUSim agree there, $AB in neither the nametable nor the attributes (the bus
-held a pattern fetch's address, into CHR), where the board's write in that
-harness hit a nametable byte at 162 and 170. That harness times the CPU's
-access its own way (the /DBE window of Visual 2C02's cpucmd.js) and the
-board's CHR is ROM there, so this neither confirms nor refutes the rule; it
-needs a scenario whose write lands in CIRAM on all three. Open.
+Open item 8, put to PPUSim with the shim's octal latch (a transparent
+74LS373 on AD, as on the NES-001). /WR goes out while the rendering fetches
+run, and what lands where depends on the fetch dot it lands on (the board's
+write delay, 3 dots after the access):
+
+- a fetch's ALE dot: AD carries that fetch's address, the latch takes it,
+  and the address's own low byte is written there (`$23C9` <- `$C9`,
+  `$20C5` <- `$C5`);
+- a fetch's /RD dot: the CPU's data sits on AD when the next ALE opens the
+  latch, so it lands under the next fetch's high byte with itself as the low
+  byte (`$20AB` and `$23AB` <- `$AB`); pattern fetches send it into CHR.
+
+`ppusim_compare.py write2007` (24 consecutive starts, every phase) and a
+sweep of all 336 start dots of a line, the bytes changed in $2000-$2FFF:
+**all agree**. (A first fix, 5bdb1b6, wrote the CPU's value at the fetch
+address that /WR began on; PPUSim's memory showed otherwise.) Visual 2C02
+cannot judge this: its CHR bus (`macros.js` `handleChrBus`) latches the
+PPU's internal 14-bit address on ALE's rising edge and stores the data bus at
+/WR's rising edge, an idealised latch, and the `write2007` scenario
+(`scripts/visual2c02/compare.py`) shows only that both dies leave the
+nametable untouched where the idealised latch would. AccuracyCoin 146 of
+146, the PPU suite 42 of 42, the mapper suite 83 of 83 unchanged.
 
 Games: a sample sweep (`compat_sweep.py --every 10`, 256 licensed dumps,
 NTSC, against Mesen2, which writes at v) found 248 identical; all 8 that
