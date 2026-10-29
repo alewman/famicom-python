@@ -644,7 +644,11 @@ before the board takes a side.
     FDS-Audio-Registers' answer (a video, not fetched); the sound's open
     claims (C42, C43); FDS-4023-Test (its answer is a video too); the drive's
     timing (C39); a sweep of the FDS sets (smoke first).
-22. **PAL, after milestone 10.** The 2A07's DMA halts only on opcode fetches
+22. **PAL and the Dendy, after milestone 10.** The Dendy: its UA6527P's DMC
+    timing (samples ending one APU cycle later, both DMA bugs; DMA.wiki) is
+    not modelled, and whether its pads clock on every read cycle (the row's
+    Famicom-style assumption) or once (Mesen2's NES behaviour) is not known.
+    PAL: The 2A07's DMA halts only on opcode fetches
     (part 3), at the specification tier: BreakingNESWiki's 2A07 page leaves
     RDY "TBD". Mapper IRQs land one instruction after Mesen2's at some
     phases (part 3: PPUSim's bus is 3 master ticks ahead of the board's

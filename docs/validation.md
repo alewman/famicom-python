@@ -1734,3 +1734,26 @@ its first divergence with `mesen_lockstep.py --machine pal --frames 620`:
 
 None of the 15 differs on NTSC. `tests/mame_traces/sweep-pal/failures.txt` is
 the PAL quick-sweep list.
+
+### Milestone 10, part 5: the Dendy, a first look (2026-10-29)
+
+- **PPUSim's UMC UA6538** (the shim's third revision): VBL set on (291, 1) and
+  cleared on (311, 1), 20 lines, in a 312-line frame: the Dendy row's timing,
+  which had been marked unverified.
+- **Mesen2 2.1.1 in Dendy mode**: *Super Mario Bros.*, *Zelda*, *Mega Man 2*
+  and *Super Mario Bros. 3* (USA dumps) give its frame 600 exactly. Lockstep,
+  1,500 frames, from Mesen2's power-on (the PPU 4 dots in, swept; no sub-dot
+  offset at 3 dots a CPU cycle; the NTSC DMC table): *SMB*, *Zelda*, *Mega
+  Man 2*, *Battletoads* and *DuckTales* identical (16.5-21.1 million
+  instructions each).
+- *Kirby's Adventure* diverges at a `$4017` read under DMC DMA: the board's
+  Dendy clocks the pad on every read cycle, as the Famicom it copies; Mesen2
+  chooses NES behaviour by its console-type setting, not by region. With the
+  board's Dendy set to NES behaviour, *Kirby* is identical for all
+  16,974,685 instructions. Which one a Dendy does, nothing here says
+  (Famicom-style is the row's assumption, unverified).
+- *Super Mario Bros. 3*: `$2002`'s open-bus bits (as on PAL);
+  *Castlevania III*: the MMC5's IRQ an instruction after Mesen2's (as on PAL).
+- Not modelled: the UA6527P's DMC samples ending one APU cycle later, with
+  both DMA bugs (DMA.wiki "Bugs", from clone results); no test or detector
+  here exercises it. The Dendy stays uncertified.

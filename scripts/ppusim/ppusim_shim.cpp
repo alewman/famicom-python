@@ -233,10 +233,11 @@ struct Board {
 
 extern "C" {
 
-// pal: the RP2C07-0 (PAL) instead of the RP2C02G.
+// pal: 0 the RP2C02G, 1 the RP2C07-0 (PAL), 2 the UMC UA6538 (the Dendy's).
 void *ppusim_new_revision(const uint8_t *chr, int chr_len, int chr_writable, int vertical,
                           int pal) {
-    auto *b = new Board(pal ? Revision::RP2C07_0 : Revision::RP2C02G);
+    auto *b = new Board(pal == 2 ? Revision::UMC_UA6538
+                        : pal ? Revision::RP2C07_0 : Revision::RP2C02G);
     b->chr.assign(chr, chr + (chr_len > 0 ? chr_len : 0x2000));
     if (chr_len <= 0) std::memset(b->chr.data(), 0, b->chr.size());
     b->chr_writable = chr_writable != 0;
