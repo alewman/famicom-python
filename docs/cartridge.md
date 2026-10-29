@@ -286,6 +286,8 @@ nf = `tests/test_roms/nesdev-forum/`.
 | **85** VRC7 | PRG 8K×3 + fixed; CHR 1K×8 | H/V/1sc | VRC IRQ | 85.1 VRC7b (A3), 85.2 VRC7a (A4); FM sound (ym2413-python's DS1001) | rainwarrior's `db_vrc7` for the level |
 | **85** VRC7 | PRG 8K×3 + fixed; CHR 1K×8 | H/V/1sc | VRC IRQ | 85.1 A3, 85.2 A4; OPLL audio | none for banking |
 | **30** UNROM-512 (homebrew) | 16K + fixed; CHR-RAM 8K×4 | header/register | — | self-flash save; submappers redefined 2026-09-26 | none |
+| **28** Action 53 (homebrew) | 32K, or 16K + fixed, in an outer bank of 32-256K; CHR-RAM 8K×4 | register: 1-screen, V, H | — | the multicart mapper; Action_53_mapper.wiki | none |
+| **31** NSF subset (homebrew) | 4K×8 from $5000-$5FFF | header | — | NSF music compilations; INES_Mapper_031.wiki | none |
 
 Less common licensed mappers (33/48 Taito, 75 VRC1, 32 Irem G-101, 80 Taito
 X1-005, 11 Color Dreams, 71 Codemasters, 34 BNROM/NINA, 28 Action 53, 111
