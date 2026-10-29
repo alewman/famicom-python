@@ -15,7 +15,9 @@ board's frame either side is tried as well and reported if it is closer.
     nice pypy3 scripts/compat_sweep.py --aftermarket --mappers 30 --every 20
 
 ``--aftermarket`` sweeps the Aftermarket set (homebrew, every dump) instead of
-the licensed ones; ``--every N`` keeps one dump in N, in name order.
+the licensed ones, ``--programs`` the test carts and programs (No-Intro's
+"(Program)" and "(Test Program)" dumps, of either set); ``--every N`` keeps one
+dump in N, in name order.
 
     nice pypy3 scripts/compat_sweep.py --fds --frames 1200,2400 --slack 12 --jobs 12
     nice pypy3 scripts/compat_sweep.py --machine pal --only Europe --out PAL.jsonl
@@ -97,7 +99,10 @@ def disk_dumps(only: str | None) -> list[Path]:
 
 
 def licensed_dumps(
-    only: str | None, mappers: set[int] | None = None, aftermarket: bool = False
+    only: str | None,
+    mappers: set[int] | None = None,
+    aftermarket: bool = False,
+    programs: bool = False,
 ) -> list[Path]:
     """Every licensed dump of ``SETS`` (every dump of the Aftermarket set) whose
     header names an implemented mapper (of ``mappers``).
@@ -108,9 +113,11 @@ def licensed_dumps(
     found, seen = [], set()
     for name in [AFTERMARKET] if aftermarket else SETS:
         for path in sorted((BASE / name).glob("*.zip")):
-            if (not aftermarket and classify(path.stem) != "licensed") or (
-                only and not re.search(only, path.stem)
-            ):
+            if programs:
+                wanted = "(Program)" in path.stem or "(Test Program)" in path.stem
+            else:
+                wanted = aftermarket or classify(path.stem) == "licensed"
+            if not wanted or (only and not re.search(only, path.stem)):
                 continue
             with zipfile.ZipFile(path) as archive:
                 members = [n for n in archive.namelist() if n.lower().endswith(".nes")]
@@ -260,6 +267,9 @@ def main() -> int:
     parser.add_argument("--slack", type=int, default=1, help="board frames tried either side")
     parser.add_argument("--list", type=Path, help="only the dumps named in this file")
     parser.add_argument("--machine", choices=("nes", "pal"), default="nes")
+    parser.add_argument(
+        "--programs", action="store_true", help="the test carts and programs instead"
+    )
     args = parser.parse_args()
     frames = sorted(int(f) for f in args.frames.split(","))
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -270,7 +280,7 @@ def main() -> int:
     if args.fds:
         roms = disk_dumps(args.only)[:: args.every]
     else:
-        roms = licensed_dumps(args.only, mappers, args.aftermarket)[:: args.every]
+        roms = licensed_dumps(args.only, mappers, args.aftermarket, args.programs)[:: args.every]
     if args.list:
         wanted = {line.strip() for line in args.list.read_text().splitlines() if line.strip()}
         roms = [r for r in roms if r.name in wanted]
