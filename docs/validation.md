@@ -1757,3 +1757,14 @@ the PAL quick-sweep list.
 - Not modelled: the UA6527P's DMC samples ending one APU cycle later, with
   both DMA bugs (DMA.wiki "Bugs", from clone results); no test or detector
   here exercises it. The Dendy stays uncertified.
+
+### A `$2007` write while rendering (2026-10-29)
+
+Open item 8, put to PPUSim (`ppusim_compare.py write2007`): `$2007 = $AB` at 15
+dots spread along a rendered line. PPUSim's /WR lands in the same dot as the
+board's write, at the address the bus holds then, the fetch in progress:
+`$23C9` (an attribute), `$014C` (a background pattern), `$20D8` (a nametable),
+`$1FFC` (a sprite fetch's), not v. The board wrote at v; it now writes at
+`_fetch_address` of that dot (the next even one), 15 of 15 with PPUSim.
+AccuracyCoin 146 of 146, the PPU suite 42 of 42, the mapper suite 83 of 83
+unchanged. Visual 2C02 has not been asked.

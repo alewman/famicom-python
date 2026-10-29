@@ -1365,6 +1365,12 @@ class PPU:
             self._ale(self.v & 0x3FFF)
 
     def _write_2007(self, v: int, value: int) -> None:
+        if self.rendering_now:
+            # /WR goes out on the bus as it stands: the address of the fetch in
+            # progress, not v (open item 8; PPUSim at 15 dots along a rendered
+            # line, scripts/ppusim_compare.py write2007).
+            dot = self.dot + 1
+            v = self._fetch_address(min(340, max(2, dot + (dot & 1))))
         if v >= 0x3F00:
             self.palette[self.palette_index(v)] = value & 0x3F
         else:
