@@ -860,6 +860,16 @@ class PPU:
             return self._sprite_pattern(line, self._fetch_y) | (8 if phase == 7 else 0)
         return 0x2000 | (v & 0x0FFF)  # 338, 340
 
+    def _ale_address(self, dot: int) -> int:
+        """The address ALE puts out on odd ``dot``, from the state now: the
+        sprite slots' garbage nametable fetches from v as it stands; past the
+        line's end, the idle dot 0's, a background pattern address (PPUSim)."""
+        if dot > 340:
+            return self._bg_pattern(self.v)
+        if 257 <= dot <= 320 and (dot - 257) & 7 in (0, 2):
+            return 0x2000 | (self.v & 0x0FFF)
+        return self._fetch_address(dot + 1)
+
     def _settle(self, high: int, low: int, steps: int) -> int:
         """ALE and /RD at once: the octal latch takes the byte it makes the bus
         read, once per master half-cycle that both last (AccuracyCoin "ALE +
@@ -1366,11 +1376,19 @@ class PPU:
 
     def _write_2007(self, v: int, value: int) -> None:
         if self.rendering_now:
-            # /WR goes out on the bus as it stands: the address of the fetch in
-            # progress, not v (open item 8; PPUSim at 15 dots along a rendered
-            # line, scripts/ppusim_compare.py write2007).
+            # /WR goes out on the bus as it stands, and the octal latch, open
+            # while ALE is high, takes whatever AD carries (open item 8; PPUSim
+            # on every phase, scripts/ppusim_compare.py write2007):
+            # - on a fetch's ALE dot, AD carries that fetch's address: the
+            #   address's own low byte is written there;
+            # - on a fetch's /RD dot, the next ALE latches the CPU's data as the
+            #   low byte under the next fetch's high byte, and the data goes there.
             dot = self.dot + 1
-            v = self._fetch_address(min(340, max(2, dot + (dot & 1))))
+            if dot & 1:
+                v = self._ale_address(dot)
+                value = v & 0xFF
+            else:
+                v = (self._ale_address(dot + 1) & 0x3F00) | value
         if v >= 0x3F00:
             self.palette[self.palette_index(v)] = value & 0x3F
         else:
