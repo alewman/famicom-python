@@ -585,8 +585,10 @@ before the board takes a side.
    (PCLK distribution, `PPUSim ppu.h` l.149) change anything modelled.
 8. What a $2007 *write* during rendering writes, and where.
 9. 2C02H differences from G; the E-and-earlier OAM evaluation bugs.
-10. PAL/Dendy VBL clear timing; PAL APU beyond the frame sequencer (only
-    `pal_apu_tests` exist).
+10. PAL/Dendy VBL clear timing: *settled on PPUSim* (milestone 10: the
+    2C07 and the UA6538 both clear VBL on (311, 1)). PAL APU beyond the
+    frame sequencer: the noise and DMC tables are the die's (milestone 10,
+    part 1); nothing else is pinned.
 11. Per-console analogue presets need recordings (rainwarrior's raw data was
     never published; no NES MDFourier set was found).
 12. FirebrandX's "Composite Direct" palette: the site answered HTTP 465 to our
@@ -615,7 +617,8 @@ before the board takes a side.
     0.8 dB loud and the DMC tone 0.4–1.5 dB loud (validation.md, milestone 3).
     The recording's analogue path is uncharacterised, so this is evidence, not
     a verdict on blargg's formula.
-18. **AccuracyCoin's remaining two**: "$2004 Stress Test" 3 (one byte, dot
+18. **AccuracyCoin's remaining two**: *done 2026-10-26* (146 of 146,
+    validation.md "AccuracyCoin 146 of 146"); kept for the history: "$2004 Stress Test" 3 (one byte, dot
     199, the overflow scan's fourth copy read) and "Misaligned OAM2 Address"
     4, which PPUSim fails as well. The five PPUSim passes are fixed: four
     mid-line toggles (C12) and "$2002 flag timing" 2, where the overflow
