@@ -651,6 +651,7 @@ before the board takes a side.
     timestamps on PAL). The alignment (C45) has
     no hardware answer. `full_palette` on PAL keeps 46 single-pixel
     transients against PPUSim, at palette-write instants. A `$2004` read on
-    the pre-render line's dots 1-64 with rendering on returns $FF on PPUSim
-    (NTSC and PAL alike) and the OAM bus here; no test ROM looks, and Visual
-    2C02 would judge it for NTSC.
+    the pre-render line's dots 1-64 with rendering on: *settled 2026-10-29*,
+    $FF, as Visual 2C02 and PPUSim both drive I/OAM2 there
+    (`scripts/visual2c02/compare.py prerender2004`); the board now returns
+    it, writing nothing to secondary OAM.

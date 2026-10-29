@@ -1700,3 +1700,16 @@ APU suite 38 of 38, AccuracyCoin 146 of 146.
   and the board does not. The board and PPUSim agree on the race at every
   one of 40 phases (`ppusim_compare.py vbl_race`): Mesen2's PAL race is not
   the die's.
+
+### The pre-render line's `$2004` reads (2026-10-29)
+
+Open item 22's NTSC question, put to Visual 2C02: with rendering on, the
+secondary-OAM clear's I/OAM2 is active on the pre-render line's dots 1-64 as
+on a visible line, in Visual 2C02 and PPUSim alike (dots 42-70 traced,
+`scripts/visual2c02/compare.py prerender2004` with `PRERENDER_TRACE=1`;
+inactive from dot 65), so a `$2004` read there returns $FF. The board
+returned the OAM bus; it now returns $FF, and writes nothing, since stale
+secondary OAM must survive to line 0 (AccuracyCoin "Sprites On Scanline 0").
+`ppusim_compare.py ntsc_oam` and `pal_oam` now agree on every read, the
+pre-render lines (261, 311) included. AccuracyCoin 146 of 146 and the PPU
+suite 42 of 42 are unchanged.
