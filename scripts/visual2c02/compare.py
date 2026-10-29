@@ -393,7 +393,27 @@ def overflow9() -> Schedule:
     return s
 
 
+def prerender2004() -> Schedule:
+    """$2004 read on the pre-render line's dots 42-63 with rendering on (open
+    item 22): PPUSim returns $FF there, the board the OAM bus. OAM[0] = $5A and
+    OAMADDR 0, so $5A is the OAM bus and $FF the secondary-OAM clear."""
+    s = Schedule()
+    s.write(3, 0)
+    s.write(4, 0x5A)
+    s.write(3, 0)
+    s.write(1, 0x18)
+    if os.environ.get("PRERENDER_TRACE"):  # no reads: I/OAM2 and the OAM buffer per half-cycle
+        s.signals = (261, 42, 70)
+        s.signal_set = "ob"
+    else:
+        for dot in range(42, 66, 3):
+            s.read(4, at(261, dot))
+    s.end = at(261, 80)
+    return s
+
+
 SCENARIOS = {
+    "prerender2004": prerender2004,
     "copy2004": copy2004,
     "line0_vis": line0_vis,
     "sprite_x": sprite_x,

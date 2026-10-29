@@ -1122,7 +1122,16 @@ class PPU:
             self._drive(value, 0xE0)
             return value
         if register == 4:
-            value = self.oam_bus if self.rendering_now else self.oam[self.oam_addr]
+            if not self.rendering_now:
+                value = self.oam[self.oam_addr]
+            elif self.line == self.prerender_line and 1 <= self.dot <= 64:
+                # The secondary-OAM clear's I/OAM2 forces the OAM buffer to $FF on
+                # the pre-render line too, though nothing is written there (stale
+                # entries reach line 0): Visual 2C02 and PPUSim alike
+                # (scripts/visual2c02/compare.py prerender2004, PRERENDER_TRACE).
+                value = 0xFF
+            else:
+                value = self.oam_bus
             self._drive(value)
             return value
         if register == 7:
