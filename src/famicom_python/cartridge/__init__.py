@@ -35,7 +35,7 @@ from .discrete import (
 )
 from .fds import FDS
 from .fds_disk import is_fds, is_qd
-from .homebrew import NSF31, Action53
+from .homebrew import GTROM, NSF31, Action53
 from .ines import BoardInfo, RomImage, parse
 from .irem import G101
 from .jaleco import SS88006
@@ -80,6 +80,7 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     75: VRC1,
     85: VRC7,
     87: J87,
+    111: GTROM,
     118: TxSROM,
     155: MMC1A,
     157: Datach,

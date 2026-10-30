@@ -27,7 +27,11 @@ else of the board (``tests/test_cartridge_boundary.py`` enforces it).
   open bus (the CPU data latch, or on the PPU side the address's low byte).
   A CPU read that drives only some data lines returns ``driven | undriven <<
   8``, the high byte the mask of lines left to open bus (Bandai's EEPROM
-  port drives D4 alone; added in milestone 7, docs/cartridge.md).
+  port drives D4 alone; added in milestone 7, docs/cartridge.md). A mapper
+  whose register latches the data bus on reads as on writes (GTROM's 74377)
+  sets :attr:`Cartridge.latches_reads` and receives
+  :meth:`Cartridge.read_data`, the byte on the bus as M2 falls, after every
+  read of $4020-$FFFF.
 - **Nametables**: the cartridge drives CIRAM /CE and CIRAM A10.
   :meth:`Cartridge.ciram_a10` returns A10 for a PPU address in $2000-$3EFF, or
   ``None`` when the cartridge disables CIRAM and answers itself through
@@ -69,6 +73,7 @@ class Cartridge:
 
     snoops_cpu_reads = False  # also receive reads of $0000-$401F
     counts_m2 = False  # receive m2(t) every CPU cycle
+    latches_reads = False  # receive read_data() after reads of $4020-$FFFF
     watches_ppu_address = False  # receive ppu_address(address, t) on every ALE
     expansion_audio = False  # has a sound chip: the board may connect audio_out
 
@@ -84,6 +89,10 @@ class Cartridge:
 
     def cpu_write(self, address: int, value: int, t: int) -> None:
         """A CPU write; bus conflicts (value AND the ROM byte) are the mapper's."""
+
+    def read_data(self, address: int, value: int, t: int) -> None:
+        """The byte on the data bus as a read of ``address`` ($4020-$FFFF) ended,
+        whoever drove it (only when :attr:`latches_reads` is set)."""
 
     def m2(self, t: int) -> None:
         """One CPU cycle ended at ``t`` (only when :attr:`counts_m2` is set)."""

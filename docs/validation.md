@@ -1837,3 +1837,30 @@ Two homebrew boards, from their NESdev wiki pages (`Action_53_mapper.wiki`,
   against the specification. *Kart Racer '86*: the CPU in lockstep for 620
   frames, a picture-only difference not yet looked at. *Super Strife*: Mesen2
   takes an interrupt at line 248 the board does not; not yet traced.
+
+### Mapper 111, GTROM (2026-10-29)
+
+Membler Industries' Cheapocabra, from `GTROM.wiki` (newly pinned), in
+`cartridge/homebrew.py`; its flash, the SST39SF040, from Microchip's data
+sheet (DS20005022C, newly pinned) in `cartridge/flash.py`, now shared with
+UNROM 512 (30). The shared chip adds chip erase and the Software ID mode the
+30 claim listed as missing.
+
+- **The register latches reads.** The 74377 clocks on M2's fall whenever
+  /ROMSEL, A14 and A12 are high, so a read of $5000-$5FFF or $7000-$7FFF
+  stores whatever is on the data bus. The connector gained
+  `Cartridge.latches_reads` and `read_data` (connector.py) for it: the board
+  hands such a mapper the bus's byte after every read of $4020-$FFFF.
+  `tests/test_mappers_homebrew.py` runs `LDA $5000` and finds $50, the
+  operand's high byte, latched.
+- **No judge ROM.** The unit tests pin the wiki's register, the four
+  unmirrored screens and the bonus RAM at $3000-$3EFF, and the data sheet's
+  command sequences (program, sector and chip erase, both ID exits, an
+  aborted sequence).
+- **Against Mesen2** (`compat_sweep.py --mappers 111`): the Aftermarket set's
+  11 dumps, **11 of 11 identical**; the Private set's 64 (`--private`, new:
+  *Storied Sword* betas and demos, *Halcyon*, *Swords and Runes*), **64 of
+  64 identical**. Neither run shows whether any of these games reads the
+  register, uses the bonus RAM or flashes a save in the first 600 frames.
+- **UNROM 512 after the move to the shared flash**: the Aftermarket sample
+  (`--aftermarket --mappers 30 --every 20`) is still 53 of 53 identical.
