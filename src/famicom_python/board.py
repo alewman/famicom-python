@@ -92,6 +92,7 @@ class Board:
         self._nmi = False
         self._ppu_access = timing.ppu_access_ticks - self.cycle_ticks  # relative to the cycle's end
         self._snoop_reads = cartridge.snoops_cpu_reads
+        self._latches_reads = cartridge.latches_reads
         self._counts_m2 = cartridge.counts_m2
         if machine.famicom_audio_through_cart and cartridge.expansion_audio:
             cartridge.audio_out = self.apu  # type: ignore[assignment]
@@ -239,10 +240,13 @@ class Board:
             value = self.cartridge.cpu_read(address, t)
             if value is None:
                 self._undriven = True
-                return self.data_bus
-            if value > 0xFF:  # some lines undriven: they keep the bus's charge
-                value = (value & 0xFF) | (self.data_bus & (value >> 8))
-            self.data_bus = value
+                value = self.data_bus
+            else:
+                if value > 0xFF:  # some lines undriven: they keep the bus's charge
+                    value = (value & 0xFF) | (self.data_bus & (value >> 8))
+                self.data_bus = value
+            if self._latches_reads:
+                self.cartridge.read_data(address, value, t)
             return value
         if self._snoop_reads:
             self.cartridge.cpu_read(address, t)

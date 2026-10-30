@@ -288,6 +288,7 @@ nf = `tests/test_roms/nesdev-forum/`.
 | **30** UNROM-512 (homebrew) | 16K + fixed; CHR-RAM 8K×4 | header/register | — | self-flash save; submappers redefined 2026-09-26 | none |
 | **28** Action 53 (homebrew) | 32K, or 16K + fixed, in an outer bank of 32-256K; CHR-RAM 8K×4 | register: 1-screen, V, H | — | the multicart mapper; Action_53_mapper.wiki | none |
 | **31** NSF subset (homebrew) | 4K×8 from $5000-$5FFF | header | — | NSF music compilations; INES_Mapper_031.wiki | none |
+| **111** GTROM (homebrew) | 32K×16 from $5000/$7000; CHR-RAM 8K×2 | 4 screens of cartridge RAM, 2 pages, unmirrored to $3EFF | — | self-flash save; the register latches open bus on reads; GTROM.wiki | none |
 
 Less common licensed mappers (33/48 Taito, 75 VRC1, 32 Irem G-101, 80 Taito
 X1-005, 11 Color Dreams, 71 Codemasters, 34 BNROM/NINA, 28 Action 53, 111

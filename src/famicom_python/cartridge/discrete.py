@@ -11,6 +11,7 @@ own tests (tests/test_mappers.py).
 from __future__ import annotations
 
 from .banked import HORIZONTAL, SCREEN_A, SCREEN_B, VERTICAL, Banked
+from .flash import SST39SF040
 from .ines import RomImage
 
 
@@ -227,12 +228,9 @@ class UNROM512(Banked):
 
     Bus conflicts on submapper 2, and on 0 without the battery bit; there the
     register answers all of $8000-$FFFF. On the others it is at $C000-$FFFF,
-    and with the battery bit $8000-$BFFF is the flash's command port: the
-    SST39SF040's sequences ($5555 = $AA, $2AAA = $55, then $A0 to program a
-    byte, or $80 $AA $55 $30 to erase a 4 KiB sector) with the flash
-    address made of the latched bank and A13-A0. Programming only clears
-    bits and completes at once (the data polling the wiki describes reads
-    the result at once); the flash is the save (:meth:`battery_ram`). The
+    and with the battery bit $8000-$BFFF is the flash's command port
+    (:class:`~.flash.SST39SF040`), the flash address made of the latched
+    bank and A13-A0; the flash is the save (:meth:`battery_ram`). The
     submapper-4 LEDs take their writes and show nothing.
     """
 
@@ -254,9 +252,7 @@ class UNROM512(Banked):
             self.chr = bytearray(0x8000)  # iNES says nothing: 32 KiB (the wiki)
         self.four_screen = False
         self.latch = 0
-        self.flash_step = 0  # where in a command sequence the flash is
-        self.flash_command = 0
-        self.flash_dirty = False
+        self.flash = SST39SF040(self.prg)
         last = len(self.prg) // 0x4000 - 1
         self.map_prg(2, 16, last)
         self._apply(0)
@@ -270,7 +266,7 @@ class UNROM512(Banked):
         elif address >= 0xC000:
             self._apply(value)
         elif self.flashable:
-            self._flash(((self.latch & 0x1F) << 14 | (address & 0x3FFF)) % len(self.prg), value)
+            self.flash.write(self._flash_offset(address), value)
 
     def _apply(self, value: int) -> None:
         self.latch = value
@@ -281,28 +277,15 @@ class UNROM512(Banked):
         elif self.submapper == 3:
             self.set_mirroring(VERTICAL if value & 0x80 else HORIZONTAL)
 
-    def _flash(self, offset: int, value: int) -> None:
-        """One write to the flash's command port (SST39SF040 data sheet)."""
-        unlock = offset & 0x7FFF
-        step = self.flash_step
-        if (step in (0, 3) and unlock == 0x5555 and value == 0xAA) or (
-            step in (1, 4) and unlock == 0x2AAA and value == 0x55
-        ):
-            self.flash_step = step + 1
-        elif step == 2 and unlock == 0x5555 and value in (0xA0, 0x80):
-            self.flash_command = value
-            self.flash_step = 6 if value == 0xA0 else 3
-        elif step == 5 and value == 0x30:  # sector erase
-            sector = offset & ~0xFFF
-            self.prg[sector : sector + 0x1000] = bytes([0xFF]) * 0x1000
-            self.flash_dirty = True
-            self.flash_step = 0
-        elif step == 6:  # byte program: bits only clear
-            self.prg[offset] &= value
-            self.flash_dirty = True
-            self.flash_step = 0
-        else:
-            self.flash_step = 0
+    def _flash_offset(self, address: int) -> int:
+        """The flash address of a CPU address in $8000-$BFFF."""
+        return ((self.latch & 0x1F) << 14 | (address & 0x3FFF)) % len(self.prg)
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        if self.flash.id_mode and address >= 0x8000:
+            offset = self.prg_offsets[(address >> 13) & 3] + (address & 0x1FFF)
+            return self.flash.read(offset)
+        return super().cpu_read(address, t)
 
     def ciram_a10(self, address: int) -> int | None:
         if self.cart_vram:

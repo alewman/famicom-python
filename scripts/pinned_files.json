@@ -4517,5 +4517,23 @@
   "kind": "live-wiki",
   "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
   "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_031 (mappers 28 and 31)"
+ },
+ {
+  "path": "reference/nesdev-wiki/GTROM.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=GTROM&action=raw",
+  "sha256": "ec86c938882283419849740e589885083743dc0e35fa7f76831e716dccbd18e7",
+  "size": 12374,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: GTROM (mapper 111)"
+ },
+ {
+  "path": "reference/docs/SST39SF040.pdf",
+  "url": "https://ww1.microchip.com/downloads/en/DeviceDoc/20005022C.pdf",
+  "sha256": "5b3899c2221a08b670c10c8a02ca9c8aac1658692d2f9fd5ca5e7b93c684fe66",
+  "size": 3258661,
+  "kind": "document",
+  "license": "Microchip data sheet (freely distributed)",
+  "note": "SST39SF010A/020A/040 data sheet DS20005022C: the flash of mappers 30 and 111"
  }
 ]
