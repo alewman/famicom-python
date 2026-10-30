@@ -1864,3 +1864,36 @@ UNROM 512 (30). The shared chip adds chip erase and the Software ID mode the
   register, uses the bonus RAM or flashes a save in the first 600 frames.
 - **UNROM 512 after the move to the shared flash**: the Aftermarket sample
   (`--aftermarket --mappers 30 --every 20`) is still 53 of 53 identical.
+
+### The licensed gaps (2026-10-29)
+
+Every licensed No-Intro dump whose mapper was missing, from the mappers'
+NESdev wiki pages (37 newly pinned), on branch `licensed-gaps`: 43 mappers,
+81 in all. Licensed coverage **95.91% to 99.62%** (2,652 of 2,662 dumps);
+the ten left are 446 (Mindkids' FPGA multi-mapper), 547 (Konami QTa, a kanji
+ROM), 555 (undocumented), 186 (the StudyBox's tape) and none Mesen2 2.1.1
+supports. `tests/test_mappers_gaps.py` pins the bank arithmetic (19 tests).
+
+- **Licensed dumps against Mesen2** (`compat_sweep.py --mappers ...`): the
+  discrete and MMC3/108-derived boards **57 of 57** identical; the counters
+  and odd boards 39 of 42. *Battletoads & Double Dragon* (470) Mesen2 cannot
+  load: by eye, Retro-Bit's region menu and then the game from another
+  256 KiB bank. *Flintstones* and *Jetsons* (48): the TC0690 delay, C48.
+  The sweep found two board bugs: VRC3 (*Salamander*) and Karaoke Studio
+  never mapped their 8 KiB of CHR-RAM, leaving every 1 KiB window at offset
+  0 (the third time this base-class default has bitten: Datach, FDS); and
+  68.1's dumps hold the internal ROM *and* the cassette, whose last bank is
+  not the fixed one. Fixed, all six are identical.
+- **Unlicensed dumps** (`--unlicensed`, new: the "(Unl)" dumps, not the
+  pirates): **173 of 199** identical. 12 are the classes PPUSim settled
+  (`sweep_triage.py`: 9 mid-line rendering toggles, 3 mid-line register
+  writes). The Color Dreams betas *Raid 2020* and *Secret Scout* are 11.0:
+  without bus conflicts (the wiki: prototypes with conflict prevention) the
+  board shows their title screens; forcing conflicts hangs them (a green
+  screen; garbage), as Mesen2, which always applies them, does. Seven are
+  the RAMBO-1 (C53). Undiagnosed, all small: the two Sachen logos on 79
+  (45 pixels on alternate frames, a sprite-0 hit read differing),
+  *Wonderland Dizzy* proto (65), *Linus Spacehead* (26), *Big Nose* beta (9),
+  *BB Car* and *Boomerang Kid* (1 each).
+- Contradictions recorded: C47-C53 (undocumented-behavior.md).
+

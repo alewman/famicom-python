@@ -18,15 +18,19 @@ from collections.abc import Callable
 from dataclasses import dataclass, fields
 from pathlib import Path
 
-from .bandai import BandaiFCG, BandaiX24C01, Datach
+from .bandai import Bandai74161, BandaiFCG, BandaiFCGRAM, BandaiX24C01, Datach, Karaoke, OekaKids
 from .banked import Banked
 from .connector import Cartridge
 from .database import load_mame_features, load_nes20db, lookup_mame, lookup_nes20db
 from .discrete import (
     CNROM,
+    CPROM,
     J87,
     NROM,
+    UN1ROM,
+    UNROM180,
     UNROM512,
+    AOROMMulticart,
     AxROM,
     CNROMProtected,
     GxROM,
@@ -37,16 +41,18 @@ from .fds import FDS
 from .fds_disk import is_fds, is_qd
 from .homebrew import GTROM, NSF31, Action53
 from .ines import BoardInfo, RomImage, parse
-from .irem import G101
-from .jaleco import SS88006
-from .konami import VRC1, VRC6, VRC7, VRC24
-from .mmc1 import MMC1, MMC1A
+from .irem import G101, H3001, LROG017, TAMS1
+from .jaleco import JF11, JF13, JF16, JF17, SS88006
+from .konami import VRC1, VRC3, VRC6, VRC7, VRC24
+from .mmc1 import MMC1, MMC1A, NESEvent
 from .mmc2 import MMC2, MMC4
-from .mmc3 import AA6023, TxSROM, mmc3_for
+from .mmc3 import AA6023, TQROM, Kasheng, MMC3Multicart, TxSROM, mmc3_for
 from .mmc5 import MMC5
-from .namco import Namco108, Namco163, Namco175
-from .sunsoft import FME7
-from .taito import TC0190
+from .namco import Namco108, Namco163, Namco175, Namco3425, Namco3433, Namco3446
+from .sunsoft import FME7, Sunsoft1, Sunsoft2, Sunsoft3, mapper_68
+from .taito import TC0190, TC0690, X1005, X1017
+from .tengen import RAMBO1
+from .unlicensed import NINA03, Camerica, ColorDreams
 
 #: Each implemented iNES mapper's board, built from the image and the CPU cycle
 #: length in master ticks (a class, or a function choosing one by submapper).
@@ -60,6 +66,8 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     7: AxROM,
     9: MMC2,
     10: MMC4,
+    11: ColorDreams,
+    13: CPROM,
     16: BandaiFCG,
     18: SS88006,
     19: Namco163,
@@ -75,20 +83,61 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     32: G101,
     33: TC0190,
     34: mapper_34,
+    37: MMC3Multicart,
+    47: MMC3Multicart,
+    48: TC0690,
+    64: RAMBO1,
+    65: H3001,
     66: GxROM,
+    67: Sunsoft3,
+    68: mapper_68,
     69: FME7,
+    70: Bandai74161,
+    71: Camerica,
+    72: JF17,
+    73: VRC3,
     75: VRC1,
+    76: Namco3446,
+    77: LROG017,
+    78: JF16,
+    79: NINA03,
+    80: X1005,
+    82: X1017,
     85: VRC7,
+    86: JF13,
     87: J87,
+    88: Namco3433,
+    89: Sunsoft2,
+    92: JF17,
+    93: Sunsoft2,
+    94: UN1ROM,
+    95: Namco3425,
+    96: OekaKids,
+    97: TAMS1,
+    105: NESEvent,
     111: GTROM,
+    113: NINA03,
+    115: Kasheng,
     118: TxSROM,
+    119: TQROM,
+    140: JF11,
+    152: Bandai74161,
+    153: BandaiFCGRAM,
+    154: Namco3433,
     155: MMC1A,
     157: Datach,
     159: BandaiX24C01,
+    180: UNROM180,
+    184: Sunsoft1,
     185: CNROMProtected,
+    188: Karaoke,
     206: Namco108,
+    207: X1005,
     210: Namco175,
+    232: Camerica,
     268: AA6023,
+    470: AOROMMulticart,
+    552: X1017,
 }
 
 __all__ = [

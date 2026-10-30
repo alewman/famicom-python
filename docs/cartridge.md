@@ -290,9 +290,47 @@ nf = `tests/test_roms/nesdev-forum/`.
 | **31** NSF subset (homebrew) | 4K×8 from $5000-$5FFF | header | — | NSF music compilations; INES_Mapper_031.wiki | none |
 | **111** GTROM (homebrew) | 32K×16 from $5000/$7000; CHR-RAM 8K×2 | 4 screens of cartridge RAM, 2 pages, unmirrored to $3EFF | — | self-flash save; the register latches open bus on reads; GTROM.wiki | none |
 
-Less common licensed mappers (33/48 Taito, 75 VRC1, 32 Irem G-101, 80 Taito
-X1-005, 11 Color Dreams, 71 Codemasters, 34 BNROM/NINA, 28 Action 53, 111
-GTROM, 31) are described in the wiki pages pinned under `reference/nesdev-wiki/`.
+The licensed gaps closed on 2026-10-29 (validation.md "The licensed gaps"), from
+their wiki pages, all without a judge ROM:
+
+| Mapper | Banking | Mirroring | IRQ | Quirks |
+| --- | --- | --- | --- | --- |
+| **13** CPROM | CHR-RAM 4K fixed + 4K×4 | fixed | — | bus conflicts |
+| **37/47** Nintendo multicarts | MMC3 inside an outer latch at $6000 | MMC3 | MMC3 | the latch takes writes only with the MMC3's "RAM" enabled |
+| **48** Taito TC0690 | PRG 8K×2 + fixed; CHR 2K×2 (2K units) + 1K×4 | H/V | MMC3's counter, later | the delay (C48) |
+| **64** Tengen RAMBO-1 | PRG 8K×3 + fixed (R6/RF swap); CHR 2K or 1K at $0000 | H/V | A12 or every 4 CPU cycles | reload + 1 "kick" |
+| **65** Irem H3001 | PRG 8K×2 + 2 fixed (mode swap); CHR 1K×8 | H/V/1sc | 16-bit down counter, stops at 0 | power-on $8000 = 0, $A000 = 1 (C49) |
+| **67** Sunsoft-3 | PRG 16K + fixed; CHR 2K×4 | H/V/1sc | 16-bit down counter, pauses on wrap | count written high then low |
+| **68** Sunsoft-4 | PRG 16K + fixed; CHR 2K×4 | H/V/1sc, CHR-ROM nametables | — | 68.1: the cassette ROM and licensing timer (C52) |
+| **70/152** Bandai 74161 | PRG 16K + fixed; CHR 8K | fixed / 1-screen select (152) | — | bus conflicts |
+| **71/232** Camerica | PRG 16K + fixed (232: in 64K outer banks) | fixed / 1-screen (Fire Hawk) | — | 71.0 waits for a $9000 write; 232.1 swaps the outer bits |
+| **72/92** Jaleco JF-17/19 | PRG 16K + fixed (92: first fixed); CHR 8K | fixed | — | banks load on a command bit's rise; speech chip not modelled |
+| **73** VRC3 | PRG 16K + fixed; CHR-RAM 8K | fixed | 16- or 8-bit up counter | |
+| **76/88/95/154** Namco 108 boards | as 206 | fixed / CHR A15 → CIRAM A10 (95) / 1-screen (154) | — | 76: 2K CHR×4; 88/154: PPU A12 as CHR A16 |
+| **77** Irem LROG017 | PRG 32K; CHR-ROM 2K + RAM | two cartridge nametables + CIRAM | — | $3000-$3EFF open bus |
+| **78** Jaleco JF-16 / Holy Diver | PRG 16K + fixed; CHR 8K | 1-screen select (78.1) or H/V (78.3) | — | |
+| **80/207** Taito X1-005 | PRG 8K×3 + fixed; CHR 2K×2 + 1K×4 | H/V (C47) / per-2K CIRAM A10 (207) | — | 128 B RAM behind $A3; registers ignore A7 |
+| **82/552** Taito X1-017 | as X1-005, CHR A12 inversion | H/V | 16× prescaled counter (no game) | 552 reverses PRG lines; reads of $4020-$7FFF 0 |
+| **86** Jaleco JF-13 | PRG 32K; CHR 8K, at $6000 | fixed | — | speech chip not modelled |
+| **89/93** Sunsoft-2 | PRG 16K + fixed; CHR 8K (89) | 1-screen (89) / fixed | — | bus conflicts; 93's CHR-RAM enable |
+| **94** UN1ROM | UxROM, bank in D4-D2 | fixed | — | |
+| **96** Oeka Kids | PRG 32K; CHR-RAM 4K by the last nametable entered | fixed | — | the tablet is not modelled |
+| **97** Irem TAM-S1 | last 16K fixed at $8000, $C000 switched | H/V | — | |
+| **105** NES-EVENT | MMC1 over two PRG chips | MMC1 | 30-bit timer, DIP switches | locked until I goes 0 then 1 |
+| **11** Color Dreams, **79/113** AVE NINA-03/06 | PRG 32K; CHR 8K | fixed / H/V (113) | — | 79's register at $4100-$5FFF with A8 high |
+| **115** Kǎshèng | MMC3 + NROM override, outer CHR | MMC3 | MMC3 (Sharp) | C51 |
+| **119** TQROM | MMC3, CHR ROM and RAM by bank bit 6 | MMC3 | MMC3 | |
+| **140** Jaleco JF-11/14 | GNROM at $6000 | fixed | — | |
+| **153** Bandai LZ93D50 + RAM | PRG 16K in 256K outer + fixed; CHR-RAM | H/V/1sc | Bandai's | 8 KiB battery RAM |
+| **180** UNROM (AND) | first 16K fixed, $C000 switched | fixed | — | |
+| **184** Sunsoft-1 | CHR 4K×2 from $6000 | fixed | — | |
+| **188** Karaoke Studio | PRG 16K internal or expansion + fixed | H/V | — | the microphone reads idle |
+| **470** INX_007T_V01 | AOROM in 256K outer banks | 1-screen | — | Retro-Bit's Battletoads & Double Dragon |
+
+Not implemented (no detector, or a whole system beyond a mapper): 446 (Mindkids'
+FPGA multi-mapper), 547 (Konami QTa with its kanji ROM), 555 (Nintendo Campus
+Challenge, undocumented), 186 (the StudyBox tape drive), 682 (Rainbow, Broke
+Studio's Wi-Fi mapper, documented outside the wiki).
 
 ## Mapper test ROMs and what they can judge
 

@@ -1,11 +1,13 @@
-"""Discrete-logic boards: NROM (0), UxROM (2), CNROM (3), AxROM (7), UNROM 512 (30), BNROM and
-NINA-001 (34), GxROM (66), J87 (87) and CNROM with copy-protection diodes (185).
+"""Discrete-logic boards: NROM (0), UxROM (2), CNROM (3), AxROM (7), CPROM (13), UNROM 512
+(30), BNROM and NINA-001 (34), GxROM (66), J87 (87), UN1ROM (94), UNROM with a fixed first
+bank (180) and CNROM with copy-protection diodes (185).
 
 Judged in milestone 5 by Holy Mapperel, rainwarrior's ``2_test``,
 ``3_test``, ``7_test`` and ``34_test``, and tepples's ``bntest``
 (docs/claims.md); 66 by Holy Mapperel; 87 and 185 have no judge (milestone 7's
 sweep against Mesen2, a detector); 30, milestone 8's homebrew board, by its
-own tests (tests/test_mappers.py).
+own tests (tests/test_mappers.py); 13, 94 and 180 have no judge ROM (sweeps
+against Mesen2).
 """
 
 from __future__ import annotations
@@ -206,6 +208,90 @@ class CNROMProtected(NROM):
         if address < 0x2000 and not self.chr_enabled:
             return (address & 0xFF) | 1
         return super().ppu_read(address, t)
+
+
+class UN1ROM(UxROM):
+    """Mapper 94: HVC-UN1ROM (Senjou no Ookami): UxROM with the bank in D4-D2.
+
+    INES_Mapper_094.wiki: always AND-type bus conflicts.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.bus_conflicts = True
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+            return
+        self.map_prg(0, 16, (self.bus_conflict(address, value) >> 2) & 7)
+
+
+class UNROM180(NROM):
+    """Mapper 180: UNROM with an AND gate (Crazy Climber): the first 16 KiB fixed, $C000 switched.
+
+    INES_Mapper_180.wiki: D2-D0 select the bank at $C000. The page says
+    nothing of bus conflicts: as UxROM, by submapper (2 has them).
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.bus_conflicts = image.board.submapper == 2
+        self.map_prg(0, 16, 0)
+        self.map_prg(2, 16, 0)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+            return
+        if self.bus_conflicts:
+            value = self.bus_conflict(address, value)
+        self.map_prg(2, 16, value & 7)
+
+
+class CPROM(NROM):
+    """Mapper 13: NES-CPROM (Videomation): 16 KiB of CHR-RAM in 4 KiB pages.
+
+    CPROM.wiki: PPU $0000-$0FFF is the first page; a write to $8000-$FFFF
+    (AND-type bus conflicts) selects the page at $1000 from D1-D0. Power-on
+    page unspecified: 0 here.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.chr = bytearray(0x4000)
+        self.chr_writable = True
+        self.map_chr(0, 8, 0)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+            return
+        self.map_chr(4, 4, self.bus_conflict(address, value) & 3)
+
+
+class AOROMMulticart(AxROM):
+    """NES 2.0 mapper 470: INX_007T_V01 (Retro-Bit's Battletoads and Double Dragon).
+
+    NES_2.0_Mapper_470.wiki: AOROM with a register at $5000-$5FFF selecting
+    the 256 KiB outer bank. The wiki says reset clears it; the console's
+    reset does not reach the connector, so only power-on does here.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.outer = self.inner = 0
+        super().__init__(image, cpu_cycle_ticks)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if 0x5000 <= address < 0x6000:
+            self.outer = value
+            self.map_prg(0, 32, self.inner)
+            return
+        super().cpu_write(address, value, t)
+
+    def map_prg(self, window: int, size_kib: int, bank: int) -> None:
+        self.inner = bank & 7
+        super().map_prg(window, size_kib, self.outer << 3 | self.inner)
 
 
 def mapper_34(image: RomImage, cpu_cycle_ticks: int) -> Banked:
