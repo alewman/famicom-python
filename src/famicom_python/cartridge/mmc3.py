@@ -31,6 +31,8 @@ known to need it and the wiki says no emulator does.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from .banked import HORIZONTAL, VERTICAL, Banked
 from .ines import RomImage
 
@@ -314,8 +316,8 @@ class MMC3Multicart(MMC3):
     - 47 (Super Spike V'Ball + Nintendo World Cup, INES_Mapper_047.wiki): D0
       selects a 128 KiB PRG and 128 KiB CHR block.
 
-    Not modelled: the CIC's reset clearing 37's latch (the console's reset
-    does not reach the connector), so only power-on returns to the menu here.
+    37's latch is cleared by the CIC's reset, which follows the reset button
+    (:meth:`m2_gap`), so a reset returns to the menu.
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
@@ -327,6 +329,11 @@ class MMC3Multicart(MMC3):
     def ram_protect(self, value: int) -> None:
         self.ram_control = value
         super().ram_protect(value)
+
+    def m2_gap(self, t: int) -> None:
+        if self.three_games:
+            self.outer = 0
+            self._update()
 
     def cpu_write(self, address: int, value: int, t: int) -> None:
         if 0x6000 <= address < 0x8000:
@@ -431,6 +438,11 @@ class Kasheng(MMC3):
     def map_chr(self, window: int, size_kib: int, bank: int) -> None:
         for i in range(size_kib):
             super().map_chr(window + i, 1, (bank * size_kib + i) | self.chr_outer << 8)
+
+
+def mindkids_224(image: RomImage, cpu_cycle_ticks: int) -> AA6023:
+    """Mapper 224: Jncota's KT-008, the Mindkids chipset of 268.1 (INES_Mapper_224.wiki)."""
+    return AA6023(image.with_board(replace(image.board, submapper=1)), cpu_cycle_ticks)
 
 
 def mmc3_for(image: RomImage, cpu_cycle_ticks: int) -> MMC3:

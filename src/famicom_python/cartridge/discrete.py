@@ -274,8 +274,7 @@ class AOROMMulticart(AxROM):
     """NES 2.0 mapper 470: INX_007T_V01 (Retro-Bit's Battletoads and Double Dragon).
 
     NES_2.0_Mapper_470.wiki: AOROM with a register at $5000-$5FFF selecting
-    the 256 KiB outer bank. The wiki says reset clears it; the console's
-    reset does not reach the connector, so only power-on does here.
+    the 256 KiB outer bank, which a reset clears (:meth:`m2_gap`).
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
@@ -288,6 +287,10 @@ class AOROMMulticart(AxROM):
             self.map_prg(0, 32, self.inner)
             return
         super().cpu_write(address, value, t)
+
+    def m2_gap(self, t: int) -> None:
+        self.outer = 0
+        self.map_prg(0, 32, self.inner)
 
     def map_prg(self, window: int, size_kib: int, bank: int) -> None:
         self.inner = bank & 7

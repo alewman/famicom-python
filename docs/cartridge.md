@@ -327,10 +327,17 @@ their wiki pages, all without a judge ROM:
 | **188** Karaoke Studio | PRG 16K internal or expansion + fixed | H/V | — | the microphone reads idle |
 | **470** INX_007T_V01 | AOROM in 256K outer banks | 1-screen | — | Retro-Bit's Battletoads & Double Dragon |
 
-Not implemented (no detector, or a whole system beyond a mapper): 446 (Mindkids'
-FPGA multi-mapper), 547 (Konami QTa with its kanji ROM), 555 (Nintendo Campus
-Challenge, undocumented), 186 (the StudyBox tape drive), 682 (Rainbow, Broke
-Studio's Wi-Fi mapper, documented outside the wiki).
+The remaining mappers followed on 2026-10-30 (validation.md "The remaining
+mappers"; 280 in all): `conversions.py` the FDS conversions, `multiasic.py` the
+multi-chip multicarts, `pic16c54.py` the microcontroller on 355, and the rest
+beside their nearest relatives. Each class's docstring gives its page.
+
+Not implemented: 446 (Mindkids' FPGA multi-mapper), 547 (Konami QTa with its
+kanji ROM), 555 (Nintendo Campus Challenge, undocumented), 186 (the StudyBox
+tape drive), 682 (Rainbow, Broke Studio's Wi-Fi mapper, documented outside the
+wiki), 256 and 405 (the VT02+ and UM6578 famiclones). No usable description:
+127, 169, 170, 171, 216, 222, 238, 244, 258, 272, 413, 418, 549, 557; no page:
+559, 563, 564, 576, 585.
 
 ## Mapper test ROMs and what they can judge
 

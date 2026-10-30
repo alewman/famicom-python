@@ -36,8 +36,11 @@ else of the board (``tests/test_cartridge_boundary.py`` enforces it).
   :meth:`Cartridge.ciram_a10` returns A10 for a PPU address in $2000-$3EFF, or
   ``None`` when the cartridge disables CIRAM and answers itself through
   :meth:`Cartridge.ppu_read` and :meth:`Cartridge.ppu_write`.
-- **No reset**: the reset button never reaches the cartridge (MMC5 sees it as a
-  gap in M2, which the timestamps show).
+- **Reset**: the reset button reaches the cartridge only as a gap in M2: with
+  /RST low the CPU's pins, M2 among them, go high-impedance (CPU_pinout.wiki).
+  The board calls :meth:`Cartridge.m2_gap` when the button is pressed; the
+  reset-based multicarts and the outer registers some boards clear on a reset
+  take it there.
 - **Sound** (milestone 8): a mapper with a sound chip sets
   :attr:`Cartridge.expansion_audio`; on a console that routes the 2A03's sound
   through the cartridge (the Famicom's pins 45/46) the board connects
@@ -93,6 +96,9 @@ class Cartridge:
     def read_data(self, address: int, value: int, t: int) -> None:
         """The byte on the data bus as a read of ``address`` ($4020-$FFFF) ended,
         whoever drove it (only when :attr:`latches_reads` is set)."""
+
+    def m2_gap(self, t: int) -> None:
+        """M2 stopped: the reset button held the CPU in reset (see the module notes)."""
 
     def m2(self, t: int) -> None:
         """One CPU cycle ended at ``t`` (only when :attr:`counts_m2` is set)."""

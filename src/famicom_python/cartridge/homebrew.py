@@ -1,4 +1,5 @@
-"""Homebrew boards: Action 53 (28), the NSF subset (31) and GTROM (111).
+"""Homebrew boards: Action 53 (28), the NSF subset (31), GTROM (111), Magic Floor (218) and
+Drip (284).
 
 Each from its NESdev wiki page (pinned in scripts/pinned_files.json) and judged by
 its own community test ROMs (docs/claims.md).
@@ -174,3 +175,151 @@ class GTROM(Banked):
 
     def _restore(self, data: bytes) -> None:
         self.prg[:] = data
+
+
+class MagicFloor(Banked):
+    """Mapper 218 (Magic Floor, Starfight): no CHR memory: the console's CIRAM is the CHR-RAM.
+
+    INES_Mapper_218.wiki: CIRAM is always selected and its A10 wired to PPU
+    A10, A11, A12 or A13 (the header: vertical, horizontal, and with the
+    four-screen bit A12 or A13 for its two one-screen layouts), so pattern
+    tables and nametables share the 2 KiB. The connector does not reach
+    CIRAM for pattern addresses, so this board disables it and answers with
+    a 2 KiB RAM of its own, which behaves identically (nothing else can
+    reach CIRAM). PRG: up to 32 KiB, unbanked.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        board = image.board
+        flags6 = image.header[6] if len(image.header) > 6 else 0
+        if flags6 & 8:
+            self.a10_line = 13 if flags6 & 1 else 12
+        else:
+            self.a10_line = 10 if board.mirroring == "V" else 11
+        self.four_screen = False
+        self.ciram = bytearray(0x800)
+        self.prg = self.prg * (0x8000 // len(self.prg))  # Magic Floor is 4 KiB
+        for window in range(4):
+            self.map_prg(window, 8, window)
+
+    def _index(self, address: int) -> int:
+        return ((address >> self.a10_line) & 1) << 10 | (address & 0x3FF)
+
+    def ciram_a10(self, address: int) -> int | None:
+        return None
+
+    def ppu_read(self, address: int, t: int) -> int | None:
+        return self.ciram[self._index(address)]
+
+    def ppu_write(self, address: int, value: int, t: int) -> None:
+        self.ciram[self._index(address)] = value
+
+
+class DripGame(Banked):
+    """NES 2.0 mapper 284: Quietust's FPGA for the port of Drip (UNIF_UNL-DripGame.wiki).
+
+    $4800-$4FFF reads the status ($64: ready; D7 the DIP switch, 0 here);
+    $5000/$5800 the sound channels' buffer status (empty here). Writes to
+    $8000-$BFFF (low nibble): 0-7 the two sound channels (taken; the sample
+    playback is not modelled, so they stay silent and empty), 8/9 the IRQ
+    reload's low and high bits (9's D7 enables; 9 acknowledges and reloads),
+    A ``....SAMM``: the mirroring (vertical, horizontal, one-screen A, B),
+    the extended attributes (A), PRG-RAM writes (S); B the 16 KiB PRG bank at
+    $8000 (the last fixed); C-F the 2 KiB CHR banks. $C000-$FFFF writes the
+    extended attribute table (two 1 KiB halves, by the nametable page): with
+    A set, a tile's attribute is its entry's D1-D0. The counter counts M2
+    cycles down and, at expiry, asserts /IRQ and stops.
+    """
+
+    counts_m2 = True
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.control = 0
+        self.reload = self.counter = 0
+        self.counting = False
+        self.ext = bytearray(0x800)
+        self.last_tile = 0  # CIRAM index of the last nametable fetch
+        self.map_prg(2, 16, len(self.prg) // 0x4000 - 1)
+        self.prg_ram_writable = False
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        if 0x4800 <= address < 0x5000:
+            return 0x64
+        if 0x5000 <= address < 0x6000:
+            return 0x40 | 0x3F << 8  # buffer empty, not full
+        return super().cpu_read(address, t)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address >= 0xC000:
+            self.ext[address & 0x7FF] = value & 3
+            return
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+            return
+        register = address & 0x0F
+        if register == 8:
+            self.reload = (self.reload & 0x7F00) | value
+        elif register == 9:
+            self.reload = (self.reload & 0xFF) | (value & 0x7F) << 8
+            self.counter = self.reload
+            self.counting = bool(value & 0x80)
+            self.irq = False
+        elif register == 0x0A:
+            self.control = value
+            self.set_mirroring((VERTICAL, HORIZONTAL, SCREEN_A, SCREEN_B)[value & 3])
+            self.prg_ram_writable = bool(value & 8)
+        elif register == 0x0B:
+            self.map_prg(0, 16, value & 0x0F)
+        elif register >= 0x0C:
+            self.map_chr((register - 0x0C) * 2, 2, value & 0x0F)
+
+    def m2(self, t: int) -> None:
+        if self.counting:
+            self.counter -= 1
+            if self.counter < 0:
+                self.counter = 0
+                self.counting = False
+                self.irq = True
+
+    def ciram_a10(self, address: int) -> int | None:
+        a10 = super().ciram_a10(address)
+        if address & 0x3FF >= 0x3C0:
+            if self.control & 4:
+                return None
+        elif a10 is not None:
+            self.last_tile = a10 << 10 | (address & 0x3FF)
+        return a10
+
+    def ppu_read(self, address: int, t: int) -> int | None:
+        if address >= 0x2000 and self.control & 4:
+            return self.ext[self.last_tile] * 0x55
+        return super().ppu_read(address, t)
+
+
+class SealieRET(Banked):
+    """Mapper 29: Sealie Computing's RET-CUFROM (Glider): UNROM-like with 32 KiB of CHR-RAM.
+
+    INES_Mapper_029.wiki: a write to $8000-$FFFF ``...PPPCC``: the 16 KiB PRG
+    bank at $8000 (the last fixed) and the 8 KiB CHR-RAM bank; no bus
+    conflicts; 8 KiB of WRAM; vertical mirroring. (The CopyNES reflashing
+    path through EXP0 is not on the connector.) Power-on 0.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.chr = bytearray(0x8000)
+        self.chr_writable = True
+        self.map_prg(2, 16, len(self.prg) // 0x4000 - 1)
+        self._latch(0)
+
+    def _latch(self, value: int) -> None:
+        self.map_prg(0, 16, (value >> 2) & 7)
+        self.map_chr(0, 8, value & 3)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address >= 0x8000:
+            self._latch(value)
+        else:
+            super().cpu_write(address, value, t)

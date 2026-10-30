@@ -592,6 +592,69 @@ before the board takes a side.
   10,754), Rolling Thunder 9/8/16 (926/917/925), Xybots 0/15,455/- (0/2/8),
   Hard Drivin' 116/15/634 (7,385/3,072/5,995), Skull & Crossbones 256/256/32
   (14,222/16,650/-). **Open**: no judge; Tengen's games are the only test.
+- **C54. Mapper 163 (Nanjing).** The wiki's protection registers against
+  Mesen2's older model, which boots the wrong bank: all 49 differing dumps
+  reach proper title screens on the board and not on Mesen2. *Board*: the wiki.
+- **C55. Mapper 286 (BS-5), the page's "8 KiB".** The page calls the CHR banks
+  8 KiB; the 2 KiB Mesen2 uses is what the games need (10 of 10 Aftermarket
+  dumps identical). *Board*: 2 KiB; a slip on the page.
+- **C56. Mapper 172's Invert at power-on.** The page gives no power-on state,
+  and each write to `$8000-$FFFF` sets the mirroring from Invert. *Venice Beach
+  Volleyball* (Super Mega) writes `$8000` at reset and uploads its title before
+  it ever writes `$4101`, and only comes out right if that first write leaves
+  vertical mirroring: Invert must power on set. *Board*: set; identical to
+  Mesen2 at frame 300 (0 of 61,440 pixels differ) with the other two dumps.
+- **C57. Mapper 224's GNROM mode.** 224 is "the same chipset as" 268.1, whose
+  register 3 D4 is GNROM mode, and *Sanguo Fengyun* sets it (`$5003 = $10`)
+  and jumps through the new bank's reset vector. Mesen2 has no such mode on
+  224: it stays in the old bank and re-runs its reset for ever, a blank screen.
+  *Board*: the page; the game reaches its title.
+- **C58. Mapper 351, read off its own menu.** The page's `BBBBBB..` fields are
+  bank numbers (value >> 2), not masked values: the stub writes `$5001 = $3C`
+  from the 16 KiB bank that must stay mapped, bank 15. Its marks for the CHR
+  size fall on D6-D4, which holds p; D7-D5 is the reading that leaves p alone,
+  and the stub's `$5002 = $D4` fits it. *Board*: both, and the 42-in-1 menu
+  comes up. No judge.
+- **C59. Mapper 347's registers are address-decoded.** Its page's `A~`
+  diagrams are the truth: *Yume Koujou* writes `STA $8000,Y` with the bank in
+  Y. The page's "actual" ROM layout (the 64 KiB part first) is right too: the
+  layout emulators used to assume crashes. *Board*: both; the Kaiser title.
+- **C60. Mapper 399 has a submapper its page does not know.** *Anamanaguchi -
+  Power Supply* is 399.1: it runs code from `$6000-$7FFF` and banks through
+  `$E000`, `$A001`, `$C001`. **Open**: nothing to build from; the board runs
+  399.0, *Star Versus* boots, this one does not.
+- **C61. Mapper 314's Brazilian dumps.** *30 Games* and *64 Games* write
+  `$5000 = 0, $5001 = 0, $8000 = 0` from RAM and jump to `$C055`: the page's
+  UNROM mode, which keeps the 16 KiB bank 7 there. Mesen2 goes on to a menu
+  from a bank those registers cannot name; the board does not. The other 314
+  dumps are identical. **Open**: undiagnosed.
+- **C62. What 539's RAM slices fold onto.** The page lists six ranges of RAM
+  over ROM, 6 KiB in 8, not how the board folds them. *Board*: kept apart, as
+  they were on the disk system; the game runs. **Open**: no measurement.
+- **C63. Mapper 221's A6.** INES_Mapper_221.wiki's latch has no bit 6. The
+  NTDEC 400-in-1 writes `$8040` and copies its tiles from `$C000`: only with
+  A6 as PRG A18 do they come out as tiles. *Board*: A6 drives A18.
+- **C64. Mapper 123's D3.** INES_Mapper_123.wiki's `$5800` is `.M31.2S0`, D3
+  unused. *Earthworm Jim 2* (Shin-Shin) writes `$CD` from bank 5, and only
+  bank 7 holds what comes next (`CLD` at the very next address): D3 is a bank
+  line. *Board*: D3 and D4 both drive bank bit 1, as neither the page's
+  reading nor this one alone can be ruled out on two games.
+- **C65. Mapper 42 has a submapper its page does not know.** Both *Green
+  Beret* dumps are 42.2 and neither touches `$E000`. They write `$8000 = 5`
+  and then a bank to `$8001`, and read their disk files from `$6000`; the
+  dumps' tables run 0-15 in D4-D1 (Whirlwind's D5 is always set). With that
+  bank both boot to the title and load the same files. Mesen2 shows garbage
+  on both, and so did the board on the page's registers. *Board*: 42.2 takes
+  the bank from `$8001`. The `$8000` value is ignored: only 5 is ever seen.
+- **C66. Mapper 530's A3.** NES_2.0_Mapper_530.wiki calls it VRC4f (A0/A1).
+  *Pocker Mali* writes `$8008`, `$A008`-`$A00B`, `$C008`-`$C00B` and `$E00B`
+  where a VRC4 has `$9000`, `$B000`, `$D000` and `$F000`: A3 stands in for
+  A12. *Board*: the game's reading; the title appears, garbage without it.
+- **C67. Mapper 112's power-on mirroring.** INES_Mapper_112.wiki gives `$E000`
+  and no power-on state; *Master Shooter*'s header says horizontal, but it
+  never writes `$E000` and fills two nametables, the second overwriting the
+  first's menu on horizontal. *Board*: the register powers on 0, the header
+  is ignored. Mesen2 agrees.
 
 ## Open items
 

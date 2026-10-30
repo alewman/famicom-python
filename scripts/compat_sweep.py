@@ -17,6 +17,7 @@ board's frame either side is tried as well and reported if it is closer.
 ``--aftermarket`` sweeps the Aftermarket set (homebrew, every dump) instead of
 the licensed ones, ``--private`` the Private set (homebrew betas and demos,
 every dump), ``--unlicensed`` adds the "(Unl)" dumps to the licensed ones,
+``--all`` takes every dump of the sets, pirates included,
 ``--programs`` the test carts and programs (No-Intro's
 "(Program)" and "(Test Program)" dumps, of either set); ``--every N`` keeps one
 dump in N, in name order.
@@ -107,10 +108,12 @@ def licensed_dumps(
     every_dump_of: str | None = None,
     programs: bool = False,
     unlicensed: bool = False,
+    every_kind: bool = False,
 ) -> list[Path]:
     """Every licensed dump of ``SETS`` (or every dump of the set
     ``every_dump_of``) whose header names an implemented mapper (of ``mappers``);
-    ``unlicensed`` adds the sets' "(Unl)" dumps (not the pirates).
+    ``unlicensed`` adds the sets' "(Unl)" dumps (not the pirates), ``every_kind``
+    every dump: pirates, prototypes, betas and demos too.
 
     The 2024 set renames many of the other's dumps; a dump whose .nes CRC (from
     the zip's directory) an earlier set already gave is skipped.
@@ -122,7 +125,7 @@ def licensed_dumps(
                 wanted = "(Program)" in path.stem or "(Test Program)" in path.stem
             else:
                 kind = classify(path.stem)
-                wanted = every_dump_of is not None or kind == "licensed"
+                wanted = every_dump_of is not None or every_kind or kind == "licensed"
                 wanted = wanted or (unlicensed and kind == "Unl")
             if not wanted or (only and not re.search(only, path.stem)):
                 continue
@@ -271,6 +274,7 @@ def main() -> int:
     parser.add_argument("--aftermarket", action="store_true", help="the Aftermarket set instead")
     parser.add_argument("--private", action="store_true", help="the Private set instead")
     parser.add_argument("--unlicensed", action="store_true", help="add the (Unl) dumps")
+    parser.add_argument("--all", action="store_true", help="every dump of the sets, pirates too")
     parser.add_argument("--every", type=int, default=1, help="keep one dump in N")
     parser.add_argument("--fds", action="store_true", help="the licensed FDS set instead")
     parser.add_argument("--slack", type=int, default=1, help="board frames tried either side")
@@ -290,7 +294,9 @@ def main() -> int:
         roms = disk_dumps(args.only)[:: args.every]
     else:
         every_dump_of = AFTERMARKET if args.aftermarket else PRIVATE if args.private else None
-        roms = licensed_dumps(args.only, mappers, every_dump_of, args.programs, args.unlicensed)
+        roms = licensed_dumps(
+            args.only, mappers, every_dump_of, args.programs, args.unlicensed, args.all
+        )
         roms = roms[:: args.every]
     if args.list:
         wanted = {line.strip() for line in args.list.read_text().splitlines() if line.strip()}

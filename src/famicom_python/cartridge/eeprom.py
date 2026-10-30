@@ -120,3 +120,121 @@ class X24C01(Eeprom):
             self.ack, self.after_ack = True, READ if byte & 1 else WRITE
         else:
             self._store(byte)
+
+
+class Microwire93C66:
+    """Microchip's 93C66 with ORG low: 512 bytes on a 3-wire bus (93C66.pdf, Table 1-4).
+
+    DI is clocked in on CLK's rise while CS is high; a 1 with CS and DI high is
+    the start bit, then a 2-bit opcode and a 9-bit address: READ (10) drives a
+    dummy 0 and then the byte MSB first on DO, the address counting on while
+    clocks continue; WRITE (01) and WRAL (00 01) take 8 data bits; ERASE (11)
+    and ERAL (00 10) set bytes to $FF; EWEN (00 11) and EWDS (00 00) allow and
+    forbid programming (EWDS at power-on). CS low ends any instruction.
+    Programming finishes at once, so DO reads ready (1) after it; DO is
+    otherwise high-impedance, taken as 1 here.
+    """
+
+    size = 512
+    address_bits = 9
+    word_bits = 8
+
+    def __init__(self) -> None:
+        self.memory = bytearray([0xFF]) * self.size
+        self.cs = self.clk = 0
+        self.output = 1
+        self.bits = 0  # bits shifted in since the start bit (0: no start bit yet)
+        self.shift = 0
+        self.write_enabled = False
+        self.reading = False
+        self.read_bits = 0
+        self.address = 0
+        self.words = self.size * 8 // self.word_bits
+
+    def lines(self, cs: int, clk: int, di: int) -> None:
+        if not cs:
+            self.bits = 0
+            self.reading = False
+            self.output = 1
+        elif clk and not self.clk:
+            self._rise(di)
+        self.cs, self.clk = cs, clk
+
+    def _word(self, address: int) -> int:
+        if self.word_bits == 8:
+            return self.memory[address]
+        return self.memory[address * 2] << 8 | self.memory[address * 2 + 1]
+
+    def _store(self, address: int, word: int) -> None:
+        if self.word_bits == 8:
+            self.memory[address] = word
+        else:
+            self.memory[address * 2] = word >> 8
+            self.memory[address * 2 + 1] = word & 0xFF
+
+    def _rise(self, di: int) -> None:
+        if self.reading:
+            if self.read_bits == self.word_bits:  # sequential read: on to the next word
+                self.address = (self.address + 1) % self.words
+                self.read_bits = 0
+            word = self._word(self.address)
+            self.output = (word >> (self.word_bits - 1 - self.read_bits)) & 1
+            self.read_bits += 1
+            return
+        if not self.bits:
+            if di:
+                self.bits, self.shift = 1, 0
+            return
+        self.shift = self.shift << 1 | di
+        self.bits += 1
+        if self.bits == 3 + self.address_bits:  # start bit + opcode + address
+            self._instruction()
+        elif self.bits == 3 + self.address_bits + self.word_bits:  # + the data
+            self._program()
+
+    def _instruction(self) -> None:
+        opcode = self.shift >> self.address_bits
+        address = self.shift & ((1 << self.address_bits) - 1)
+        special = address >> (self.address_bits - 2)
+        address %= self.words
+        self.address = address
+        if opcode == 0b10:  # READ
+            self.reading, self.read_bits, self.output = True, 0, 0
+        elif opcode == 0b11:  # ERASE
+            if self.write_enabled:
+                self._store(address, (1 << self.word_bits) - 1)
+            self._done()
+        elif opcode == 0b00:
+            if special in (0b11, 0b00):  # EWEN, EWDS
+                self.write_enabled = special == 0b11
+                self._done()
+            elif special == 0b10:  # ERAL
+                if self.write_enabled:
+                    self.memory[:] = bytes([0xFF]) * len(self.memory)
+                self._done()
+            # WRAL (01) takes its data bits first
+
+    def _program(self) -> None:
+        word_bits = self.word_bits
+        opcode = (self.shift >> (self.address_bits + word_bits)) & 3
+        data = self.shift & ((1 << word_bits) - 1)
+        if self.write_enabled:
+            if opcode == 0b01:  # WRITE
+                address = (self.shift >> word_bits) & ((1 << self.address_bits) - 1)
+                self._store(address % self.words, data)
+            else:  # WRAL
+                for address in range(self.words):
+                    self._store(address, data)
+        self._done()
+
+    def _done(self) -> None:
+        self.bits = 0
+        self.output = 1  # ready
+
+
+class Microwire93C56(Microwire93C66):
+    """The 93C56 with ORG high: 128 16-bit words, 8 address bits (A7 unused), big-endian here."""
+
+    size = 256
+    address_bits = 8
+    word_bits = 16
