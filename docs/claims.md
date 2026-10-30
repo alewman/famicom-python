@@ -64,6 +64,12 @@ written against the NES 2.0 definition, not measured on hardware.
 | 87 J87 | swapped CHR bits | none | detector only | |
 | 185 CNROM + diodes | 185.4-7 chip selects, D0 pulled up when disabled | `tests/test_mappers_m7.py` | detector only | 185.0 (no licensed dump) |
 | 268 AA6023 | 268.0/1 and 268.8/9: outer PRG/CHR banks, GNROM mode, lockout, NEC IRQ | none | detector only | the "weird" modes, mixed CHR-ROM/RAM, mega-UNROM, other PCBs |
+| 13, 37, 47, 70, 72, 76, 77, 78, 86, 88, 89, 92, 93, 94, 95, 97, 119, 140, 152, 154, 180, 184 | the discrete and MMC3/Namco-108-derived boards of the licensed gaps, each from its wiki page (cartridge.md "The licensed gaps") | every licensed dump (57) equals Mesen2's frames; `tests/test_mappers_gaps.py` | detector only | the µPD7756C speech of 72 and 86; 86's `$E000` register copies; 37's latch cleared by the CIC reset |
+| 65, 67, 73, 68, 80/207, 82/552, 105, 153, 188 | the counters (H3001, Sunsoft-3, VRC3), Sunsoft-4's ROM nametables and 68.1's cassette and licensing timer, the X1-005/X1-017 RAM and registers, NES-EVENT's lock and timer, the LZ93D50 with RAM, Karaoke Studio's expansion ROM | every licensed dump equals Mesen2's frames; `tests/test_mappers_gaps.py` | detector only | C47 (`$7EF6` polarity), C49 (H3001 `$C000`), C52; the X1-017 IRQ (no game); the Karaoke microphone (idle) |
+| 48 TC0690 | TC0190's banks, the MMC3's counter, /IRQ 4 CPU cycles later | 4 of 6 licensed dumps equal Mesen2; *Flintstones* and *Jetsons* do not (C48) | detector only | the delay (C48, open) |
+| 64 RAMBO-1 | the wiki's main description: R0-RF, K and P modes, A12 or 4-cycle clock, the reload "kick", /IRQ 2 or 1 cycles late | `tests/test_mappers_gaps.py`; 7 Tengen dumps differ from Mesen2 (C53) | model only | the counter (C53, open) |
+| 11, 71, 79, 113, 232 | Color Dreams (conflicts by submapper), Camerica (Fire Hawk's late mirroring, the Aladdin swap), NINA-03/06 and HES | 173 of 199 "(Unl)" dumps on the new mappers equal Mesen2 (validation.md); the Color Dreams betas need 11.0's conflict-free board, where Mesen2 hangs them | detector only | the lockout circuits |
+| 96 Oeka Kids, 115 Kǎshèng, 470 INX_007T_V01 | as cartridge.md | 96 and 115: their licensed dumps equal Mesen2; 470: Mesen2 2.1.1 has no 470, so by eye (Retro-Bit's menu, then the game from another outer bank) | detector only (470: none) | the Oeka Kids tablet; C51 |
 
 **The MMC3's A12 filter** ("after the line has remained low for three
 falling edges of M2", MMC3.wiki from Furrtek's MMC3C schematic) is three falls

@@ -4535,5 +4535,338 @@
   "kind": "document",
   "license": "Microchip data sheet (freely distributed)",
   "note": "SST39SF010A/020A/040 data sheet DS20005022C: the flash of mappers 30 and 111"
+ },
+ {
+  "path": "reference/nesdev-wiki/Taito_X1-017.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=Taito_X1-017&action=raw",
+  "sha256": "2501fa46e124200564a9462d62a0f37fdeba2f65eb512e87493db8832193d38c",
+  "size": 6002,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: Taito_X1-017 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_207.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_207&action=raw",
+  "sha256": "2350fec4f5d621d3a850666ee1fab438adc8cdc1e5954452130307be57b97c03",
+  "size": 1397,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_207 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_152.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_152&action=raw",
+  "sha256": "d6ba88972d1dea6b7a3d6cca4794acba9d94cb2c45214e0882ff989d4aaa6a01",
+  "size": 1073,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_152 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_140.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_140&action=raw",
+  "sha256": "685cf8ee17ce23daee036550bf2ca29725aaeb754a798d4b7de821d941d57615",
+  "size": 795,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_140 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_070.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_070&action=raw",
+  "sha256": "ee45532ef14833d9d6d4c610f03d4db1afc8b7bcbd31924f7417b126c70227de",
+  "size": 1459,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_070 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_119.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_119&action=raw",
+  "sha256": "2ba3f650b5555c6cc703d8a19a7fe973912909ccc09d18d7ed7f74e92e339a76",
+  "size": 2579,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_119 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_065.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_065&action=raw",
+  "sha256": "bb7b414ea980f6368a58c932b8231f7e2aa5442c486defeeaf45b8dd687be575",
+  "size": 2605,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_065 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_076.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_076&action=raw",
+  "sha256": "cd1347166b6d8f3d82704f421753275b94fef9fb54c4c07dfbed05064e21f602",
+  "size": 1434,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_076 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_095.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_095&action=raw",
+  "sha256": "112b8d323e7b0978f4e1c8dbed36728c45108f5cb92a34a166a66c25102f3ab9",
+  "size": 2497,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_095 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_188.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_188&action=raw",
+  "sha256": "a0d0fd8780a9f8a65c053ab5d5f1f72d487f9a833d0d131b33bdd9d5c0f6b51f",
+  "size": 2350,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_188 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_072.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_072&action=raw",
+  "sha256": "c90b655f9ef720474dbc14346482d3283a5f5ac14f1ef51e2d38597dfcac50e5",
+  "size": 5537,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_072 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_093.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_093&action=raw",
+  "sha256": "190d13f0dc600606142c9944ae8c2d580a75aca734422e9f1149447e8f9fee17",
+  "size": 1800,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_093 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_067.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_067&action=raw",
+  "sha256": "b55281036c7ace67c11848102de358d9a4da2cd26fd79dbeb31b92b3ed95f5c8",
+  "size": 3465,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_067 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_092.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_092&action=raw",
+  "sha256": "c697658ae29fd7b0f239cb9c1ecfbc66dccf850c26939ba9ff02f89c5cad2585",
+  "size": 745,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_092 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_096.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_096&action=raw",
+  "sha256": "89114dddbebab0689f476553bbdb574f3a4c6d1cde572c8897450b76237ca9bc",
+  "size": 4886,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_096 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_037.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_037&action=raw",
+  "sha256": "1c2776bcf774d5f012fad09a92ba3d3c2185b6a79e4af4d3492675a57d80c03f",
+  "size": 2944,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_037 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_154.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_154&action=raw",
+  "sha256": "e5e8d36a0fbb035b39e80779bdafe491b5f259656328bd9646efd0afd4680ab9",
+  "size": 939,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_154 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_153.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_153&action=raw",
+  "sha256": "843b83f795cc6794917bdf11187a6b20a7afdeb9a5bd922c98673e2d91687395",
+  "size": 1668,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_153 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_097.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_097&action=raw",
+  "sha256": "06b3e044cb9de14b22c1d1f1f7da000fab6c82e8d320876be9d2245b940673f3",
+  "size": 887,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_097 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_077.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_077&action=raw",
+  "sha256": "8e2d4250e8c0b21de89464541b6defc6f9028f90c2ee7c6b09ee470212c3b86e",
+  "size": 1439,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_077 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/NES-EVENT.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=NES-EVENT&action=raw",
+  "sha256": "36de43a3d0a6226c0a28513e4577d856c031d7f714e554d9c4fcae8a67f60521",
+  "size": 5877,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: NES-EVENT (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/VRC3.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=VRC3&action=raw",
+  "sha256": "ee96e00c10d4ccea9fd8225d3ee3b057ad2c117e393592a391cc02150d3c0817",
+  "size": 3285,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: VRC3 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_094.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_094&action=raw",
+  "sha256": "6022828f3bfb53fee57bc02adfeaee930bc466527fad50ed4dfb5188f2e8f5fa",
+  "size": 1136,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_094 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_047.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_047&action=raw",
+  "sha256": "84e7db0ee370dedccfcd42aebb6a7c5f292878eb5a08ec8e1b479f07436e162f",
+  "size": 844,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_047 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_089.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_089&action=raw",
+  "sha256": "491d6797826e44e1086a42e08efee00df1b7bddafb193f1c38d11c8f2044e220",
+  "size": 986,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_089 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_115.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_115&action=raw",
+  "sha256": "f62c9a75093a9eb73c9c4f6e9fafbbf94d35f30413b6cc6312ceebce422fe39c",
+  "size": 2344,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_115 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/CPROM.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=CPROM&action=raw",
+  "sha256": "6ab27b949d2760ebe4bd1f4a017dc977ef9e774343c6291416375ffbd577bd2f",
+  "size": 1367,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: CPROM (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_186.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_186&action=raw",
+  "sha256": "245f8db0aea97436d4c7337408f387218e0f5e819776dd2e9c0b95575686e883",
+  "size": 338,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_186 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/RAMBO-1.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=RAMBO-1&action=raw",
+  "sha256": "1721290b8c6d797331ae0f10c9efb57cca18a304e2da2e88f0bb31ab2cba439b",
+  "size": 9970,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: RAMBO-1 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_232.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_232&action=raw",
+  "sha256": "cd5d7ef6cac8703819ac1a30bfb998d98996f906ebcd62d93ec45173cbeb3547",
+  "size": 1176,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_232 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_113.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_113&action=raw",
+  "sha256": "1ac38cbd127b59974e0272938cddfaf89a27cdf2af3b81db031f91a0bf3b06ae",
+  "size": 1516,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_113 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_029.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_029&action=raw",
+  "sha256": "87bdd9b6ea73ca6d14ad0a17f60198fed25b36418c8faaf76eae44321c5772f8",
+  "size": 2414,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: INES_Mapper_029 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/NES_2.0_Mapper_547.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=NES_2.0_Mapper_547&action=raw",
+  "sha256": "ef0556de8a38675f7037aba163c10c05ab4868bcbee35c2ad736a10011029acf",
+  "size": 11958,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: NES_2.0_Mapper_547 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/NES_2.0_Mapper_470.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=NES_2.0_Mapper_470&action=raw",
+  "sha256": "8d24d26bcb0d004edfc8b9467bb6466c2642ab7b71ac3a5974dbb1f965ab2f59",
+  "size": 459,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: NES_2.0_Mapper_470 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/NES_2.0_Mapper_555.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=NES_2.0_Mapper_555&action=raw",
+  "sha256": "bfcecf02a5d96167f081e3ff2b3c167adae3f70a831cc491f04d9b4267106019",
+  "size": 174,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: NES_2.0_Mapper_555 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/NES_2.0_Mapper_682.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=NES_2.0_Mapper_682&action=raw",
+  "sha256": "3825201f0f612ae26c59c38e42b99c277b44cbdaa499999c4c6c92934463e76f",
+  "size": 672,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: NES_2.0_Mapper_682 (the licensed gaps)"
+ },
+ {
+  "path": "reference/nesdev-wiki/Bandai_FCG_board.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=Bandai_FCG_board&action=raw",
+  "sha256": "ce11688a5ee17e1af22e3ef7e43f5d2a1d5da02c7484746e792222609e32aa4f",
+  "size": 3841,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-10-29: Bandai_FCG_board (the licensed gaps)"
  }
 ]

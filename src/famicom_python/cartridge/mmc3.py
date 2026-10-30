@@ -1,4 +1,6 @@
-"""MMC3 and its relatives (mapper 4): MMC6, MC-ACC, and the NEC and Sharp IRQs.
+"""MMC3 and its relatives (mapper 4): MMC6, MC-ACC, and the NEC and Sharp IRQs; and its boards
+TxSROM (118), TQROM (119), the AA6023 (268), the multicarts 37 and 47, and Kǎshèng's clone
+(115).
 
 MMC3.wiki and MMC6.wiki (specification tier); judged by blargg's
 ``mmc3_test_2``, ``mmc3_test`` and ``mmc3_irq_tests`` and by Holy Mapperel
@@ -298,6 +300,137 @@ class AA6023(MMC3):
             if o3 & 0x10:
                 one = (one & ~0x7F) | (self.outer[2] & 0x0F) << 3 | ((window + i) & 7)
             super().map_chr(window + i, 1, one)
+
+
+class MMC3Multicart(MMC3):
+    """Mappers 37 and 47: Nintendo of Europe's MMC3 multicarts, an outer bank in place of PRG-RAM.
+
+    A latch at $6000-$7FFF takes writes only while the MMC3's $A001 enables
+    and allows writing its "RAM"; reads there are open bus.
+
+    - 37 (Super Mario Bros. + Tetris + Nintendo World Cup,
+      INES_Mapper_037.wiki): D2-D0 = Q2-Q0; PRG A16 = Q0·Q1 + Q2·(the MMC3's
+      A16), PRG A17 = CHR A17 = Q2.
+    - 47 (Super Spike V'Ball + Nintendo World Cup, INES_Mapper_047.wiki): D0
+      selects a 128 KiB PRG and 128 KiB CHR block.
+
+    Not modelled: the CIC's reset clearing 37's latch (the console's reset
+    does not reach the connector), so only power-on returns to the menu here.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.outer = 0
+        self.ram_control = 0x80  # $A001 as the MMC3 powers on here: enabled, writable
+        self.three_games = image.board.mapper == 37
+        super().__init__(image, cpu_cycle_ticks)
+
+    def ram_protect(self, value: int) -> None:
+        self.ram_control = value
+        super().ram_protect(value)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if 0x6000 <= address < 0x8000:
+            if self.ram_control & 0xC0 == 0x80:
+                self.outer = value & (7 if self.three_games else 1)
+                self._update()
+            return
+        super().cpu_write(address, value, t)
+
+    def map_prg(self, window: int, size_kib: int, bank: int) -> None:
+        q = self.outer
+        if self.three_games:
+            a16 = (q & 3 == 3) or bool(q & 4 and bank & 8)
+            bank = (bank & 7) | a16 << 3 | (q & 4) << 2
+        else:
+            bank = (bank & 0x0F) | q << 4
+        super().map_prg(window, size_kib, bank)
+
+    def map_chr(self, window: int, size_kib: int, bank: int) -> None:
+        high = (self.outer >> 2 if self.three_games else self.outer) & 1
+        for i in range(size_kib):
+            super().map_chr(window + i, 1, (bank * size_kib + i) & 0x7F | high << 7)
+
+
+class TQROM(MMC3):
+    """Mapper 119: TQROM (High Speed, Pin-Bot): CHR-ROM and 8 KiB of CHR-RAM side by side.
+
+    INES_Mapper_119.wiki: D6 of a CHR bank number selects the RAM (1) or the
+    ROM (0) for that bank's window, D5-D0 the bank (the RAM's eight 1 KiB
+    banks repeat).
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.rom_size = len(image.chr)
+        self.ram_window = [False] * 8
+        super().__init__(image, cpu_cycle_ticks)
+        self.chr = bytearray(image.chr) + bytearray(0x2000)  # the RAM after the ROM
+
+    def map_chr(self, window: int, size_kib: int, bank: int) -> None:
+        for i in range(size_kib):
+            one = bank * size_kib + i
+            ram = bool(one & 0x40)
+            self.ram_window[window + i] = ram
+            if ram:
+                self.chr_offsets[window + i] = self.rom_size + (one & 7) * 0x400
+            else:
+                self.chr_offsets[window + i] = (one & 0x3F) * 0x400 % self.rom_size
+
+    def ppu_write(self, address: int, value: int, t: int) -> None:
+        if address >= 0x2000:
+            super().ppu_write(address, value, t)
+        elif self.ram_window[address >> 10]:
+            self.chr[self.chr_offsets[address >> 10] + (address & 0x3FF)] = value
+
+
+class Kasheng(MMC3):
+    """Mapper 115: Kǎshèng SFC-02B/-03/-004: an MMC3 clone with an NROM override and outer banks.
+
+    INES_Mapper_115.wiki (mask $E003, regardless of the PRG-RAM enable):
+    $6000 ``MPN.PPPp``: M = 1 replaces the MMC3's PRG A17-A14 with PPPp
+    (16 KiB, both halves) or, with N, PPP and CPU A14 (32 KiB); P is PRG A18
+    in either mode. $6001 D0 is CHR A18. A read of $6002 gives the solder
+    pads (D2-D0; 0 here). The IRQ is Sharp's. Mesen2 has an older model
+    (registers at $4100-$7FFF, a protection register at $5080); this is the
+    wiki's. Power-on registers $00.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.mode = 0
+        self.chr_outer = 0
+        super().__init__(image, cpu_cycle_ticks)
+        self.prg_ram_enabled = False
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        if 0x6000 <= address < 0x8000:
+            return 0x00 | 0xF8 << 8 if address & 0xE003 == 0x6002 else None
+        return super().cpu_read(address, t)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if 0x6000 <= address < 0x8000:
+            register = address & 0xE003
+            if register == 0x6000:
+                self.mode = value
+            elif register == 0x6001:
+                self.chr_outer = value & 1
+            self._update()
+            return
+        super().cpu_write(address, value, t)
+
+    def map_prg(self, window: int, size_kib: int, bank: int) -> None:
+        mode = self.mode
+        a18 = (mode >> 6) & 1
+        if mode & 0x80:  # NROM: A17-A14 from the register
+            sixteen = mode & 0x0F
+            if mode & 0x20:
+                sixteen = (sixteen & ~1) | (window >> 1)
+            bank = (a18 << 5 | sixteen << 1) | (window & 1)
+        else:
+            bank = (bank & 0x1F) | a18 << 5
+        super().map_prg(window, size_kib, bank)
+
+    def map_chr(self, window: int, size_kib: int, bank: int) -> None:
+        for i in range(size_kib):
+            super().map_chr(window + i, 1, (bank * size_kib + i) | self.chr_outer << 8)
 
 
 def mmc3_for(image: RomImage, cpu_cycle_ticks: int) -> MMC3:

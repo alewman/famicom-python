@@ -129,6 +129,74 @@ class MMC1(Banked):
             self.map_prg(2, 16, outer | fixed)
 
 
+#: The NES-EVENT timer's four DIP switches, D C B A, as Nintendo set them for
+#: the 1990 tournament (C closed: NES-EVENT.wiki), counter bits 28-25.
+EVENT_DIP_SWITCHES = 0b0100
+
+
+class NESEvent(MMC1):
+    """Mapper 105: NES-EVENT (Nintendo World Championships 1990): two PRG chips and a timer.
+
+    NES-EVENT.wiki: the MMC1's CHR register 0 ($A000) is ``IOAA.``: with O
+    clear, A selects a 32 KiB bank of the first 128 KiB chip; with O set, the
+    second chip is banked as an MMC1 by the PRG register ($E000 D2-D0) and
+    the PRG mode. Until I has been cleared and then set once, the first 32
+    KiB stays at $8000. While I is clear a 30-bit counter counts M2 cycles;
+    set, it holds at 0 and /IRQ is acknowledged. The counter reaching
+    $20000000 + (DIP switches) x $2000000 asserts /IRQ: 6.25 minutes with
+    the tournament's :data:`EVENT_DIP_SWITCHES`. 8 KiB of CHR-RAM, unbanked;
+    8 KiB of PRG-RAM, which $E000 D4 disables as on the MMC1B.
+    """
+
+    counts_m2 = True
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.unlocked = False
+        self.saw_running = False  # I has been 0 since power-on: the next 1 unlocks
+        self.timer_held = False
+        self.counter = 0
+        self.target = 0x20000000 + EVENT_DIP_SWITCHES * 0x2000000
+        super().__init__(image, cpu_cycle_ticks)
+        self.snrom = False  # CHR register 0's D4 is the timer's, not a RAM disable
+        self._update()
+
+    def _update(self) -> None:
+        held = bool(self.chr0 & 0x10)
+        if held and not self.timer_held and self.saw_running:
+            self.unlocked = True
+        if held:
+            self.counter = 0
+            self.irq = False
+        else:
+            self.saw_running = True
+        self.timer_held = held
+        super()._update()
+        self.map_chr(0, 8, 0)
+
+    def _update_prg(self, control: int) -> None:
+        if not self.unlocked:
+            self.map_prg(0, 32, 0)
+        elif not self.chr0 & 0x08:  # the first chip, 32 KiB banks
+            self.map_prg(0, 32, (self.chr0 >> 1) & 3)
+        else:  # the second chip, as an MMC1
+            bank = 8 | (self.prg_bank & 7)
+            mode = (control >> 2) & 3
+            if mode < 2:
+                self.map_prg(0, 32, bank >> 1)
+            elif mode == 2:
+                self.map_prg(0, 16, 8)
+                self.map_prg(2, 16, bank)
+            else:
+                self.map_prg(0, 16, bank)
+                self.map_prg(2, 16, 15)
+
+    def m2(self, t: int) -> None:
+        if not self.timer_held:
+            self.counter += 1
+            if self.counter == self.target:
+                self.irq = True
+
+
 class MMC1A(MMC1):
     """Mapper 155: MMC1A, whose $E000 D4 leaves PRG-RAM enabled (MMC1.wiki "ASIC Revisions")."""
 

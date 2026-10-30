@@ -1,4 +1,5 @@
-"""Namco's mappers: the 108 family (206), the 129/163 (19) and the 175/340 (210).
+"""Namco's mappers: the 108 family (206, and its boards 76, 88, 95 and 154), the 129/163 (19)
+and the 175/340 (210).
 
 No judge ROM exists for any of them (docs/cartridge.md); their claims rest on
 milestone 7's sweep against Mesen2, a detector (docs/claims.md). The 163's
@@ -63,10 +64,63 @@ class Namco108(Banked):
             self.map_prg(1, 8, r[7] & 0x0F)
             self.map_prg(2, 8, last - 1)
             self.map_prg(3, 8, last)
+        self._map_chr(r)
+
+    def _map_chr(self, r: list[int]) -> None:
         self.map_chr(0, 2, (r[0] & 0x3E) >> 1)
         self.map_chr(2, 2, (r[1] & 0x3E) >> 1)
         for i in range(4):
             self.map_chr(4 + i, 1, r[2 + i] & 0x3F)
+
+
+class Namco3446(Namco108):
+    """Mapper 76: NAMCOT-3446 (Megami Tensei): four 2 KiB CHR banks from R2-R5, 128 KiB.
+
+    INES_Mapper_076.wiki: the 108's 1 KiB registers rewired for 2 KiB; R0 and
+    R1 do nothing.
+    """
+
+    def _map_chr(self, r: list[int]) -> None:
+        for i in range(4):
+            self.map_chr(2 * i, 2, r[2 + i] & 0x3F)
+
+
+class Namco3433(Namco108):
+    """Mappers 88 (NAMCOT-3433/3443) and 154 (NAMCOT-3453, Devil Man): PPU A12 as CHR A16.
+
+    INES_Mapper_088.wiki, _154.wiki: $0000-$0FFF sees the first 64 KiB of
+    CHR, $1000-$1FFF the second (the same as 206 with 64 KiB or less). 154
+    adds D6 of any write to $8000-$FFFF as the one-screen select (A or B).
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.one_screen = image.board.mapper == 154
+        if self.one_screen:
+            self.set_mirroring(SCREEN_A)
+
+    def _map_chr(self, r: list[int]) -> None:
+        self.map_chr(0, 2, (r[0] & 0x3E) >> 1)
+        self.map_chr(2, 2, (r[1] & 0x3E) >> 1)
+        for i in range(4):
+            self.map_chr(4 + i, 1, r[2 + i] & 0x3F | 0x40)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        super().cpu_write(address, value, t)
+        if self.one_screen and address >= 0x8000:
+            self.set_mirroring(SCREEN_B if value & 0x40 else SCREEN_A)
+
+
+class Namco3425(Namco108):
+    """Mapper 95: NAMCOT-3425 (Dragon Buster): CHR A15 drives CIRAM A10.
+
+    INES_Mapper_095.wiki: D5 of R0 picks the nametable at $2000-$27FF, D5 of
+    R1 the one at $2800-$2FFF (the 108 maps a nametable fetch through the CHR
+    registers, ignoring PPU A13, as TxSROM does).
+    """
+
+    def ciram_a10(self, address: int) -> int | None:
+        return (self.registers[(address >> 11) & 1] >> 5) & 1
 
 
 class Namco163(Banked):

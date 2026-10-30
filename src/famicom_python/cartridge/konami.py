@@ -1,4 +1,5 @@
-"""Konami's VRC mappers: VRC1 (75), VRC2 and VRC4 (21, 22, 23, 25), VRC6 (24, 26), the VRC IRQ.
+"""Konami's VRC mappers: VRC1 (75), VRC2 and VRC4 (21, 22, 23, 25), VRC3 (73), VRC6 (24, 26),
+the VRC IRQ.
 
 AWJ's ``vrctest`` judges the VRC2/VRC4 wiring and IRQ (docs/claims.md); no
 judge ROM exists for the VRC1, whose claim rests on milestone 7's sweep
@@ -60,6 +61,64 @@ class VRC1(Banked):
     def _update_chr(self) -> None:
         self.map_chr(0, 4, self.chr_banks[0])
         self.map_chr(4, 4, self.chr_banks[1])
+
+
+class VRC3(Banked):
+    """Mapper 73: VRC3 (Salamander): 16 KiB PRG and the last fixed, 8 KiB CHR-RAM, a cycle counter.
+
+    VRC3.wiki: $8000-$BFFF the reload value's four nibbles, low first; $C000
+    ``.MEA``: M the 8-bit mode, E enables, A the enable an acknowledge
+    restores, and with E set the write reloads all 16 bits; $D000 copies A
+    to E; both acknowledge. $F000 D2-D0 the PRG bank. Enabled, the counter
+    increments every CPU cycle; its overflow from $FFFF (in 8-bit mode the
+    low byte's, from $FF) asserts /IRQ and reloads it (in 8-bit mode the low
+    byte only). PRG-RAM at $6000 if the board has it. Power-on registers
+    unspecified: 0 here.
+    """
+
+    counts_m2 = True
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.reload = 0
+        self.counter = 0
+        self.control = 0
+        self.map_prg(2, 16, len(self.prg) // 0x4000 - 1)
+        self.map_chr(0, 8, 0)
+
+    def m2(self, t: int) -> None:
+        if not self.control & 2:
+            return
+        if self.control & 4:
+            low = (self.counter & 0xFF) + 1
+            if low > 0xFF:
+                low = self.reload & 0xFF
+                self.irq = True
+            self.counter = (self.counter & 0xFF00) | low
+        else:
+            self.counter += 1
+            if self.counter > 0xFFFF:
+                self.counter = self.reload
+                self.irq = True
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+            return
+        region = address & 0xF000
+        if region < 0xC000:
+            shift = (region - 0x8000) >> 10  # $8000 0, $9000 4, $A000 8, $B000 12
+            self.reload = (self.reload & ~(0xF << shift)) | (value & 0xF) << shift
+        elif region == 0xC000:
+            self.control = value & 7
+            if value & 2:
+                self.counter = self.reload
+            self.irq = False
+        elif region == 0xD000:
+            self.control = (self.control & ~2) | (self.control & 1) << 1
+            self.irq = False
+        elif region == 0xF000:
+            self.map_prg(0, 16, value & 7)
 
 
 class VRCIrq:

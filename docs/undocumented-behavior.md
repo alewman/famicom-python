@@ -550,6 +550,48 @@ before the board takes a side.
   refresh step on the same dot. So OAM *can* be written then, at a moving
   address. Accesses on consecutive cycles, which no 6502 instruction makes,
   behave otherwise again and are not modelled.
+- **C47. Taito X1-005/X1-017 `$7EF6` D0.** Both wiki pages write "0:
+  vertical (A11); 1: horizontal (A10)": the words contradict the pins, since
+  CIRAM A10 from PPU A10 *is* vertical. *Board*: the pins (1 vertical), as
+  Mesen2 has it; every licensed dump of 80, 82, 207 and 552 equals Mesen2's
+  frames (validation.md "The licensed gaps").
+- **C48. TC0690's IRQ delay** (mapper 48). INES_Mapper_048.wiki (Disch's
+  notes): "about a 4 CPU cycle delay" after the MMC3's IRQ. Forum t=18277:
+  *Flintstones* runs cleanly on its own TC0690 (krzysiobal's cart), while
+  *Jetsons*' ROMs on that same chip show a glitched line, so the two games
+  may have had different chip revisions; NewRisingSun: Jetsons needs "at
+  least six CPU cycles, not four". Mesen2 uses 22 (48.0) and 6 with the
+  reload + 1 (48.1, a submapper the NES 2.0 page does not list). *Board*:
+  the wiki's 4 (`taito.TC0690_IRQ_DELAY`); every delay from 17 to 22 gives
+  Mesen2's Flintstones frame, 4 to 16 another (2,318 pixels below the
+  title's split), and neither looks wrong. **Open**: no measurement.
+- **C49. Irem H3001's `$C000`.** Disch's notes and Mesen2: a switchable bank
+  at `$C000` (register `$C000`). INES_Mapper_065.wiki, citing forum
+  p=259459: no such register; `$9000` D7 moves the `$8000` bank to `$C000`
+  instead, the second-last taking its place. *Board*: the wiki. The three
+  licensed games equal Mesen2's frames either way.
+- **C50. Bus conflicts on 13, 70, 89, 93, 94 and 152.** Their wiki pages
+  give them AND-type conflicts (a 74161 latch with the ROM enabled during
+  the write); Mesen2 models none. *Board*: the wiki. Every licensed dump
+  equals Mesen2's frames: the games write values that agree with the ROM.
+- **C51. Mapper 115's registers.** INES_Mapper_115.wiki: `$6000-$6002`
+  (mask `$E003`), `$6000` D6 PRG A18, `$6002` the solder pads. Mesen2: an
+  older model decoding `$4100-$7FFF` with a protection register at `$5080`.
+  *Board*: the wiki.
+- **C52. Nantettatte!! Baseball's licensing timer.** INES_Mapper_068.wiki:
+  restarted by writes to `$6000-$7FFF` while the RAM is disabled. Mesen2:
+  by any write there. *Board*: the wiki; both dumps equal Mesen2's frames.
+- **C53. The RAMBO-1's counter** (mapper 64). RAMBO-1.wiki gives two
+  descriptions: the main one (MMC3-like clocking, a reload "ORed with 1"
+  after `$C001`, /IRQ 2 cycles late in scanline mode, 1 in cycle mode) and
+  M2-level rules for scanline mode that "need to be refined and merged"
+  (a 4-bit prescaler of M2 falls with A12 low; /IRQ on a clock that finds 0).
+  Mesen2's counter is tuned per game (its source names Hard Drivin', Skull &
+  Crossbones and Klax). *Board*: the main description. Against Mesen2's
+  frames (60/300/600): Klax 0/4,982/4,982 pixels (the M2 rules 0/10,754/
+  10,754), Rolling Thunder 9/8/16 (926/917/925), Xybots 0/15,455/- (0/2/8),
+  Hard Drivin' 116/15/634 (7,385/3,072/5,995), Skull & Crossbones 256/256/32
+  (14,222/16,650/-). **Open**: no judge; Tengen's games are the only test.
 
 ## Open items
 
