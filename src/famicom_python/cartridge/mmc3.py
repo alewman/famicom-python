@@ -389,6 +389,68 @@ class TQROM(MMC3):
             self.chr[self.chr_offsets[address >> 10] + (address & 0x3FF)] = value
 
 
+class Event2(TQROM):
+    """Mapper 555: NES-EVENT2 (Nintendo Campus Challenge 1991): MMC3, TQROM and a timer.
+
+    The page is a stub; MAME's event.cpp (BSD-3, from RetroZone's reproduction). $5000-$57FF
+    2 KiB of RAM after the 8 KiB at $6000. $5800-$5BFF: D1-D2 = %01 the TQROM
+    mode, D2 PRG A17 and CHR A17 base, D1-D0 the PRG mask's D4-D3, D3 runs the
+    30-bit M2 timer (0 clears it). Reads of $5800-$5FFF: D7 set once the timer
+    passes (16 + DIP) * 2^25, the DIPs here MAME's default, 6:15.5. What the
+    RJ11 to the scoreboard does is not known and not modelled.
+    """
+
+    counts_m2 = True
+    DIP = 4
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.tq_mode = False
+        self.prg_base, self.prg_mask, self.chr_base = 0, 7, 0
+        self.timer = 0
+        self.timing = False
+        super().__init__(image, cpu_cycle_ticks)
+        self.prg_ram = bytearray(max(len(self.prg_ram), 0x4000))
+        self.prg_ram_mask = 0x1FFF
+
+    def map_prg(self, window: int, size_kib: int, bank: int) -> None:
+        super().map_prg(window, size_kib, (bank & self.prg_mask) | self.prg_base)
+
+    def map_chr(self, window: int, size_kib: int, bank: int) -> None:
+        if self.tq_mode:
+            super().map_chr(window, size_kib, bank)
+            return
+        for i in range(size_kib):
+            one = ((bank * size_kib + i) & 0x7F) | self.chr_base
+            self.ram_window[window + i] = False
+            self.chr_offsets[window + i] = one * 0x400 % self.rom_size
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        if 0x5800 <= address < 0x6000:
+            return 0x80 if self.timer >= (0x10 | self.DIP) << 25 else 0
+        if 0x5000 <= address < 0x5800:
+            return self.prg_ram[0x2000 + (address & 0x7FF)]
+        return super().cpu_read(address, t)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if 0x5000 <= address < 0x5800:
+            self.prg_ram[0x2000 + (address & 0x7FF)] = value
+        elif 0x5800 <= address < 0x5C00:
+            self.tq_mode = value & 6 == 2
+            self.prg_base = (value & 4) << 3
+            self.prg_mask = (value & 3) << 3 | 7
+            self.chr_base = self.prg_base << 2
+            self.timing = bool(value & 8)
+            if not self.timing:
+                self.timer = 0
+            self._update()
+        else:
+            super().cpu_write(address, value, t)
+
+    def m2(self, t: int) -> None:
+        if self.timing:
+            self.timer += 1
+
+
 class Kasheng(MMC3):
     """Mapper 115: Kǎshèng SFC-02B/-03/-004: an MMC3 clone with an NROM override and outer banks.
 

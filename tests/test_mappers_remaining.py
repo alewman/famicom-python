@@ -8,11 +8,15 @@ orders, what a reset does, the counters' edges.
 
 from __future__ import annotations
 
-from test_mappers import build
+from dataclasses import replace
 
+from test_mappers import TICKS, build, image
+
+from famicom_python.cartridge import MAPPERS
 from famicom_python.cartridge.eeprom import Microwire93C56, Microwire93C66
 from famicom_python.cartridge.flash import Flash29F040
 from famicom_python.cartridge.pic16c54 import PIC16C54, STATUS, Z
+from famicom_python.cartridge.vrc5 import kanji_tile
 
 
 def offset(cart, address: int) -> int:
@@ -359,7 +363,7 @@ def test_mappers_252_253_ram_pages() -> None:
     cart.map_chr(0, 1, 5)
     cart.map_chr(1, 1, 6)
     assert cart.chr_ram_window[:2] == [True, False] and cart.chr_offsets[0] == 0x400
-    assert build(252, prg_kib=256, chr_kib=128).first_ram == 6
+    assert build(252, prg_kib=256, chr_kib=128).ram_match == 6
 
 
 def test_mapper_117_registers() -> None:
@@ -374,3 +378,178 @@ def test_mapper_117_registers() -> None:
         cart.ppu_address(0, rise * 1000)
         cart.ppu_address(0x1000, rise * 1000 + 500)
     assert cart.irq
+
+
+# -- the second pass: games, forum analyses and MAME's notes ----------------
+
+
+def test_mapper_222_counter_clocks_its_two_nibbles_apart() -> None:
+    cart = build(222, prg_kib=128, chr_kib=128, submapper=1)
+    cart.cpu_write(0xF000, 0, 0)
+    cart.cpu_write(0xF001, 0xEE, 0)
+    cart.cpu_write(0xF002, 0, 0)
+    for _ in range(0x40):
+        cart.m2(0)
+    assert cart.count == 0xFF and cart.irq  # $EE to $FF, the low one carrying at 15
+    cart.cpu_write(0xF001, 0, 0)
+    assert not cart.irq
+
+
+def test_mapper_222_2_takes_a_whole_chr_bank() -> None:
+    cart = build(222, prg_kib=128, chr_kib=256, submapper=2)
+    cart.cpu_write(0xB000, 0x44, 0)
+    cart.cpu_write(0xB001, 0x44, 0)
+    assert cart.chr_registers[0] == 0x44
+
+
+def test_mapper_272_counts_a13_falls_and_overrides_the_arrangement() -> None:
+    cart = build(272, prg_kib=128, chr_kib=128)
+    cart.cpu_write(0xF008, 0, 0)
+    for _ in range(86):
+        cart.ppu_address(0x2000, 0)
+        cart.ppu_address(0x0000, 0)
+    assert cart.irq and cart.count == 0
+    cart.cpu_write(0xF004, 0, 0)
+    assert not cart.irq
+    cart.cpu_write(0x9004, 3, 0)  # both the VRC2's register and the extra one
+    assert cart.mirroring == "B"
+
+
+def test_mapper_238_protection() -> None:
+    cart = build(238, prg_kib=128, chr_kib=128)
+    for written, expected in ((0, 0), (1, 2), (2, 2), (3, 3)):
+        cart.cpu_write(0x5D82, written, 0)
+        assert cart.cpu_read(0x4345, 0) & 3 == expected
+
+
+def test_mapper_216_latches_the_address() -> None:
+    cart = build(216, prg_kib=64, chr_kib=64)
+    cart.cpu_write(0xFFFF, 0, 0)
+    assert cart.prg_offsets[0] == 0x8000 and cart.chr_offsets[0] == 7 * 0x2000
+    assert cart.cpu_read(0x6000, 0) == 0
+
+
+def test_mapper_170_keeps_d6_for_d7() -> None:
+    cart = build(170, prg_kib=32, chr_kib=8)
+    cart.cpu_write(0x7000, 0x40, 0)
+    assert cart.cpu_read(0x7001, 0) & 0x80
+    cart.cpu_write(0x6502, 0, 0)
+    assert not cart.cpu_read(0x7777, 0) & 0x80
+
+
+def test_mapper_244_banks_by_address() -> None:
+    cart = build(244, prg_kib=128, chr_kib=64)
+    cart.cpu_write(0x806D, 0x13, 0)  # the game's table: group 1, bank 0 on lines 3
+    assert cart.prg_offsets[0] == 0
+    cart.cpu_write(0x8066, 0, 0)
+    assert cart.prg_offsets[0] == 0x8000
+    cart.cpu_write(0x80A7, 0, 0)
+    assert cart.chr_offsets[0] == 2 * 0x2000
+
+
+def test_mappers_418_557_share_two_ports_on_different_mirroring_bits() -> None:
+    star = build(418, prg_kib=128, chr_kib=0)
+    star.cpu_write(0x8000, 6, 0)
+    star.cpu_write(0x8FFF, 0x0C, 0)
+    assert star.prg_offsets[0] == 0x0C * 0x2000
+    star.cpu_write(0x8000, 5, 0)
+    star.cpu_write(0x8001, 1, 0)
+    assert star.mirroring == "H"
+    bee = build(557, prg_kib=128, chr_kib=0)
+    bee.cpu_write(0x8000, 5, 0)
+    bee.cpu_write(0x8001, 1, 0)
+    assert bee.mirroring == "V"
+    bee.cpu_write(0x8001, 0x20, 0)
+    assert bee.mirroring == "H"
+
+
+def test_mapper_549_latches_a5_a2_with_its_a15_flipped() -> None:
+    cart = build(549, prg_kib=128, chr_kib=0)
+    assert cart.prg_offsets[0] == 8 * 0x2000
+    cart.cpu_write(0x8000 | 3 << 2, 0, 0)
+    assert cart.bank6000 == 3
+    cart.cpu_write(0x8000 | 9 << 2, 0, 0)
+    assert cart.bank6000 == 0x0D
+
+
+def test_mapper_258_reads_its_power_on_row() -> None:
+    cart = build(258, prg_kib=128, chr_kib=128)
+    assert [cart.cpu_read(0x5000 + i, 0) & 0x0F for i in (3, 4, 5, 6)] == [1, 2, 4, 15]
+    cart.cpu_write(0x5002, 2, 0)
+    assert cart.cpu_read(0x5004, 0) & 0x0F == 3
+
+
+def test_mapper_253_gal_moves_the_ram() -> None:
+    cart = build(253, prg_kib=256, chr_kib=512)
+    cart.map_chr(0, 1, 0x88)
+    assert not cart.chr_ram_window[0]
+    cart.ppu_write(0x0000, 0, 0)
+    cart.map_chr(1, 1, 0x4D)
+    assert cart.chr_ram_window[1] and cart.chr_offsets[1] == 0x400
+
+
+def test_mapper_413_speech_pointer_shifts_in_and_steps() -> None:
+    rom = image(413, 0, prg_kib=256, chr_kib=256)
+    cart = MAPPERS[413](replace(rom, misc=bytes(range(16))), TICKS)
+    for bit in (0, 1, 0, 1):
+        cart.cpu_write(0xC000, bit << 7, 0)
+    assert cart.cpu_read(0x4800, 0) == 5
+    assert cart.cpu_read(0xC123, 0) == 6
+
+
+def test_mapper_547_translates_jis_to_a_kanji_tile() -> None:
+    assert kanji_tile(0x21, 0x21, 0) == 0  # the first code point, top left
+    assert kanji_tile(0x22, 0x21, 3) == 7  # the next glyph, bottom right
+    cart = build(547, prg_kib=640, chr_kib=128)
+    cart.cpu_write(0xDB00, 5, 0)  # corner 1, alternate attribute
+    cart.cpu_write(0xDC00, 0x22, 0)
+    cart.cpu_write(0xDD00, 0x21, 0)
+    assert cart.cpu_read(0xDC00, 0) == 5
+    assert cart.cpu_read(0xDD00, 0) == 0xC0
+
+
+def test_mapper_547_background_tiles_take_their_bank_from_qtram() -> None:
+    cart = build(547, prg_kib=640, chr_kib=128)
+    cart.chr_ram[0x1000] = 0x5A
+    cart.qtram[0] = 1  # CHR-RAM bank 1, whatever PPU A12 says
+    cart.ciram_a10(0x2000)  # nametable, then attribute: a background pattern is next
+    cart.ciram_a10(0x23C0)
+    assert cart.ppu_read(0x0000, 0) == 0x5A
+    cart.ciram_a10(0x2000)  # two nametable fetches: a sprite's
+    cart.ciram_a10(0x2000)
+    assert cart.ppu_read(0x0000, 0) == cart.chr_ram[0]
+
+
+def test_mapper_547_irq_wraps_and_reloads() -> None:
+    cart = build(547, prg_kib=640, chr_kib=128)
+    cart.cpu_write(0xD600, 0xFF, 0)
+    cart.cpu_write(0xD700, 0xFF, 0)
+    cart.cpu_write(0xD900, 2, 0)
+    cart.m2(0)
+    assert cart.irq and cart.counter == 0xFFFF
+    cart.cpu_write(0xD800, 0, 0)
+    assert not cart.irq and not cart.irq_enable
+
+
+def test_mapper_446_chooses_a_board_and_locks() -> None:
+    cart = build(446, prg_kib=512, chr_kib=0)
+    assert cart.asic is None
+    cart.cpu_write(0x5001, 0x10, 0)
+    assert cart.prg_offsets[0] == 0x10 * 0x2000
+    cart.cpu_write(0x5001, 0x20, 0)
+    cart.cpu_write(0x5003, 0xE0, 0)
+    cart.cpu_write(0x5000, 0x81, 0)
+    assert type(cart.asic).__name__ == "HostMMC1"
+    assert cart.asic.prg_offsets[0] == 0x40000  # outer D7-D5 over the MMC1's five bits
+    cart.cpu_write(0x5001, 0, 0)  # locked
+    assert cart.outer == 0x20
+
+
+def test_mapper_555_outer_bank_and_timer() -> None:
+    cart = build(555, prg_kib=512, chr_kib=256)
+    cart.cpu_write(0x5800, 0x0C, 0)  # D2 the outer bank, D3 the timer
+    assert cart.prg_offsets[3] >= 0x40000
+    cart.timer = (0x10 | cart.DIP) << 25
+    assert cart.cpu_read(0x5800, 0) == 0x80
+    cart.cpu_write(0x5000, 0x5A, 0)
+    assert cart.cpu_read(0x5000, 0) == 0x5A

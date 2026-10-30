@@ -6,6 +6,8 @@ claims rest on sweeps against Mesen2, a detector (docs/claims.md).
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from .banked import HORIZONTAL, SCREEN_A, SCREEN_B, VERTICAL
 from .flash import Flash29F040
 from .ines import RomImage
@@ -1602,5 +1604,66 @@ class Rinco594(MMC3):
         elif address & 0xF000 == 0xB000:
             self.mode = min(value >> 6, 2)
             self._update()
+        else:
+            super().cpu_write(address, value, t)
+
+
+class ContraFighter238(MMC3):
+    """Mapper 238 (Contra Fighter): an MMC3 and a protection register.
+
+    The page names only the game. Its code decides (C68): anywhere in $4020-$7FFF a write
+    selects an entry and a read gives it, and it checks D1-D0 against 0, 2, 2
+    and 3 for writes of 0, 1, 2 and 3 ($0300 and $DB9D in its last banks).
+    """
+
+    PROTECTION = (0, 2, 2, 3)
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.protection = 0
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        if 0x4020 <= address < 0x8000:
+            return self.PROTECTION[self.protection] | 0xFC << 8
+        return super().cpu_read(address, t)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if 0x4020 <= address < 0x8000:
+            self.protection = value & 3
+        else:
+            super().cpu_write(address, value, t)
+
+
+class Board158B(SuperGame):
+    """Mapper 258 (UNL-158B: Blood of Jurassic, Super Hang-On): 215's 8237 with protection.
+
+    The page has only the name; MAME's mmc3_clones.cpp (BSD-3) has the rest: $5002 (mask $F003)
+    picks a row, and reads of $5000-$5FFF give that row's entry for A2-A0 on
+    D3-D0, the high lines open bus. The games decrypt their start from these.
+    """
+
+    PROTECTION = (
+        (0, 0, 0, 0, 0, 0, 0, 0),
+        (0, 0, 0, 0, 0, 0, 3, 0),
+        (0, 0, 0, 0, 3, 4, 0, 0),
+        (0, 0, 0, 1, 0, 4, 5, 0),
+        (0, 0, 0, 0, 0, 0, 0, 0),
+        (0, 0, 0, 0, 0, 0, 0, 0),
+        (0, 0, 0, 0, 0, 0, 0, 0),
+        (0, 0, 0, 1, 2, 4, 15, 0),
+    )
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.row = 7
+        super().__init__(image.with_board(replace(image.board, mapper=215)), cpu_cycle_ticks)
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        if 0x5000 <= address < 0x6000:
+            return self.PROTECTION[self.row][address & 7] | 0xF0 << 8
+        return super().cpu_read(address, t)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address & 0xF003 == 0x5002:
+            self.row = value & 7
         else:
             super().cpu_write(address, value, t)

@@ -35,7 +35,7 @@ Two cautions apply to every tier:
   revision-dependent success codes. The target here is NES-001 with 2A03G/2C02G.
 
 Paths as in [start-here.md](start-here.md). Every file and repository is pinned
-in `scripts/pinned_files.json` (745 files with SHA-256) and
+in `scripts/pinned_files.json` (759 files with SHA-256) and
 `scripts/pinned_repos.json` (29 repositories at full commit SHAs);
 `scripts/fetch_references.py` rebuilds `reference/` and `tests/test_roms/` from
 them.
@@ -1936,3 +1936,40 @@ outside the wiki. `tests/test_mappers_remaining.py` pins the arithmetic.
   identical); 195's ROM offsets; 347 read from data instead of the address;
   351's bank units; 218 with less than 8 KiB of PRG; 112 took the header's
   mirroring (C67). Page against game: C54-C67, undocumented-behavior.md.
+
+### The rest of the mappers, second pass (2026-10-30)
+
+Going back over what the first pass left out: 294 mappers in all. Dumps on an implemented mapper: main set **4,455 of
+4,464 (99.80%)**, Aftermarket 2,905 of 2,913 (99.73%), Private **634 of 634**.
+The one licensed dump left is the StudyBox BIOS (186: a tape drive, nothing to
+run on it).
+
+The first pass had the sources wrong. Two pages it called undocumented (547,
+446) are detailed. MAME's NES cartridge sources, BSD-3 unlike the GPL
+emulators, describe many boards the wiki does not; pinned as
+`reference/mame-nes/` and cited in each docstring. Where it was possible the
+game was read first and MAME used as a check.
+
+- **By source.** 547 (Konami's VRC5 with its kanji ROM) and 446 (Mindkids' FPGA)
+  from their pages; 222 and 272 from the forum's schematic readings; 258, 413,
+  418, 549, 555, 557 from MAME; 170, 216, 238, 244 from the games (C68, C69),
+  three of them checked against MAME after.
+- **Against Mesen2**: 170, 216 (6 dumps, 5 identical, *Magic Jewelry II* one
+  pixel), 222 (3), 238, 244, 258's *Blood of Jurassic*, 252 and 253's
+  *Shenhua Jian Yun* identical. (222.2's frame 600 matches one frame off, the
+  sweep's slack, and differs by 6 pixels on the exact frame.)
+- **Mesen2 refuses** 272, 326, 330, 413, 415, 418, 446, 517, 547, 549, 553, 555
+  and 557. **By eye**: *Akumajou Special* bootleg, bootleg *Contra*,
+  *Sangokushi*, *Super Russian Roulette* (its speech ROM's screens), *Lucky
+  Rabbit*, *Highway Star*, the six 446 dumps' titles including *Hammerin'
+  Harry 2*'s Irem logo, *NHK Gakuen* with kanji on its keyboard, *Meikyuu Jiin
+  Dababa*, *Dong Dongnao 1*, *Campus Challenge*, *Moero TwinBee*. Titles only:
+  none of these was played, and 555's dump is the only one there is, a [b].
+- **Differs**: *Super Hang-On* (258: board shows the publisher's logo, Mesen2
+  blank), 30/64 *Games* (C61).
+- **Not modelled**: 517's ADC, 413's `$D000`, 555's RJ11, 446's other FPGA boards
+  (no dump asks for them), 547's unused kanji mode at PPU `$1000`.
+- **Left**: 127 (*Double Dragon II* bootleg), 171 (BBK), 169 (Yuxing), 559, 563,
+  564, 576, 585 (one or two dumps each, no description anywhere found); 256
+  and 405 (VT02+, UM6578: famiclones more than mappers); 682 (Rainbow: its
+  Wi-Fi hardware, documented outside the wiki); 186.

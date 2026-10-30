@@ -27,6 +27,7 @@ from .chinese import (
     Asder112,
     Dance2000,
     Daou156,
+    Decathlon244,
     Education178,
     FDSConversion108,
     Fengshenbang246,
@@ -46,7 +47,9 @@ from .connector import Cartridge
 from .conversions import (
     CTC15,
     KS7010,
+    KS7016B,
     KS7030,
+    LH42,
     LH53,
     Board0353,
     Palthena539,
@@ -66,13 +69,14 @@ from .discrete import (
     AOROMMulticart,
     AxROM,
     CNROMProtected,
+    Fujiya170,
     GxROM,
     UxROM,
     mapper_34,
 )
 from .fds import FDS
 from .fds_disk import is_fds, is_qd
-from .homebrew import GTROM, NSF31, Action53, DripGame, MagicFloor, SealieRET
+from .homebrew import BATMAPSRR, GTROM, NSF31, Action53, DripGame, MagicFloor, SealieRET
 from .ines import BoardInfo, RomImage, parse
 from .irem import G101, H3001, LROG017, TAMS1
 from .jaleco import JF11, JF13, JF16, JF17, SS88006
@@ -115,11 +119,13 @@ from .konami import (
     VRC7,
     VRC24,
     CityFighter266,
+    KidDracula272,
+    Ninja222,
     ShuiGuan183,
 )
 from .mmc1 import MMC1, MMC1A, NESEvent
 from .mmc2 import MMC2, MMC4
-from .mmc3 import AA6023, TQROM, Kasheng, MMC3Multicart, TxSROM, mindkids_224, mmc3_for
+from .mmc3 import AA6023, TQROM, Event2, Kasheng, MMC3Multicart, TxSROM, mindkids_224, mmc3_for
 from .mmc3_clones import (
     A9461,
     A9711,
@@ -132,8 +138,10 @@ from .mmc3_clones import (
     MRCM196,
     SL5020B,
     T4A54A,
+    Board158B,
     Board513,
     Cocoma516,
+    ContraFighter238,
     Gouder208,
     Haradius406,
     Haratyler451,
@@ -154,7 +162,7 @@ from .mmc3_clones import (
     Zhongguo512,
 )
 from .mmc5 import MMC5
-from .multiasic import HSK007, Techline351
+from .multiasic import HSK007, Mindkids446, Techline351
 from .multicart import (
     A65AS,
     BS5,
@@ -213,6 +221,7 @@ from .txc import ProtectedLatch
 from .unlicensed import (
     NINA03,
     NINA08,
+    RCM216,
     Action52,
     BitCorp38,
     Caltron41,
@@ -224,6 +233,7 @@ from .unlicensed import (
     RumbleStation46,
     Subor167,
 )
+from .vrc5 import QTa
 from .waixing import FK23C, FS309, T9552, Jncota523, MixedCHR, WaixingVRC4, Xiangfeng198
 
 #: Each implemented iNES mapper's board, built from the image and the CPU cycle
@@ -367,6 +377,7 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     165: Latched165,
     167: Subor167,
     168: Racermate,
+    170: Fujiya170,
     172: ProtectedLatch,
     173: ProtectedLatch,
     176: FK23C,
@@ -400,9 +411,11 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     212: AddressLatch212,
     213: AddressLatch58,
     215: SuperGame,
+    216: RCM216,
     218: MagicFloor,
     219: A9461,
     221: N625092,
+    222: Ninja222,
     224: mindkids_224,
     225: AddressLatch225,
     226: Latch226,
@@ -412,10 +425,12 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     232: Camerica,
     234: Maxi15,
     235: GoldenGame235,
+    238: ContraFighter238,
     240: Latch240,
     241: Hengge,
     242: AddressLatch242,
     243: SachenLS374N,
+    244: Decathlon244,
     245: F003,
     246: Fengshenbang246,
     249: T9552,
@@ -424,12 +439,14 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     253: WaixingVRC4,
     254: XorRAM254,
     255: AddressLatch225,
+    258: Board158B,
     260: HPxx260,
     262: SachenShero,
     263: Rex263,
     264: Cony,
     266: CityFighter266,
     268: AA6023,
+    272: KidDracula272,
     284: DripGame,
     285: A65AS,
     286: BS5,
@@ -472,9 +489,12 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     406: Haradius406,
     409: DPCMCart409,
     412: Henggedianzi412,
+    413: BATMAPSRR,
     415: Board0353,
     417: FineStudio417,
+    418: LH42,
     422: ING003C,
+    446: Mindkids446,
     451: Haratyler451,
     470: AOROMMulticart,
     471: ImpactSoft471,
@@ -502,11 +522,15 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     540: SB5013,
     541: LittleCom541,
     544: FS306,
+    547: QTa,
     548: CTC15,
+    549: KS7016B,
     551: Jncota551,
     552: X1017,
     553: Sachen3013,
     554: KS7010,
+    555: Event2,
+    557: LH42,
     558: YC0309,
     594: Rinco594,
 }

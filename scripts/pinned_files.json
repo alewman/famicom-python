@@ -6704,5 +6704,131 @@
   "kind": "live-forum",
   "license": "NESdev forum post content (authors' copyright)",
   "note": "Mapper 330: bootleg Sangokushi II, a Namco 163 subset"
+ },
+ {
+  "path": "reference/mame-nes/batlab.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/devices/bus/nes/batlab.cpp",
+  "sha256": "2e51b321db65f9c9e0e207851c0b02cf4927ef84825abf6852fd43c5fc6c7b2f",
+  "size": 6381,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME NES cart notes for the mappers the wiki leaves out"
+ },
+ {
+  "path": "reference/mame-nes/bootleg.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/devices/bus/nes/bootleg.cpp",
+  "sha256": "8d1c6ac5b38c4fd909e6654bd51e5335f686bc066ccd2edb5a1301f3bea031c4",
+  "size": 51751,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME NES cart notes for the mappers the wiki leaves out"
+ },
+ {
+  "path": "reference/mame-nes/cne.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/devices/bus/nes/cne.cpp",
+  "sha256": "8496d8bb5b7d4921c82cf880c8d5893ccfe7b2374cfbf01f78c88496d35a7450",
+  "size": 4214,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME NES cart notes for the mappers the wiki leaves out"
+ },
+ {
+  "path": "reference/mame-nes/event.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/devices/bus/nes/event.cpp",
+  "sha256": "a03a25072fabf752b6432287bb43f6d147dbe0e84585aaffa9197470bdbd0d15",
+  "size": 7952,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME NES cart notes for the mappers the wiki leaves out"
+ },
+ {
+  "path": "reference/mame-nes/kaiser.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/devices/bus/nes/kaiser.cpp",
+  "sha256": "7fcef4175e6caa93502dc6eb0b79919a980be71d35273ae6f2de3e82a0f55566",
+  "size": 25258,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME NES cart notes for the mappers the wiki leaves out"
+ },
+ {
+  "path": "reference/mame-nes/mmc3_clones.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/devices/bus/nes/mmc3_clones.cpp",
+  "sha256": "1783ffd9f13653f55b57e060269f3437dee05141dcfef385df67849a0913671d",
+  "size": 93553,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME NES cart notes for the mappers the wiki leaves out"
+ },
+ {
+  "path": "reference/mame-nes/multigame.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/devices/bus/nes/multigame.cpp",
+  "sha256": "744e07c69a21f8817246189df2d1c48a2765ff3e9590d1a8d01be57936a8eb93",
+  "size": 89746,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME NES cart notes for the mappers the wiki leaves out"
+ },
+ {
+  "path": "reference/mame-nes/pirate.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/devices/bus/nes/pirate.cpp",
+  "sha256": "165aa0e8005d2022e652330dc58cf45c20042c7139a1540e1d190ea50a0bebe4",
+  "size": 17918,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME NES cart notes for the mappers the wiki leaves out"
+ },
+ {
+  "path": "reference/mame-nes/rcm.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/devices/bus/nes/rcm.cpp",
+  "sha256": "09925fb8f7d5710549e954ad48c4c9cda150d534d28389120c8d564b70eb6e35",
+  "size": 4671,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME NES cart notes for the mappers the wiki leaves out"
+ },
+ {
+  "path": "reference/mame-nes/vrc_clones.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/devices/bus/nes/vrc_clones.cpp",
+  "sha256": "1dfda342dff558d55129e2d49ceb7845e52344abf04b2be505c33e6098b06791",
+  "size": 21258,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME NES cart notes for the mappers the wiki leaves out"
+ },
+ {
+  "path": "reference/nesdev-forum/15302-p3.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=15302&start=30",
+  "sha256": "634ff199e716ca0bd4e655a4e1e05fa3dd980d0f764e1fb218a9b7d53124376e",
+  "size": 72299,
+  "kind": "live-forum",
+  "license": "NESdev forum post content (authors' copyright)",
+  "note": "Mapper 272: analyses of the bootleg Akumajou PAL"
+ },
+ {
+  "path": "reference/nesdev-forum/12654-p2.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=12654&start=15",
+  "sha256": "cdb60d990c8224e72b5ac935d2e772b8b36e34e936e87d59586f904c10e60bd2",
+  "size": 72894,
+  "kind": "live-forum",
+  "license": "NESdev forum post content (authors' copyright)",
+  "note": "Mapper 222: the CTC-31 counter"
+ },
+ {
+  "path": "reference/nesdev-forum/24632.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=24632",
+  "sha256": "3d80b59b2c54f1b5058b4c509188b5856ff3953dd9af6e913c979ea65d132fd5",
+  "size": 40764,
+  "kind": "live-forum",
+  "license": "NESdev forum post content (authors' copyright)",
+  "note": "Mapper 216: Bonza SIM port"
+ },
+ {
+  "path": "reference/nesdev-forum/19303.html",
+  "url": "https://forums.nesdev.org/viewtopic.php?t=19303",
+  "sha256": "66a1c29a5afd420dc911cc939a056c1c6470babbeb07bd2e386f8e62e7a627b3",
+  "size": 45621,
+  "kind": "live-forum",
+  "license": "NESdev forum post content (authors' copyright)",
+  "note": "Mapper 549: KS-7016B"
  }
 ]

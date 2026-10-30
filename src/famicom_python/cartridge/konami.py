@@ -720,6 +720,112 @@ class CityFighter266(VRC24):
             super().cpu_write((address & 0x9FFF) | a14 << 13 | a13 << 14, value, t)
 
 
+class Ninja222(VRC24):
+    """Mapper 222: pirate VRC2b boards: Dragon Ninja (222.1, CTC-31) and Super Bros. 8 (222.2).
+
+    From the forum's reading of the CTC-31's schematic (t=12654; the page has none):
+    $F000 (mask $F003) sets load mode, $F002 count mode, $F001 (mask $F001)
+    acknowledges and, in load mode, takes the count. Counting, the '4020 runs
+    and each rise of its 64s bit clocks two 74161s: the low one, and when it
+    reaches 15 the high one (so $0E goes to $1F, then $10). When the high one
+    reaches 15, /IRQ asserts and holds the '4020 at 0. 222.2 writes a whole
+    CHR bank to both $B000 and $B001 and the board takes it (forum, and the game).
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.whole_chr = image.board.submapper == 2
+        board = replace(image.board, mapper=23, submapper=3)
+        super().__init__(image.with_board(board), cpu_cycle_ticks)
+        self.counts_m2 = True
+        self.loading = True
+        self.count = self.divider = 0
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if self.whole_chr and 0xB000 <= address < 0xF000:
+            if not address & 1:
+                super().cpu_write(address, value & 0x0F, t)
+                super().cpu_write(address | 1, value >> 4, t)
+        elif address & 0xF003 == 0xF000:
+            self.loading = True
+        elif address & 0xF003 == 0xF002:
+            self.loading = False
+        elif address & 0xF001 == 0xF001:
+            self.irq = False
+            if self.loading:
+                self.count = value
+        else:
+            super().cpu_write(address, value, t)
+
+    def m2(self, t: int) -> None:
+        if self.loading or self.irq:
+            self.divider = 0
+            return
+        self.divider = (self.divider + 1) & 0x3FFF
+        if self.divider & 0x7F == 0x40:
+            low, high = ((self.count & 0x0F) + 1) & 0x0F, self.count >> 4
+            if low == 15:
+                high = (high + 1) & 0x0F
+            self.count = high << 4 | low
+            if high == 15:
+                self.irq = True
+
+
+class KidDracula272(VRC24):
+    """Mapper 272: a bootleg Akumajou Special: a VRC2b clone with a PAL for IRQs and mirroring.
+
+    From lidnariq's and krzysiobal's analyses of the PAL (forum t=15302; the page has none),
+    the extra registers on mask $C00C beside the VRC2's on $F003, so a write
+    to $9004 reaches both: $8004 D1 one-screen in place of the VRC2's
+    arrangement, D0 which; $C004 acknowledges; $C008 lets the counter run;
+    $C00C acknowledges and holds it at 0; $800C forces the IRQ. The counter
+    counts PPU A13's falls and at 86 (two scanlines) clears itself and asserts
+    /IRQ. krzysiobal found 84 looks better on a line-based emulator; this is
+    not one, so the PAL's 86.
+    """
+
+    watches_ppu_address = True
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        board = replace(image.board, mapper=23, submapper=3)
+        super().__init__(image.with_board(board), cpu_cycle_ticks)
+        self.arrangement = VERTICAL
+        self.extended = 0
+        self.a13 = self.count = 0
+        self.running = False
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address >= 0x8000:
+            extra = address & 0xC00C
+            if extra == 0x8004:
+                self.extended = value & 3
+            elif extra == 0x800C:
+                self.irq = True
+            elif extra == 0xC004:
+                self.irq = False
+            elif extra == 0xC008:
+                self.running = True
+            elif extra == 0xC00C:
+                self.irq = self.running = False
+                self.count = 0
+            if address & 0xF003 == 0x9000:
+                self.arrangement = HORIZONTAL if value & 1 else VERTICAL
+        super().cpu_write(address, value, t)
+        if address >= 0x8000:
+            if self.extended & 2:
+                self.set_mirroring(SCREEN_B if self.extended & 1 else SCREEN_A)
+            else:
+                self.set_mirroring(self.arrangement)
+
+    def ppu_address(self, address: int, t: int) -> None:
+        a13 = address & 0x2000
+        if self.a13 and not a13 and self.running:
+            self.count += 1
+            if self.count == 86:
+                self.count = 0
+                self.irq = True
+        self.a13 = a13
+
+
 def swap_bits(value: int, a: int, b: int) -> int:
     """``value`` with bits ``a`` and ``b`` exchanged."""
     if (value >> a ^ value >> b) & 1:

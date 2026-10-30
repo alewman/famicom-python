@@ -397,3 +397,27 @@ class UNROM512(Banked):
 
     def _restore(self, data: bytes) -> None:
         self.prg[:] = data
+
+
+class Fujiya170(NROM):
+    """Mapper 170 (Fujiya's Famicasse Thinking Game Collection): NROM and a one-bit latch.
+
+    The page names only the game. Its code decides (C69): a write of $6502 or $7000 keeps D6, and
+    a read of $7001 or $7777 returns it in D7 (it spins until 0 gives 0 and
+    $40 gives $80); the other bits are open bus.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.latch = 0
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        if address in (0x7001, 0x7777):
+            return self.latch | 0x7F << 8
+        return super().cpu_read(address, t)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address in (0x6502, 0x7000):
+            self.latch = (value & 0x40) << 1
+        else:
+            super().cpu_write(address, value, t)

@@ -328,16 +328,16 @@ their wiki pages, all without a judge ROM:
 | **470** INX_007T_V01 | AOROM in 256K outer banks | 1-screen | — | Retro-Bit's Battletoads & Double Dragon |
 
 The remaining mappers followed on 2026-10-30 (validation.md "The remaining
-mappers"; 280 in all): `conversions.py` the FDS conversions, `multiasic.py` the
-multi-chip multicarts, `pic16c54.py` the microcontroller on 355, and the rest
-beside their nearest relatives. Each class's docstring gives its page.
+mappers" and "second pass"; 294 in all): `conversions.py` the FDS conversions,
+`multiasic.py` the multi-chip multicarts and Mindkids' FPGA (446), `vrc5.py`
+Konami's Q-Ta adapter (547), `pic16c54.py` the microcontroller on 355, and the
+rest beside their nearest relatives. Each class's docstring gives its source:
+a wiki page, a forum analysis (`reference/nesdev-forum/`) or MAME's notes
+(`reference/mame-nes/`, BSD-3).
 
-Not implemented: 446 (Mindkids' FPGA multi-mapper), 547 (Konami QTa with its
-kanji ROM), 555 (Nintendo Campus Challenge, undocumented), 186 (the StudyBox
-tape drive), 682 (Rainbow, Broke Studio's Wi-Fi mapper, documented outside the
-wiki), 256 and 405 (the VT02+ and UM6578 famiclones). No usable description:
-127, 169, 170, 171, 216, 222, 238, 244, 258, 272, 413, 418, 549, 557; no page:
-559, 563, 564, 576, 585.
+Not implemented: 186 (the StudyBox tape drive), 682 (Rainbow, Broke Studio's
+Wi-Fi mapper, documented outside the wiki), 256 and 405 (the VT02+ and UM6578
+famiclones). No description found: 127, 169, 171, 559, 563, 564, 576, 585.
 
 ## Mapper test ROMs and what they can judge
 

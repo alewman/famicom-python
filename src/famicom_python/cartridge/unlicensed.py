@@ -445,3 +445,33 @@ class Subor167(Banked):
             self._update()
         else:
             super().cpu_write(address, value, t)
+
+
+class RCM216(Banked):
+    """Mapper 216 (Bonza, Magic Jewelry II): a latch of the address.
+
+    The page names only the games. Theirs: a write anywhere at $8000-$FFFF takes A0 as
+    the 32 KiB bank and A3-A1 as the 8 KiB CHR bank: *Bonza* flips between
+    $FFF0 and $FFFF, *Magic Jewelry II* between $8000 and $8001. $5000 is
+    the SIM-card port (krzysiobal, forum t=24632); D7 set says no card.
+    $6000-$7FFF reads 0, which Videopoker Bonza needs (MAME's rcm.cpp, BSD-3).
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.map_prg(0, 32, 0)
+        self.map_chr(0, 8, 0)
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        if address & 0xF000 == 0x5000:
+            return 0x80 | 0x7E << 8
+        if 0x6000 <= address < 0x8000:
+            return 0
+        return super().cpu_read(address, t)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address >= 0x8000:
+            self.map_prg(0, 32, address & 1)
+            self.map_chr(0, 8, (address >> 1) & 7)
+        else:
+            super().cpu_write(address, value, t)

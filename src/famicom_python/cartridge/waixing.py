@@ -355,27 +355,34 @@ class MixedCHR(MMC3):
             self._update()
 
 
-class WaixingVRC4(VRC24):
-    """Mappers 252 and 253: Waixing's VRC4e clones whose CHR bank numbers pick CHR-RAM too.
+#: 252/253: a pattern-table write in this bank moves the RAM to (mask, match).
+WAIXING_GAL = {0x88: (0xFC, 0x4C), 0xC2: (0xFE, 0x7C), 0xC8: (0xFE, 0x04)}
 
-    INES_Mapper_252.wiki, INES_Mapper_253.wiki: chip A0/A1 on CPU A2/A3 (23.2); 1 KiB
-    pages 6-7 (252) or 4-5 (253) are 2 KiB of CHR-RAM, the rest ROM. Taken as
-    bank numbers, as on the MMC3 boards the pages compare them to.
+
+class WaixingVRC4(VRC24):
+    """Mappers 252 and 253: Waixing's VRC4e clones with 2 KiB of CHR-RAM among the banks.
+
+    INES_Mapper_252.wiki, INES_Mapper_253.wiki: chip A0/A1 on CPU A2/A3 (23.2); bank numbers
+    6-7 (252) or 4-5 (253) are the RAM. Which numbers can change: a GAL watches
+    the bank a pattern-table write lands in, and a bank of $88 moves the RAM to
+    $4C-$4F, $C2 to $7C-$7D and $C8 to $04-$05, seen at the next bank write
+    (MAME's vrc_clones.cpp, BSD-3; *Shenhua Jian Yun* needs it).
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
-        self.first_ram = 6 if image.board.mapper == 252 else 4
+        self.ram_mask, self.ram_match = 0xFE, 6 if image.board.mapper == 252 else 4
         self.rom = image.chr
         self.chr_ram = bytearray(0x800)
         self.chr_ram_window = [False] * 8
+        self.banks = [0] * 8
         super().__init__(image.with_board(replace(image.board, **VRC4E)), cpu_cycle_ticks)
 
     def map_chr(self, window: int, size_kib: int, bank: int) -> None:
-        ram = self.first_ram <= bank < self.first_ram + 2
-        self.chr_ram_window[window] = ram
-        self.chr_offsets[window] = ((bank - self.first_ram) * 0x400 if ram else bank * 0x400) % (
-            len(self.chr_ram) if ram else len(self.rom)
-        )
+        self.banks[window] = bank
+        for w, one in enumerate(self.banks):
+            ram = one & self.ram_mask == self.ram_match
+            self.chr_ram_window[w] = ram
+            self.chr_offsets[w] = (one & 1) * 0x400 if ram else one * 0x400 % len(self.rom)
 
     def ppu_read(self, address: int, t: int) -> int | None:
         if address < 0x2000:
@@ -387,8 +394,13 @@ class WaixingVRC4(VRC24):
     def ppu_write(self, address: int, value: int, t: int) -> None:
         if address >= 0x2000:
             super().ppu_write(address, value, t)
-        elif self.chr_ram_window[address >> 10]:
-            self.chr_ram[self.chr_offsets[address >> 10] + (address & 0x3FF)] = value
+            return
+        window = address >> 10
+        if self.chr_ram_window[window]:
+            self.chr_ram[self.chr_offsets[window] + (address & 0x3FF)] = value
+        self.ram_mask, self.ram_match = WAIXING_GAL.get(
+            self.banks[window], (self.ram_mask, self.ram_match)
+        )
 
 
 class FS309(MMC3):

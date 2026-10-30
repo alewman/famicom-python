@@ -647,22 +647,25 @@ class K1029(Banked):
 class NoRepeat314(Banked):
     """NES 2.0 mapper 314 (BMC-64in1NoRepeat: the Y2K multicarts).
 
-    NES_2.0_Mapper_314.wiki (mask taken as $F003): $5000 ``U.M..CCP``: NROM
+    NES_2.0_Mapper_314.wiki: $5000 ``U.M..CCP``: NROM
     (U) or UNROM, the mirroring (M: 0 vertical), CHR bank bits 0-1, PRG A21;
     $5001 ``MpPPPPPP``: the 32 KiB PRG bank (A20-A15), p the 16 KiB half and
     M 32 KiB (NROM modes); $5002 CHR bank bits 2-5; $8000-$FFFF the UNROM
     latch (D2-D0: the inner 16 KiB bank at $8000, 7 at $C000). Power-on
-    $80, $43, $00.
+    $80, $43, $00. All of $5000-$5FFF decodes, and with CHR-RAM only A0, so
+    $5002 is $5000 again (MAME's multigame.cpp, BSD-3; the Brazilian dumps
+    need it, C61).
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
         super().__init__(image, cpu_cycle_ticks)
-        self.regs = [0x80, 0x43, 0x00]
+        self.regs = [0x80, 0x43, 0x00, 0x00]
+        self.register_mask = 1 if self.chr_writable else 3
         self.latch = 0
         self._update()
 
     def _update(self) -> None:
-        r0, r1, r2 = self.regs
+        r0, r1, r2, _ = self.regs
         bank32 = (r0 & 1) << 6 | r1 & 0x3F
         if r0 & 0x80:  # NROM
             if r1 & 0x80:
@@ -681,8 +684,8 @@ class NoRepeat314(Banked):
     def cpu_write(self, address: int, value: int, t: int) -> None:
         if address >= 0x8000:
             self.latch = value
-        elif address & 0xF003 in (0x5000, 0x5001, 0x5002):
-            self.regs[address & 3] = value
+        elif 0x5000 <= address < 0x6000:
+            self.regs[address & self.register_mask] = value
         else:
             super().cpu_write(address, value, t)
             return

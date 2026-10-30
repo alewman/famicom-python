@@ -624,10 +624,12 @@ before the board takes a side.
   `$E000`, `$A001`, `$C001`. **Open**: nothing to build from; the board runs
   399.0, *Star Versus* boots, this one does not.
 - **C61. Mapper 314's Brazilian dumps.** *30 Games* and *64 Games* write
-  `$5000 = 0, $5001 = 0, $8000 = 0` from RAM and jump to `$C055`: the page's
-  UNROM mode, which keeps the 16 KiB bank 7 there. Mesen2 goes on to a menu
-  from a bank those registers cannot name; the board does not. The other 314
-  dumps are identical. **Open**: undiagnosed.
+  `$5000 = 0, $5001 = 0, $8000 = 0` from RAM and jump to `$C055`. MAME's
+  multigame.cpp decodes all of `$5000-$5FFF`, and with CHR-RAM only A0, so a
+  write to `$5002` is `$5000` again. *Board*: so; it now reaches *30 Games*'
+  "30 IN 1" menu, where Mesen2 at frames 60-600 still has rendering off and
+  the power-on palette, so the two differ and neither judges the other. The
+  other 314 dump stays identical. **Open**: no judge for the menu's banks.
 - **C62. What 539's RAM slices fold onto.** The page lists six ranges of RAM
   over ROM, 6 KiB in 8, not how the board folds them. *Board*: kept apart, as
   they were on the disk system; the game runs. **Open**: no measurement.
@@ -650,11 +652,37 @@ before the board takes a side.
   *Pocker Mali* writes `$8008`, `$A008`-`$A00B`, `$C008`-`$C00B` and `$E00B`
   where a VRC4 has `$9000`, `$B000`, `$D000` and `$F000`: A3 stands in for
   A12. *Board*: the game's reading; the title appears, garbage without it.
+  MAME's vrc_clones.cpp, found later, has the same line, and Mesen2 is
+  identical.
 - **C67. Mapper 112's power-on mirroring.** INES_Mapper_112.wiki gives `$E000`
   and no power-on state; *Master Shooter*'s header says horizontal, but it
   never writes `$E000` and fills two nametables, the second overwriting the
   first's menu on horizontal. *Board*: the register powers on 0, the header
   is ignored. Mesen2 agrees.
+- **C68. Mapper 238's protection.** The page names only *Contra Fighter*. Its
+  code writes 0-3 anywhere in `$4020-$7FFF` and spins until the same range
+  reads back 0, 2, 2, 3 on D1-D0 (`$0300`, `$DB9D`). *Board*: that table.
+  Mesen2 is identical.
+- **C69. Pages that name only a game.** 170 (*Fujiya*): the code spins on D6
+  of `$6502`/`$7000` coming back in D7 of `$7001`/`$7777`. 216 (*Bonza*): the
+  address is the latch, `$FFF0` and `$FFFF`. 244 (*Decathlon*): the ROM holds a
+  table at `$8065-$80E4` of what looks like permuted bank lines, and the game
+  writes each entry to its own address; MAME's cne.cpp says the address alone
+  picks the bank, and the table agrees entry by entry. *Board*: the address.
+  Each was read from the game first and checked against MAME's notes after;
+  all agree, and the three are identical to Mesen2 bar *Magic Jewelry II*'s
+  one pixel.
+- **C70. Mapper 446 before the mapper is chosen.** The page gives no reset
+  state. Reset vectors sit in the last bank and four of six games jump to
+  `$8xxx`; they copy CHR from the outer bank at `$8000` and return to code
+  at `$C000` or in bank 0. *Board*: an UNROM: outer bank at `$8000`, last 16
+  KiB fixed. All six reach their titles. The page says only submapper 2
+  inverts `$5003`; *Hammerin' Harry 2* (446.3) needs it not inverted.
+- **C71. 252/253's RAM moves.** The pages give fixed pages. MAME's
+  vrc_clones.cpp: a GAL watches the bank a pattern write lands in, and
+  banks `$88`, `$C2`, `$C8` move the RAM's bank numbers. *Board*: so, which
+  cures *Shenhua Jian Yun*'s hang (identical to Mesen2 now). The five other
+  253 dumps differ only in the phase of an animated intro.
 
 ## Open items
 
