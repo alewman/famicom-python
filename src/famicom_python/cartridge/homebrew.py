@@ -323,3 +323,84 @@ class SealieRET(Banked):
             self._latch(value)
         else:
             super().cpu_write(address, value, t)
+
+
+class BATMAPSRR(Banked):
+    """Mapper 413 (Super Russian Roulette): BATMAP-SRR-X, a CPLD and a speech ROM.
+
+    MAME's batlab.cpp (BSD-3); the wiki names only the game. $5000-$5FFF ROM at $1000; $6000,
+    $8000 and $A000 8 KiB banks; $D000-$FFFF ROM at $7000; CHR 4 KiB banked at
+    $0000, bank $3D at $1000. $E000-$FFFF: D7-D6 pick the $6000, $8000, $A000 or
+    CHR bank, D5-D0 the bank. $8000 the counter's latch, $9000 clears the
+    counter, $A000 disables and acknowledges, $B000 enables: an MMC3-like IRQ,
+    on PPU A12 here as MAME's hblank approximates. $C000: D7 shifts into the
+    pointer into the Misc ROM of DPCM; reads of $4800-$4FFF and $C000-$CFFF
+    give its next byte and step it. $D000 is unexplained, stored nowhere.
+    """
+
+    watches_ppu_address = True
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.speech = image.misc
+        self.pointer = 0
+        self.bank6000 = 0
+        self.counter = self.latch = 0
+        self.irq_enabled = False
+        self.a12 = self.a12_ready = 0
+        self.prg_ram_enabled = False
+        self.map_prg(2, 8, 3)
+        self.map_prg(3, 8, 4)
+        self.map_chr(0, 4, 0)
+        self.map_chr(4, 4, 0x3D)
+
+    def _speech_byte(self) -> int:
+        self.pointer &= len(self.speech) - 1
+        value = self.speech[self.pointer]
+        self.pointer += 1
+        return value
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        if 0x4800 <= address < 0x5000 or 0xC000 <= address < 0xD000:
+            return self._speech_byte()
+        if 0x5000 <= address < 0x6000:
+            return self.prg[address - 0x4000]
+        if 0x6000 <= address < 0x8000:
+            return self.prg[(self.bank6000 * 0x2000 + (address & 0x1FFF)) % len(self.prg)]
+        return super().cpu_read(address, t)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+            return
+        region = address & 0xF000
+        if region == 0x8000:
+            self.latch = value
+        elif region == 0x9000:
+            self.counter = 0
+        elif region == 0xA000:
+            self.irq_enabled = self.irq = False
+        elif region == 0xB000:
+            self.irq_enabled = True
+        elif region == 0xC000:
+            self.pointer = self.pointer << 1 | value >> 7
+        elif region >= 0xE000:
+            kind, bank = value >> 6, value & 0x3F
+            if kind == 0:
+                self.bank6000 = bank
+            elif kind == 3:
+                self.map_chr(0, 4, bank)
+            else:
+                self.map_prg(kind - 1, 8, bank)
+
+    def ppu_address(self, address: int, t: int) -> None:
+        if address & 0x1000:
+            if not self.a12:
+                self.a12 = 1
+                if t >= self.a12_ready:
+                    self.counter = self.counter - 1 if self.counter else self.latch
+                    if not self.counter and self.irq_enabled:
+                        self.irq = True
+        elif self.a12:
+            self.a12 = 0
+            self.a12_ready = (t // self.cpu_cycle_ticks + 3) * self.cpu_cycle_ticks

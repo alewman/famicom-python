@@ -147,7 +147,7 @@ cover 83 % of licensed cartridges, and the 34 done cover 95.8 % (2,551 of
 ## What is fetched
 
 Nothing third-party is committed. `scripts/fetch_references.py` rebuilds
-`reference/` and `tests/test_roms/` from `scripts/pinned_files.json` (745 files
+`reference/` and `tests/test_roms/` from `scripts/pinned_files.json` (759 files
 pinned by SHA-256: NESdev wiki and forum snapshots, documents, test ROMs,
 hardware captures) and `scripts/pinned_repos.json` (29 repositories at full
 commit SHAs, sparse where large):

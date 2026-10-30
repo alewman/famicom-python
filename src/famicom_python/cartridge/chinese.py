@@ -778,3 +778,26 @@ class FutureMedia117(Banked):
         elif self.a12:
             self.a12 = 0
             self.a12_ready = (t // self.cpu_cycle_ticks + 3) * self.cpu_cycle_ticks
+
+
+class Decathlon244(Banked):
+    """Mapper 244 (C&E's Decathlon): the address picks the banks.
+
+    The page names only the game. A write to $8065-$80A4 sets the 32 KiB bank to A1-A0 less
+    the base and $80A5-$80E4 the 8 KiB CHR bank to A2-A0 (MAME's cne.cpp, BSD-3).
+    The game's own tables at those addresses, which it reads and writes back,
+    agree on every entry (C69).
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.map_prg(0, 32, 0)
+        self.map_chr(0, 8, 0)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+        elif 0x8065 <= address < 0x80A5:
+            self.map_prg(0, 32, (address - 0x8065) & 3)
+        elif 0x80A5 <= address < 0x80E5:
+            self.map_chr(0, 8, (address - 0x80A5) & 7)

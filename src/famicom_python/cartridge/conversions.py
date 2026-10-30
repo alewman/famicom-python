@@ -1,4 +1,6 @@
-"""Cartridge conversions of Famicom Disk System games: 347, 368, 415, 535, 538, 539, 548, 554.
+"""Cartridge conversions of Famicom Disk System games.
+
+Mappers 347, 368, 415, 418, 535, 538, 539, 548, 549, 554, 557.
 
 Each from its NESdev wiki page (NES_2.0_Mapper_*.wiki). A disk game expects 32 KiB of RAM at
 $6000-$DFFF and these boards spend as little as they can on it, so ROM and a
@@ -340,3 +342,52 @@ class KS7030(Banked):
             place = self._place(address)
             if place is not None and place[0]:
                 self.prg_ram[place[1]] = value
+
+
+class LH42(Banked):
+    """Mappers 418 (LH42, Highway Star) and 557 (LG25, NTDEC 2718, Moero TwinBee).
+
+    MAME's bootleg.cpp (BSD-3); the wiki has a schematic and a name. A cut-down
+    MMC3's two ports, mask $E001: $8000 D2-D0 selects, $8001 writes: 6 and 7
+    the 8 KiB banks at $8000 and $A000 (D3-D0), 5 the mirroring (D0 on 418, D5
+    on 557: 1 horizontal). The last 16 KiB fixed, 8 KiB of CHR-RAM. 557 adds
+    8 KiB of RAM at $6000.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.mirror_bit = 5 if image.board.mapper == 557 else 0
+        self.select = 0
+        self.map_prg(2, 16, len(self.prg) // 0x4000 - 1)
+        self.map_chr(0, 8, 0)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+        elif address & 0xE001 == 0x8000:
+            self.select = value & 7
+        elif address & 0xE001 == 0x8001:
+            if self.select == 5:
+                self.set_mirroring(HORIZONTAL if (value >> self.mirror_bit) & 1 else VERTICAL)
+            elif self.select >= 6:
+                self.map_prg(self.select & 1, 8, value & 0x0F)
+
+
+class KS7016B(Conversion):
+    """Mapper 549 (Meikyuu Jiin Dababa): Kaiser's KS-7016B: the address banks $6000.
+
+    A write to $8000-$FFFF latches A5-A2, with bank numbers $08-$0B reading as $0C-$0F:
+    PRG A15 inverted when A16 is set (krzysiobal's analysis, forum t=19303;
+    MAME's kaiser.cpp, BSD-3). $8000-$FFFF is the 32 KiB at banks 8-11.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.map_prg(0, 32, 2)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address >= 0x8000:
+            bank = (address >> 2) & 0x0F
+            self.bank6000 = bank | 4 if bank & 8 else bank
+        else:
+            super().cpu_write(address, value, t)

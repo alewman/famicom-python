@@ -1,4 +1,4 @@
-"""Multicarts that switch whole mapper ASICs: Realtec's HSK007 (394) and Techline's XB (351).
+"""Multicarts that switch whole mapper ASICs: 394, 351 and Mindkids' FPGA (446).
 
 Each from its NESdev wiki page. One die holds an MMC3 clone and a J.Y. Company ASIC, or
 an MMC3, an MMC1 and a VRC4, and the board's registers say which one answers.
@@ -14,6 +14,7 @@ from typing import Any
 
 from .banked import HORIZONTAL, VERTICAL, Banked
 from .ines import RomImage
+from .irem import H3001
 from .jycompany import JYCompany
 from .konami import VRC24
 from .mmc1 import MMC1
@@ -57,6 +58,20 @@ class HostJY(Translated, JYCompany):
 
     def refresh(self) -> None:
         self._update()
+
+
+class HostH3001(Translated, H3001):
+    def __init__(self, host: Any, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.prg_banks: dict[int, int] = {}
+        super().__init__(host, image, cpu_cycle_ticks)
+
+    def map_prg(self, window: int, size_kib: int, bank: int) -> None:
+        self.prg_banks[window] = bank
+        super().map_prg(window, size_kib, bank)
+
+    def refresh(self) -> None:
+        for window, bank in list(self.prg_banks.items()):
+            self.map_prg(window, 8, bank)
 
 
 class HostVRC4(Translated, VRC24):
@@ -242,3 +257,99 @@ class Techline351(Composite):
             self.asic.set_mirroring(HORIZONTAL if value & 8 else VERTICAL)
         else:
             self.forward_write(address, value, t)
+
+
+#: Mapper 446's (submapper, $5000) that are MMC1 and MMC3 boards.
+FPGA_MMC1 = {(0, 1), (1, 5), (1, 6), (1, 7), (2, 5), (2, 6), (2, 7)}
+FPGA_MMC3 = {(1, 1), (2, 1), (2, 9), (2, 0x0D)}
+
+
+class Mindkids446(Composite):
+    """Mapper 446: Mindkids' SMD172B_FPGA: an FPGA that becomes the mapper the game asks for.
+
+    NES_2.0_Mapper_446.wiki. $5000 ``L..MMMMM``: the mapper, by submapper's table, and L
+    locks the supervisor until reset. $5001/$5002 the outer 8 KiB bank; $5003
+    its mask, 1 the outer bit, but the inner one on submapper 2; $5004
+    D5-D4 CHR-RAM's inner mask (0x 256, 10 128, 11 32 KiB), D0 the mirroring
+    (1 vertical); $5005 D2 protects CHR-RAM; $5006 D4-D0 its outer 8 KiB bank.
+
+    Only the MMC1 and MMC3 boards and H3001 are here, the ones the dumps ask for.
+    Until the mapper is chosen the board acts as an UNROM (mapper 0 on the
+    table; the page gives no reset state, the games decide): the outer bank at
+    $8000, from which they copy their CHR to CHR-RAM, and the last 16 KiB fixed.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.image = image
+        self.ticks = cpu_cycle_ticks
+        self.submapper = image.board.submapper
+        self.outer = self.mask = 0
+        self.flags = self.protect = self.chr_outer = 0
+        self.locked = False
+        self.chr_ram = bytearray(0x40000)
+        self.chr = self.chr_ram
+        self.chr_writable = True
+        self.map_prg(2, 16, len(self.prg) // 0x4000 - 1)
+        self._map_outer()
+
+    def _map_outer(self) -> None:
+        self.map_prg(0, 8, self.outer)
+        self.map_prg(1, 8, self.outer + 1)
+
+    def prg_bank(self, asic: Any, window: int, bank: int) -> int:
+        mask = ~self.mask & 0xFFFF if self.submapper == 2 else self.mask
+        return (bank & ~mask & 0xFFFF) | (self.outer & mask)
+
+    def chr_bank(self, asic: Any, bank: int) -> int:
+        inner = {2: 0x7F, 3: 0x1F}.get(self.flags >> 4 & 3, 0xFF)
+        return (bank & inner) | (self.chr_outer << 3 & ~inner)
+
+    def _choose(self, value: int) -> None:
+        key = (self.submapper, value & 0x1F)
+        small = replace(self.image, prg=self.image.prg[:0x40000])
+        if key in FPGA_MMC1:
+            self.asic = HostMMC1(self, small, self.ticks)
+        elif self.submapper == 3 and key[1] == 1:
+            self.asic = HostH3001(self, self.image, self.ticks)
+        elif key in FPGA_MMC3:
+            self.asic = HostMMC3(self, self.image, self.ticks)
+        else:
+            return
+        asic = self.asic
+        asic.prg, asic.chr, asic.chr_writable = self.prg, self.chr_ram, not self.protect
+        asic.prg_ram = self.prg_ram or asic.prg_ram
+        asic.set_mirroring(VERTICAL if self.flags & 1 else HORIZONTAL)
+        asic.refresh()
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if 0x5000 <= address < 0x5007 and not self.locked:
+            register = address & 7
+            if register == 0:
+                self.locked = bool(value & 0x80)
+                self._choose(value)
+            elif register == 1:
+                self.outer = (self.outer & 0xFF00) | value
+                if not self.asic:
+                    self._map_outer()
+            elif register == 2:
+                self.outer = (self.outer & 0x00FF) | value << 8
+                if not self.asic:
+                    self._map_outer()
+            elif register == 3:
+                self.mask = value
+            elif register == 4:
+                self.flags = value
+            elif register == 5:
+                self.protect = value & 4
+                self.chr_writable = not self.protect
+            else:
+                self.chr_outer = value & 0x1F
+                self.map_chr(0, 8, self.chr_outer)
+            if self.asic:
+                self.asic.chr_writable = not self.protect
+                self.asic.refresh()
+        elif self.asic:
+            self.forward_write(address, value, t)
+        else:
+            super().cpu_write(address, value, t)
