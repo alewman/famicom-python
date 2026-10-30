@@ -1,0 +1,244 @@
+"""Multicarts that switch whole mapper ASICs: Realtec's HSK007 (394) and Techline's XB (351).
+
+Each from its NESdev wiki page. One die holds an MMC3 clone and a J.Y. Company ASIC, or
+an MMC3, an MMC1 and a VRC4, and the board's registers say which one answers.
+Here each is the ordinary class with its banks translated through the board's
+outer registers. No judge ROM exists; the claims rest on sweeps against
+Mesen2, a detector, and on looking (docs/claims.md).
+"""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from typing import Any
+
+from .banked import HORIZONTAL, VERTICAL, Banked
+from .ines import RomImage
+from .jycompany import JYCompany
+from .konami import VRC24
+from .mmc1 import MMC1
+from .mmc3 import MMC3
+
+
+class Translated:
+    """A mapper whose bank numbers the host board rewrites (mixed in before the mapper)."""
+
+    host: Any
+
+    def __init__(self, host: Any, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.host = host
+        super().__init__(image, cpu_cycle_ticks)  # type: ignore[call-arg]
+
+    def map_prg(self, window: int, size_kib: int, bank: int) -> None:
+        count = size_kib // 8
+        for i in range(count):
+            eighth = self.host.prg_bank(self, window + i, bank * count + i)
+            self.prg_offsets[window + i] = eighth * 0x2000 % len(self.prg)  # type: ignore[attr-defined]
+
+    def map_chr(self, window: int, size_kib: int, bank: int) -> None:
+        for i in range(size_kib):
+            one = self.host.chr_bank(self, bank * size_kib + i)
+            self.chr_offsets[window + i] = one * 0x400 % len(self.chr)  # type: ignore[attr-defined]
+
+
+class HostMMC3(Translated, MMC3):
+    def refresh(self) -> None:
+        self._update()
+
+
+class HostMMC1(Translated, MMC1):
+    def refresh(self) -> None:
+        self._update()
+
+
+class HostJY(Translated, JYCompany):
+    def _map_chr(self, window: int, size_kib: int, bank: int) -> None:
+        self.map_chr(window, size_kib, bank)
+
+    def refresh(self) -> None:
+        self._update()
+
+
+class HostVRC4(Translated, VRC24):
+    """The XB's VRC4: A0, A1 from CPU A2, A3, exchanged when A11 is set."""
+
+    def __init__(self, host: Any, image: RomImage, cpu_cycle_ticks: int) -> None:
+        board = replace(image.board, mapper=21, submapper=1)
+        super().__init__(host, image.with_board(board), cpu_cycle_ticks)
+
+    def _register(self, address: int) -> int:
+        low, high = (address >> 2) & 1, (address >> 3) & 1
+        return high | low << 1 if address & 0x800 else low | high << 1
+
+    def refresh(self) -> None:
+        self._update_prg()
+        for window, bank in enumerate(self.chr_registers):
+            self.map_chr(window, 1, bank)
+
+
+class Composite(Banked):
+    """Forwards the connector to the ASIC in charge (``self.asic``), or none."""
+
+    counts_m2 = True
+    watches_ppu_address = True
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.asic: Any = None
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        return self.asic.cpu_read(address, t) if self.asic else super().cpu_read(address, t)
+
+    def forward_write(self, address: int, value: int, t: int) -> None:
+        if self.asic:
+            self.asic.cpu_write(address, value, t)
+            self.irq = self.asic.irq
+
+    def ciram_a10(self, address: int) -> int | None:
+        return self.asic.ciram_a10(address) if self.asic else super().ciram_a10(address)
+
+    def ppu_read(self, address: int, t: int) -> int | None:
+        return self.asic.ppu_read(address, t) if self.asic else super().ppu_read(address, t)
+
+    def ppu_write(self, address: int, value: int, t: int) -> None:
+        if self.asic:
+            self.asic.ppu_write(address, value, t)
+        else:
+            super().ppu_write(address, value, t)
+
+    def ppu_address(self, address: int, t: int) -> None:
+        if self.asic:
+            self.asic.ppu_address(address, t)
+            self.irq = self.asic.irq
+
+    def m2(self, t: int) -> None:
+        if self.asic:
+            self.asic.m2(t)
+            self.irq = self.asic.irq
+
+
+class HSK007(Composite):
+    """Mapper 394: Realtec's HSK007: BNROM, an MMC3 clone or a J.Y. Company ASIC.
+
+    NES_2.0_Mapper_394.wiki: $5009 (masks unknown, A3 set) ``...MMCBA``: A PRG A18,
+    B PRG and CHR A19, MM 0 BNROM, 1 MMC3, 2-3 J.Y.; CHR A18 is A on submapper
+    0, C on 1. $500B ``cC.pPBB.``: BB PRG A16-A15 in BNROM mode, P PRG A17
+    where p is 0 (p: from the MMC3), C CHR A17 where c is 0 (c: from the
+    MMC3). Power-on $0F, $90.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.submapper = image.board.submapper
+        self.mode_register = 0x0F
+        self.outer = 0x90
+        self.jy: Any = None
+        self.mmc3 = HostMMC3(self, image, cpu_cycle_ticks)
+        self.jy = HostJY(self, image, cpu_cycle_ticks)
+        self._select()
+
+    def _high_prg(self) -> int:
+        return (self.mode_register & 3) << 5
+
+    def _high_chr(self) -> int:
+        r = self.mode_register
+        a18 = (r >> 2) & 1 if self.submapper else r & 1
+        return (a18 | (r & 2)) << 8
+
+    def prg_bank(self, asic: Any, window: int, bank: int) -> int:
+        if asic is self.jy:
+            return bank & 0x1F | self._high_prg()
+        a17 = bank & 0x10 if self.outer & 0x10 else (self.outer & 8) << 1
+        return bank & 0x0F | a17 | self._high_prg()
+
+    def chr_bank(self, asic: Any, bank: int) -> int:
+        if asic is self.jy:
+            return bank & 0xFF | self._high_chr()
+        a17 = bank & 0x80 if self.outer & 0x80 else (self.outer & 0x40) << 1
+        return bank & 0x7F | a17 | self._high_chr()
+
+    def _select(self) -> None:
+        mode = (self.mode_register >> 3) & 3
+        self.asic = None if mode == 0 else self.mmc3 if mode == 1 else self.jy
+        if self.asic:
+            self.asic.refresh()
+            return
+        a17 = 0 if self.outer & 0x10 else (self.outer >> 3) & 1
+        self.map_prg(0, 32, (self.outer >> 1) & 3 | a17 << 2 | self._high_prg() >> 2)
+        self.map_chr(0, 8, self._high_chr() >> 3)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address & 0xF00F == 0x5009:
+            self.mode_register = value
+            self._select()
+        elif address & 0xF00F == 0x500B:
+            self.outer = value
+            self._select()
+        else:
+            self.forward_write(address, value, t)
+
+
+class Techline351(Composite):
+    """Mapper 351: Techline's XB multicarts: an MMC3, an MMC1 or a VRC4 on one die.
+
+    NES_2.0_Mapper_351.wiki (mask $F003, all 0 at reset): $5000 ``BBBBBBMM``: the 8 KiB
+    CHR base and M, the ASIC (0/1 MMC3, 2 MMC1, 3 VRC4); $5001 ``BBBBBB..``:
+    the 16 KiB PRG base; $5002 ``CCCpPP.R``: the inner PRG size (PP: p clear
+    256, 128 KiB; p set NROM of 32, 16, 8 KiB), the inner CHR size (1xx 8 KiB,
+    01x 128, 001 32, 000 256 KiB), and R: CHR-RAM, with the CHR-ROM becoming
+    the second half of the PRG. In NROM mode $4025 D3 is the mirroring (1
+    horizontal). The page's marks for CCC fall on D6-D4, which holds p;
+    D7-D5 is the reading that leaves p alone, and the menu's $5002 = $D4 suits
+    it. The B fields are bank numbers (value >> 2): the menu's stub writes
+    $5001 = $3C from the bank that must stay put, the 16 KiB bank 15.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.rom = image.chr
+        self.chr_ram = bytearray(0x2000)
+        self.registers = [0, 0, 0]
+        self.asics = {
+            0: HostMMC3(self, image, cpu_cycle_ticks),
+            2: HostMMC1(self, image, cpu_cycle_ticks),
+            3: HostVRC4(self, image, cpu_cycle_ticks),
+        }
+        self.asics[1] = self.asics[0]
+        self._select()
+
+    def prg_bank(self, asic: Any, window: int, bank: int) -> int:
+        base8, mode = (self.registers[1] >> 2) * 2, self.registers[2]
+        size = (mode >> 2) & 3
+        if mode & 0x10:
+            if size == 0:
+                return (base8 & ~3) | window
+            return (base8 & ~1) | window & 1 if size == 1 else base8
+        mask = 0x1F if size == 0 else 0x0F
+        return (base8 & ~mask) | bank & mask
+
+    def chr_bank(self, asic: Any, bank: int) -> int:
+        size = self.registers[2] >> 5
+        mask = 0x07 if size & 4 else 0x7F if size & 2 else 0x1F if size & 1 else 0xFF
+        return (((self.registers[0] >> 2) * 8) & ~mask) | bank & mask
+
+    def _select(self) -> None:
+        self.asic = self.asics[self.registers[0] & 3]
+        ram = self.registers[2] & 1
+        for asic in self.asics.values():
+            asic.prg = self.prg + self.rom if ram else self.prg
+            asic.chr = self.chr_ram if ram else self.rom
+            asic.chr_writable = bool(ram)
+        self.asic.refresh()
+
+    def m2_gap(self, t: int) -> None:
+        self.registers = [0, 0, 0]
+        self._select()
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address & 0xF003 in (0x5000, 0x5001, 0x5002):
+            self.registers[address & 3] = value
+            self._select()
+        elif address == 0x4025 and self.registers[2] & 0x10:
+            self.asic.set_mirroring(HORIZONTAL if value & 8 else VERTICAL)
+        else:
+            self.forward_write(address, value, t)

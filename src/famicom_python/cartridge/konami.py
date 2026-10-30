@@ -9,10 +9,13 @@ against Mesen2, a detector. The VRC6's sound level is rainwarrior's
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from ym2413_python import DS1001, OPLL
 
 from .banked import HORIZONTAL, SCREEN_A, SCREEN_B, VERTICAL, Banked
 from .connector import expansion_gain
+from .eeprom import Microwire93C56
 from .ines import RomImage
 
 
@@ -596,3 +599,284 @@ class VRC7(VRCIrq, Banked):
         words = [mo for mo, _ in self.fm.take_outputs()]
         self.fm_words = (self.fm_words + words)[-18:]
         self.audio_out.expansion = sum(self.fm_words) * VRC7_GAIN
+
+
+class TH2131(VRC24):
+    """NES 2.0 mapper 308: the TH2131-1 board (NTDEC's Batman): a VRC2 with its own IRQ.
+
+    NES_2.0_Mapper_308.wiki: the VRC2's registers (taken as VRC2b's wiring,
+    A0/A1, which the page does not state); $F000 (mask $F003) acknowledges,
+    stops counting and clears the low counter; $F001 starts it; $F003 D7-D4
+    the high counter. Counting, the 12-bit low counter steps every M2 cycle;
+    on reaching 2048 the high counter decrements; /IRQ is asserted while
+    the high counter is 0 and the low counter below 2048.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(
+            image.with_board(replace(image.board, mapper=23, submapper=3)), cpu_cycle_ticks
+        )
+        self.counts_m2 = True
+        self.low = self.high = 0
+        self.counting = False
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        register = address & 0xF003
+        if register == 0xF000:
+            self.counting = False
+            self.low = 0
+            self.irq = False
+        elif register == 0xF001:
+            self.counting = True
+        elif register == 0xF003:
+            self.high = value >> 4
+        elif register < 0xF000:
+            super().cpu_write(address, value, t)
+
+    def m2(self, t: int) -> None:
+        if not self.counting:
+            return
+        self.low = (self.low + 1) & 0xFFF
+        if self.low == 2048:
+            self.high = (self.high - 1) & 0x0F
+        self.irq = self.high == 0 and self.low < 2048
+
+
+class TF1201(VRC24):
+    """NES 2.0 mapper 298 (UNL-TF1201: Lethal Weapon, a Lethal Enforcers backport): a VRC4b clone.
+
+    NES_2.0_Mapper_298.wiki: VRC4b's wiring (CPU A1 to A0, A0 to A1); its
+    $F003 only acknowledges, without the VRC4's copy of the A bit to E (the
+    game writes $F003 right after enabling with $F002).
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(
+            image.with_board(replace(image.board, mapper=25, submapper=1)), cpu_cycle_ticks
+        )
+
+    def irq_acknowledge(self) -> None:
+        self.irq = False
+
+
+class ShuiGuan183(VRC24):
+    """Mapper 183 (Shui Guan Pipe, a Gimmick! bootleg): VRC4e with an 8 KiB bank at $6000.
+
+    INES_Mapper_183.wiki: a VRC4 clone wired as VRC4e (A0 = CPU A2, A1 = CPU
+    A3); a write to $6000-$7FFF selects, by its address's A3-A0, the 8 KiB
+    PRG bank read at $6000 (banks 0-15). (The early $A000 register at $C000
+    is not on the cartridge.)
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(
+            image.with_board(replace(image.board, mapper=23, submapper=2)), cpu_cycle_ticks
+        )
+        self.bank6000 = 0
+        self.prg_ram_enabled = False
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        if 0x6000 <= address < 0x8000:
+            return self.prg[(self.bank6000 * 0x2000 + (address & 0x1FFF)) % len(self.prg)]
+        return super().cpu_read(address, t)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if 0x6000 <= address < 0x8000:
+            self.bank6000 = address & 0x0F
+        else:
+            super().cpu_write(address, value, t)
+
+
+#: VRC4e's wiring, the clones below start from.
+VRC4E = {"mapper": 23, "submapper": 2}
+
+
+class CityFighter266(VRC24):
+    """Mapper 266 (UNL-CITYFIGHT): City Fighter IV, a VRC4e clone with A13 and A14 exchanged.
+
+    NES_2.0_Mapper_266.wiki: so $A/$B/$D/$E hold the CHR banks at PPU $0800, $1000, $0000,
+    $1800. $900C (mask $F80C): D3-D2 a 32 KiB PRG bank in place of the
+    VRC4's; $980C: D3-D0 a 4-bit DAC, not modelled (the speech is silent).
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.prg32 = 0
+        super().__init__(image.with_board(replace(image.board, **VRC4E)), cpu_cycle_ticks)
+
+    def _update_prg(self) -> None:
+        self.map_prg(0, 32, self.prg32)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+        elif address & 0xF80C == 0x900C:
+            self.prg32 = (value >> 2) & 3
+            self._update_prg()
+        elif address & 0xF000 == 0x9000:
+            if not address & 0x0C:
+                super().cpu_write(address, value, t)
+        elif address & 0xF000 != 0x8000:
+            a13, a14 = (address >> 13) & 1, (address >> 14) & 1
+            super().cpu_write((address & 0x9FFF) | a14 << 13 | a13 << 14, value, t)
+
+
+def swap_bits(value: int, a: int, b: int) -> int:
+    """``value`` with bits ``a`` and ``b`` exchanged."""
+    if (value >> a ^ value >> b) & 1:
+        return value ^ (1 << a | 1 << b)
+    return value
+
+
+class AX5705(VRC24):
+    """Mapper 530 (UNL-AX5705): Super Mario Bros. Pocker Mali, a scrambled VRC4f clone.
+
+    NES_2.0_Mapper_530.wiki: a VRC4 with A0/A1 (VRC4f, 23.1) whose PRG A14 and A16
+    are exchanged, and CHR A15 and A16. The game decides what the page leaves
+    out: it writes $8008, $A008, $C008 and $E008 for the VRC4's $9000, $B000,
+    $D000 and $F000, so A3 stands in for A12 (C66).
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        board = replace(image.board, mapper=23, submapper=1)
+        super().__init__(image.with_board(board), cpu_cycle_ticks)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address >= 0x8000:
+            address = (address & 0xE003) | (address & 8) << 9
+        super().cpu_write(address, value, t)
+
+    def map_prg(self, window: int, size_kib: int, bank: int) -> None:
+        super().map_prg(window, size_kib, swap_bits(bank, 1, 3))
+
+    def map_chr(self, window: int, size_kib: int, bank: int) -> None:
+        super().map_chr(window, size_kib, swap_bits(bank, 5, 6))
+
+
+class T230(VRC24):
+    """Mapper 529 (UNL-T-230): bootleg Dragon Ball Z: a VRC4e clone with 16 KiB banking.
+
+    NES_2.0_Mapper_529.wiki: $800x does nothing; $A00x selects the 16 KiB bank at $8000
+    (the last is fixed at $C000). With PRG-NVRAM in the header, a 93C56 on
+    $8800 (mask $8800, also the VRC4's): D2 CS, D1 CLK, D0 DI, and $5000 (mask
+    $F000) reads DO on D0.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image.with_board(replace(image.board, **VRC4E)), cpu_cycle_ticks)
+        self.eeprom = Microwire93C56() if image.board.prg_nvram else None
+        self.prg_ram = bytearray()
+        self.prg_ram_enabled = False
+
+    def _update_prg(self) -> None:
+        self.map_prg(0, 16, self.prg_registers[1])
+        self.map_prg(2, 16, len(self.prg) // 0x4000 - 1)
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        if self.eeprom and address & 0xF000 == 0x5000:
+            return self.eeprom.output | 0xFE << 8
+        return super().cpu_read(address, t)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if self.eeprom and address & 0x8800 == 0x8800:
+            self.eeprom.lines((value >> 2) & 1, (value >> 1) & 1, value & 1)
+        if address & 0xF000 != 0x8000:
+            super().cpu_write(address, value, t)
+
+    def battery_ram(self) -> bytes | None:
+        return bytes(self.eeprom.memory) if self.eeprom else None
+
+    def _restore(self, data: bytes) -> None:
+        if self.eeprom:
+            self.eeprom.memory[:] = data
+
+
+#: Mapper 544's CHR-RAM window by the value written to CHR-ROM (D7, D6, D3, D1): (first bank,
+#: banks), compared with the bank's low 8 bits; None for ROM only.
+FS306_WINDOWS = {
+    0x80: (0x28, 4),
+    0x82: (0x00, 4),
+    0x88: (0x4C, 4),
+    0x8A: (0x64, 4),
+    0xC0: (0x46, 2),
+    0xC2: (0x7C, 2),
+    0xC8: (0x04, 2),
+    0xCA: None,
+}
+
+
+class FS306(VRC24):
+    """Mapper 544: Waixing's FS306 (Bawang de Dalu): a VRC4 clone with a third PRG bank.
+
+    NES_2.0_Mapper_544.wiki: the clone's A0 and A1 are CPU A10 and A11. Its External
+    Select, $9C00 in that wiring: with A2 clear D4-D0 the 8 KiB bank at $C000;
+    with A2 set D0 the CIRAM page for the nametable A1-A0 names. A write to
+    a CHR-ROM bank with D7 set moves 2 KiB of CHR-RAM (:data:`FS306_WINDOWS`,
+    D4: ROM only). 8 KiB of battery RAM at $6000 always. The page's IRQ "one
+    M2 later than a VRC4" is not modelled.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.prg_c000 = 0
+        self.rom = image.chr
+        self.chr_ram = bytearray(0x800)
+        self.chr_ram_window = [False] * 8
+        self.chr_banks = [0] * 8
+        self.ram_range: tuple[int, int] | None = FS306_WINDOWS[0x80]
+        super().__init__(image.with_board(replace(image.board, **VRC4E)), cpu_cycle_ticks)
+        self.lines0, self.lines1 = (10,), (11,)
+        self.ciram = [0, 1, 0, 1] if self.mirroring == VERTICAL else [0, 0, 1, 1]
+        self.prg_ram = bytearray(max(len(self.prg_ram), 0x2000))
+        self.prg_ram_mask = 0x1FFF
+        self.prg_ram_enabled = True
+        self._remap()
+
+    def _update_prg(self) -> None:
+        self.map_prg(0, 8, self.prg_registers[0])
+        self.map_prg(1, 8, self.prg_registers[1])
+        self.map_prg(2, 8, self.prg_c000)
+        self.map_prg(3, 8, len(self.prg) // 0x2000 - 1)
+
+    def map_chr(self, window: int, size_kib: int, bank: int) -> None:
+        self.chr_banks[window] = bank
+        self._remap()
+
+    def _remap(self) -> None:
+        for window, bank in enumerate(self.chr_banks):
+            low = bank & 0xFF
+            first, count = self.ram_range or (0, 0)
+            ram = first <= low < first + count
+            self.chr_ram_window[window] = ram
+            self.chr_offsets[window] = (
+                (low - first) % 2 * 0x400 if ram else bank * 0x400 % len(self.rom)
+            )
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address & 0xF000 != 0x9000:
+            super().cpu_write(address, value, t)
+        elif address & 0x0C00 == 0x0C00:
+            if address & 4:
+                self.ciram[address & 3] = value & 1
+            else:
+                self.prg_c000 = value & 0x1F
+                self._update_prg()
+
+    def ciram_a10(self, address: int) -> int | None:
+        return self.ciram[(address >> 10) & 3]
+
+    def ppu_read(self, address: int, t: int) -> int | None:
+        if address < 0x2000:
+            window = address >> 10
+            memory = self.chr_ram if self.chr_ram_window[window] else self.rom
+            return memory[self.chr_offsets[window] + (address & 0x3FF)]
+        return super().ppu_read(address, t)
+
+    def ppu_write(self, address: int, value: int, t: int) -> None:
+        if address >= 0x2000:
+            super().ppu_write(address, value, t)
+            return
+        window = address >> 10
+        if self.chr_ram_window[window]:
+            self.chr_ram[self.chr_offsets[window] + (address & 0x3FF)] = value
+        elif value & 0x80:
+            self.ram_range = None if value & 0x10 else FS306_WINDOWS[value & 0xCA]
+            self._remap()

@@ -190,6 +190,11 @@ class NESEvent(MMC1):
                 self.map_prg(0, 16, bank)
                 self.map_prg(2, 16, 15)
 
+    def m2_gap(self, t: int) -> None:
+        """A reset locks the first 32 KiB in again (Disch's notes: "on powerup and reset")."""
+        self.unlocked = self.saw_running = False
+        self._update()
+
     def m2(self, t: int) -> None:
         if not self.timer_held:
             self.counter += 1

@@ -20,11 +20,13 @@ result, which ends a program's wait loop at its first read.
 
 from __future__ import annotations
 
-MANUFACTURER, DEVICE = 0xBF, 0xB7  # Table 2 (SST39SF040)
-
 
 class SST39SF040:
     """The command state machine over a cartridge's PRG bytes (``data``)."""
+
+    manufacturer, device = 0xBF, 0xB7  # Table 2
+    unlock_mask = 0x7FFF
+    sector_size = 0x1000
 
     def __init__(self, data: bytearray) -> None:
         self.data = data
@@ -35,31 +37,43 @@ class SST39SF040:
     def read(self, offset: int) -> int:
         """The byte at chip address ``offset`` (only differs in ID mode)."""
         if self.id_mode and offset >> 1 == 0:
-            return DEVICE if offset & 1 else MANUFACTURER
+            return self.device if offset & 1 else self.manufacturer
         return self.data[offset]  # elsewhere in ID mode the data sheet says nothing
 
     def write(self, offset: int, value: int) -> None:
         """One write cycle at chip address ``offset``."""
-        unlock = offset & 0x7FFF
+        unlock = offset & self.unlock_mask
+        first, second = 0x5555 & self.unlock_mask, 0x2AAA & self.unlock_mask
         step = self.step
         self.step = 0  # unless the sequence goes on
-        if (step in (0, 3) and unlock == 0x5555 and value == 0xAA) or (
-            step in (1, 4) and unlock == 0x2AAA and value == 0x55
+        if (step in (0, 3) and unlock == first and value == 0xAA) or (
+            step in (1, 4) and unlock == second and value == 0x55
         ):
             self.step = step + 1
-        elif step == 2 and unlock == 0x5555 and value in (0xA0, 0x80):
+        elif step == 2 and unlock == first and value in (0xA0, 0x80):
             self.step = 6 if value == 0xA0 else 3  # program's data next, or erase's unlock
-        elif step == 2 and unlock == 0x5555 and value in (0x90, 0xF0):
+        elif step == 2 and unlock == first and value in (0x90, 0xF0):
             self.id_mode = value == 0x90
         elif step == 0 and value == 0xF0:  # Software ID Exit, the short form
             self.id_mode = False
         elif step == 5 and value == 0x30:  # Sector-Erase
-            sector = offset & ~0xFFF
-            self.data[sector : sector + 0x1000] = bytes([0xFF]) * 0x1000
+            sector = offset & -self.sector_size
+            self.data[sector : sector + self.sector_size] = bytes([0xFF]) * self.sector_size
             self.dirty = True
-        elif step == 5 and unlock == 0x5555 and value == 0x10:  # Chip-Erase
+        elif step == 5 and unlock == first and value == 0x10:  # Chip-Erase
             self.data[:] = bytes([0xFF]) * len(self.data)
             self.dirty = True
         elif step == 6:  # Byte-Program: bits only clear
             self.data[offset] &= value
             self.dirty = True
+
+
+class Flash29F040(SST39SF040):
+    """The 29F040 family: the same commands, 64 KiB sectors, unlocked on A10-A0 ($555, $2AA)."""
+
+    unlock_mask = 0x7FF
+    sector_size = 0x10000
+
+    def __init__(self, data: bytearray, manufacturer: int, device: int) -> None:
+        super().__init__(data)
+        self.manufacturer, self.device = manufacturer, device

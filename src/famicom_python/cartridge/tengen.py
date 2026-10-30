@@ -117,3 +117,24 @@ class RAMBO1(MMC3):
             self.prescaler = (self.prescaler + 1) & 3
             if self.prescaler == 0:
                 self.clock_counter()
+
+
+class RAMBO1TLS(RAMBO1):
+    """Mapper 158: Tengen 800037 (Alien Syndrome): the RAMBO-1 with CHR A17 as CIRAM A10.
+
+    INES_Mapper_158.wiki: as TLSROM to the MMC3: a nametable fetch selects the
+    bank register of the matching 1 KiB slot of $0000-$0FFF, and that bank's
+    D7 is CIRAM A10.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        self.raw_banks = [0] * 8
+        super().__init__(image, cpu_cycle_ticks)
+
+    def map_chr(self, window: int, size_kib: int, bank: int) -> None:
+        for i in range(size_kib):
+            self.raw_banks[window + i] = bank * size_kib + i
+        super().map_chr(window, size_kib, bank)
+
+    def ciram_a10(self, address: int) -> int | None:
+        return (self.raw_banks[(address >> 10) & 3] >> 7) & 1

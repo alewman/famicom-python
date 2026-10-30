@@ -109,10 +109,12 @@ class Board:
         self.apu.power()
 
     def reset(self) -> None:
-        """The reset button: the APU always, the PPU only where the console wires it."""
+        """The reset button: the APU always, the PPU only where the console wires it,
+        and the cartridge sees M2 stop (Cartridge.m2_gap)."""
         self.apu.reset()
         if self.machine.reset_resets_ppu:
             self.ppu.reset()
+        self.cartridge.m2_gap(self.t)
 
     def set_sample_rate(self, rate: int) -> None:
         """The host rate for :meth:`take_samples` (44,100 Hz by default)."""

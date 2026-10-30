@@ -35,7 +35,7 @@ Two cautions apply to every tier:
   revision-dependent success codes. The target here is NES-001 with 2A03G/2C02G.
 
 Paths as in [start-here.md](start-here.md). Every file and repository is pinned
-in `scripts/pinned_files.json` (468 files with SHA-256) and
+in `scripts/pinned_files.json` (745 files with SHA-256) and
 `scripts/pinned_repos.json` (29 repositories at full commit SHAs);
 `scripts/fetch_references.py` rebuilds `reference/` and `tests/test_roms/` from
 them.
@@ -1897,3 +1897,42 @@ supports. `tests/test_mappers_gaps.py` pins the bank arithmetic (19 tests).
   *BB Car* and *Boomerang Kid* (1 each).
 - Contradictions recorded: C47-C53 (undocumented-behavior.md).
 
+### The remaining mappers (2026-10-30)
+
+Every mapper with a usable description, on branch `remaining-mappers`: 280 in
+all. Dumps on an implemented mapper: main set 4,429 of 4,464 (99.22%),
+Aftermarket 2,904 of 2,913 (99.69%), Private 632 of 634 (99.68%). The licensed
+dumps left are the same as before: 446, 547, 555 and 186. Left out for want of
+any description: 170, 171, 216, 222, 238, 244, 258, 272, 127, 413, 418, 549,
+557, 169 and the pages that do not exist (559, 563, 564, 576, 585); 256 and
+405 (VT02+, UM6578) are consoles more than mappers; 682 (Rainbow) is documented
+outside the wiki. `tests/test_mappers_remaining.py` pins the arithmetic.
+
+- **Against Mesen2** (`compat_sweep.py --all --aftermarket --private`, every
+  dump on the mappers added here and in the unlicensed batches, re-swept after
+  each fix; 373 dumps): **272 identical**, 73 differ, 28 Mesen2 refuses.
+- **By eye**, where Mesen2 refuses: 43 dumps of 33 mappers reach their title or
+  menu at 300-900 frames, 399.1 excepted (C60). Added in triage: *Lucky Rabbit*
+  (415), *Dong Dongnao 1* (553), the Hicom logo of *Kkachi-wa Norae Chingu*
+  (517: the ADC at $6000 is not modelled), bootleg *Contra* (326) and
+  *Sangokushi* (330). Mesen2 agrees on 117 (2 of 2), 252 (1 of 1), 530 (1 of 1).
+  253: six dumps; five play the same intro with the sea's palette at another
+  phase in some frames, and *Shenhua Jian Yun* hangs at frame 188 copying
+  sound data as a string (Mesen2 reaches its copyright screen): open.
+- **The differences, by the picture.** Board shows the game, Mesen2 a blank or
+  garbage: 27 (3), 304 (2), 513, 197.1, 208.1, 116.0, 116.2, 114.1, 313.3, 519,
+  242 (6 of 7), 199 (6: Mesen2 models a different board), 42.2 (2, C65). Not all
+  of these were played past the title.
+  **Unexplained:** 314's two Brazilian dumps (C61); *4-in-1 CK-001* (242.3,
+  green bricks against red); *Drip* (284, 7 dumps, about 3,000 pixels);
+  *Racermate Challenge II* (168, 6 dumps); *Tianshi Zhi Yi 2* and *Zuqiu
+  Ziaojiang* (195: fine at frame 60, 61,440 pixels by 300); *DBZ 5* (12);
+  *Sofia Fusu* (165); *Zhong Zhuang Ji Bing* (268); *Mortal Kombat II* and
+  *III Turbo* (91: 6,998 pixels at frame 600); the Subor *Text Editor* (0);
+  the four Golden Games (235: late at frame 60, three settle). 19 dumps
+  differ by 250 pixels or fewer, most of them by one.
+- **What triage found.** Board bugs, all mine, all fixed: 74 and 192 subtracted
+  the RAM window's first bank from ROM banks too (the whole of 74 now
+  identical); 195's ROM offsets; 347 read from data instead of the address;
+  351's bank units; 218 with less than 8 KiB of PRG; 112 took the header's
+  mirroring (C67). Page against game: C54-C67, undocumented-behavior.md.
