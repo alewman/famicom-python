@@ -16,8 +16,8 @@ Of the licensed dumps only the StudyBox BIOS (186) is left.
 The final sweep, every dump in the four No-Intro sets against Mesen2: **8,221 of 8,807
 identical**, 477 differ, 109 refused, no crash, no regression among the 1,312 dumps with
 an earlier result. By evidence, of the 294: 19 mappers have a judge ROM, 200 match
-Mesen2 on at least one dump, 31 match only mame_nes, 11 differ wherever they run, 27 are
-by eye alone because no detector runs them, and 6 have no dump, so unit tests only.
+Mesen2 on at least one dump, 31 match only mame_nes (26 independently, 5 written from MAME's
+own notes), 11 differ wherever they run, 27 are by eye alone because no detector runs them, and 6 have no dump, so unit tests only.
 MesenCE closes 52 of the differences; mame_nes agrees with the board on 119 more. All 198 slow tests pass, and AccuracyCoin 147 of 147.
 
 ## How far to trust a row
@@ -35,7 +35,9 @@ is what the code's own docstrings cite.
   (upstream-findings.md).
 - **matches mame_nes**: no Mesen matches, but at least one dump's frames are identical
   on mame_nes within three frames of slack (validation.md): the third detector, and
-  the only machine check some of these boards have.
+  the only machine check some of these boards have. Marked "its own source" where the board
+  was written from MAME's notes: then agreement shows the notes were followed, not that
+  they are right ([provenance.md](provenance.md)).
 - **differs, by eye**: every dump Mesen2 runs differs. Often it is Mesen2 that is
   blank: plain green is palette entry $09, the 2C02's power-on value, with
   rendering off, so it never got as far as drawing.
@@ -400,10 +402,10 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 406 | Haradius406 | mmc3_clones | 0 | 0 | 3 | 0 / 0 / 3 | wiki | by eye (Mesen2 refuses) |
 | 409 | DPCMCart409 | multicart | 0 | 0 | 1 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 412 | Henggedianzi412 | mmc3_clones | 0 | 5 | 0 | 0 / 0 / 5 | wiki | by eye (Mesen2 refuses) |
-| 413 | BATMAPSRR | homebrew | 0 | 1 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes |
+| 413 | BATMAPSRR | homebrew | 0 | 1 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes, its own source |
 | 415 | Board0353 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 417 | FineStudio417 | chinese | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
-| 418 | LH42 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes |
+| 418 | LH42 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes, its own source |
 | 422 | ING003C | mmc3_clones | 1 | 0 | 4 | 0 / 0 / 5 | wiki | by eye (Mesen2 refuses) |
 | 446 | Mindkids446 | multiasic | 4 | 0 | 2 | 0 / 0 / 6 | wiki, the game (C70) | by eye (Mesen2 refuses) |
 | 451 | Haratyler451 | mmc3_clones | 0 | 0 | 2 | 0 / 0 / 2 | wiki | by eye (Mesen2 refuses) |
@@ -435,13 +437,13 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 544 | FS306 | konami | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
 | 547 | QTa | vrc5 | 4 | 0 | 0 | 0 / 0 / 4 | wiki | by eye (Mesen2 refuses) |
 | 548 | CTC15 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 549 | KS7016B | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, forum, MAME | matches mame_nes |
+| 549 | KS7016B | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, forum, MAME | matches mame_nes, its own source |
 | 551 | Jncota551 | chinese | 1 | 3 | 0 | 0 / 0 / 4 | wiki | matches mame_nes |
 | 552 | X1017 | taito | 4 | 0 | 0 | 4 / 0 / 0 | wiki | matches Mesen2 |
 | 553 | Sachen3013 | sachen | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 554 | KS7010 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
-| 555 | Event2 | mmc3 | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes |
-| 557 | LH42 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes |
+| 555 | Event2 | mmc3 | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes, its own source |
+| 557 | LH42 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes, its own source |
 | 558 | YC0309 | nanjing | 4 | 6 | 0 | 0 / 0 / 10 | wiki | by eye (Mesen2 refuses) |
 | 559 | **not implemented** |  | 1 | 0 | 0 |  |  |  |
 | 563 | **not implemented** |  | 1 | 0 | 0 |  |  |  |

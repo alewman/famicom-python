@@ -130,6 +130,8 @@ def registry(dumps: dict, rows: list[dict], mame: collections.Counter) -> str:
         if mapper in MAPPERS:
             name, module, sources = describe(MAPPERS[mapper])
             proof = evidence(mapper, tally, mame)
+            if proof == "matches mame_nes" and "MAME" in sources:
+                proof += ", its own source"  # circular: docs/provenance.md
         else:
             name, module, sources, proof = "**not implemented**", "", "", ""
             swept = ""
