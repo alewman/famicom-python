@@ -29,15 +29,15 @@
  {
   "path": "reference/src/AccuracyCoin",
   "url": "https://github.com/100thCoin/AccuracyCoin",
-  "rev": "6bee919529289c555803b612b8c9e4f7eaaeeabb",
-  "date": "2026-10-10T12:48:09-04:00",
+  "rev": "b4b5952f8ef57618d798c8d97cd099ab352e62e6",
+  "date": "2026-10-23T16:19:44Z",
   "sparse": [
    "/README.md",
    "/AccuracyCoin.asm",
    "/LICENSE"
   ],
   "license": "MIT",
-  "note": "hardware-corrected (designed on RP2A03G + RP2C02G); 144 tests; cited for decimal, interrupt polling, branch polls, SHx+RDY, DMA register conflicts, controller clocking variants"
+  "note": "hardware-corrected (designed on RP2A03G + RP2C02G); 147 tests; cited for decimal, interrupt polling, branch polls, SHx+RDY, DMA register conflicts, controller clocking variants"
  },
  {
   "path": "reference/src/AprVisual",
@@ -340,8 +340,8 @@
  {
   "path": "tests/test_roms/AccuracyCoin",
   "url": "https://github.com/100thCoin/AccuracyCoin",
-  "rev": "6bee919529289c555803b612b8c9e4f7eaaeeabb",
-  "date": "2026-10-10T16:48:09Z",
+  "rev": "b4b5952f8ef57618d798c8d97cd099ab352e62e6",
+  "date": "2026-10-23T16:19:44Z",
   "sparse": [],
   "note": "MIT"
  },

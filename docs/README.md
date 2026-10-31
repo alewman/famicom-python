@@ -8,6 +8,8 @@ Read in this order.
 | [timing.md](timing.md) | The master-clock timeline and CPU/PPU alignment; interrupt polling (hardware vs 6502-python today); OAM and DMC DMA cycle diagrams and the DMA-inside-`read_byte` design; the PPU dot schedule, frame events and the $2002/NMI races; the APU frame counter and tables |
 | [cartridge.md](cartridge.md) | Why mappers live here; the connector and the proposed signal protocol; iNES/NES 2.0; board identification by nes20db; mapper coverage measured over the local No-Intro sets; per-mapper table and judges |
 | [undocumented-behavior.md](undocumented-behavior.md) | 2A03 vs 6502, PPU and APU quirks, revision tables, expansion-audio mix levels, contradictions C1–C30, open items |
+| [mappers.md](mappers.md) | Every mapper: class, dumps, sweep result, source, evidence; what is left and how to pick it up. **Start here for mappers** |
+| [upstream-findings.md](upstream-findings.md) | What we found in Mesen2, Breaknes, the wiki and others: evidence, and whether it has been reported |
 | [claims.md](claims.md) | Per mapper and board variant: which judge passed, its tier, and what is not claimed (milestone 5) |
 | [validation.md](validation.md) | Every oracle by tier with pins and licences; blargg's and AccuracyCoin's result protocols; die-level models; emulator detectors; Mesen2 built and driven headless; what is not available; local romsets |
 | [mame-oracle.md](mame-oracle.md) | The verified MAME 0.285 trace recipe, its measured output (nestest matches on all 8,991 lines) and fifteen traps |

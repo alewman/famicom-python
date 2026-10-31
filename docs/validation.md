@@ -1973,3 +1973,64 @@ game was read first and MAME used as a check.
   564, 576, 585 (one or two dumps each, no description anywhere found); 256
   and 405 (VT02+, UM6578: famiclones more than mappers); 682 (Rainbow: its
   Wi-Fi hardware, documented outside the wiki); 186.
+
+### AccuracyCoin 147 of 147 (2026-10-30)
+
+Repinned from `6bee919` to `b4b5952`: one new test, "DMC Playback Rate" (each of the
+16 rates' cycles before the DMA, 3424 down to 432, and the DMA updating the data
+bus), and "DMA Landing on Write" now accepting 2A03s whose load DMA takes 3 APU
+cycles, as a second passing code. The board passes **147 of 147**, on `dc0003d`,
+with "DMA Landing on Write" code 1, the common behaviour, as an RP2A03G should. The
+new test's numbers are the die's: `scripts/apu_period_roms.py` decodes the
+same table from the 2A03's masks.
+
+Others, for scale (detectors, not judges). **MesenCE** `4b8a196`, run here by
+`scripts/mesen_accuracycoin.py`: 143 of 147; it passes the new test and fails DMC Reload
+Timing, ALE + Read, Hybrid Addresses and Frozen OAM2 Increment. Our patched Mesen2
+2.1.1: 130 of 146. **Breaknes**, the whole emulator: not run here (a Windows
+program); its author's screenshot on #531 shows 97 of 146 on 2026-10-13. Our harness
+holds only PPUSim on this board, and APUSim on a stub, neither of which can
+judge a DMC test as a whole emulator would. The public leaderboard
+(doclic.eu/neslead.htm) is at AccuracyCoin's older 140 tests, with TriCNES and
+mame_nes at 140 of 140 and MesenCE at 137. On 147, the project's owner reports TriCNES and
+mame_nes both passing all 147 (2026-10-30, not run here), so three emulators are known to.
+
+### MesenCE as a second detector (2026-10-30)
+
+SourMesen/Mesen2 is archived; development went to
+[nesdev-org/MesenCE](https://github.com/nesdev-org/MesenCE). Built as Mesen2 was, by
+hand and not by the fetch script, because it is GPL: `4b8a196e` in
+`reference/build-mesence/MesenCE`, `USE_GCC=true make core`, run as a library only.
+`MESEN_LIB=.../MesenCore.so` selects it for every script that uses `mesen_run.py`.
+
+What differs from Mesen2, found by measuring the running library: `NesConfig` has
+the same layout, but `ControllerType` was renumbered (the NES pad is 10, not 6, and with 6
+no controller is plugged in), and script log lines wrap at 300 characters, so frames now
+travel as numbered chunks of two characters a pixel (`FRAMES_LUA`). A frame with a
+chunk missing counts as no frame.
+
+Results are in upstream-findings.md. Two of the 207 dumps run there were misleading at
+first: `--all` also reads the 2024 set, whose *Tiexue Lianmeng* is a different file
+from the Aftermarket set's of the same name, so a sweep's rows must be read with their `set`.
+
+The reference model is an **early** RP2A03G: every machine row has
+`dmc_unexpected_reload_bug` off, the bug of late G and H chips, so AccuracyCoin's "Implicit
+DMA Abort" passes with code 2, "a pre-mid-1990 CPU". mame_nes passes the same test with code
+1, a later chip (compared 2026-10-30); both are hardware behaviours.
+
+### The final sweep (2026-10-30)
+
+At the commit closing the mapper work, `compat_sweep.py` over every dump of the Main, 2024,
+Aftermarket and Private sets against Mesen2, through `tests/mame_traces/sweep-final` (gitignored):
+**8,221 of 8,807 identical**, 477 differ, 109 refused. It found one crash, *NES Pong*'s
+4 KiB PRG overrunning the 8 KiB window, fixed in `Banked` and then identical. No dump
+with an earlier result (1,312 of them) got worse. Licensed: 2,573 of 2,662 identical, 79
+differ, 10 refused. The 586 are kept in `tests/sweep_failures.tsv`, the next quick-sweep list; the
+licensed ones are sorted in mappers.md. MesenCE, over the same list, is identical on
+52 more of all sets' dumps (15 of them licensed). Slow suite 198 of 198, quick 214, mappers
+all, AccuracyCoin 147 of 147, on PyPy.
+
+The sweep was killed once by something outside it (no traceback, 10:33, as another
+project's script of the same name restarted): `compat_sweep.py` resumes from its `--out`,
+so a killed run loses nothing, but a wrapper must check that each stage finished.
+
