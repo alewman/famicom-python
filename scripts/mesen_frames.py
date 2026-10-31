@@ -24,7 +24,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from mesen_run import REGIONS, ROOT, run_mesen
+from mesen_run import FRAMES_LUA, REGIONS, ROOT, decode_frames, run_mesen
 
 from famicom_python.machine import MACHINES, NES_001, Machine
 from famicom_python.ppu import HEIGHT
@@ -32,27 +32,6 @@ from famicom_python.system import System
 from famicom_python.video import load_palette, write_png
 
 HOME = ROOT / "tests" / "mame_traces" / "mesen-home"
-
-
-FRAME_LUA = """
-local target, frame = %d, 0
-emu.addEventCallback(function()
-  frame = frame + 1
-  if frame == target then
-    local size = emu.getScreenSize()
-    local buffer = emu.getScreenBuffer()
-    emu.log(string.format("S %%d %%d", size.width, size.height))
-    for y = 0, size.height - 1 do
-      local parts = {}
-      for x = 0, size.width - 1 do
-        parts[#parts + 1] = string.format("%%06x", buffer[1 + y * size.width + x])
-      end
-      emu.log("R" .. table.concat(parts))
-    end
-    emu.log("DONE")
-  end
-end, emu.eventType.endFrame)
-"""
 
 
 def unswap_emphasis(value: int) -> int:
@@ -74,20 +53,22 @@ def finished_picture(system: System) -> list[int]:
 
 
 def mesen_frame(rom: Path, frame: int, seconds: float, region: int = 1) -> list[list[int]]:
-    code, log, _ = run_mesen(
+    lines: dict[str, str] = {}
+    code, _, _ = run_mesen(
         rom,
-        lua=(FRAME_LUA % frame).encode(),
+        lua=(FRAMES_LUA % (f"[{frame}]=true", frame)).encode(),
         lua_name="frame.lua",
         seconds=seconds,
         home=HOME,
         until="DONE",
         for_comparison=True,
         region=region,
+        collect=lines,
     )
-    rows = [line[1:] for line in log.splitlines() if line.startswith("R")]
-    if code != 0 or not rows:
+    picture = decode_frames(lines).get(frame)
+    if code != 0 or not picture:
         raise SystemExit(f"Mesen2 gave no frame {frame} (stop code {code})")
-    return [[int(row[i : i + 6], 16) for i in range(0, len(row), 6)] for row in rows]
+    return [picture[y : y + 256] for y in range(0, len(picture), 256)]
 
 
 def compare(

@@ -14,12 +14,19 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import os
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 # Built by hand as docs/validation.md "Mesen2 as a second detector" describes; never committed.
-LIB = ROOT / "reference/build-mesen2/Mesen2/InteropDLL/obj.linux-x64/MesenCore.so"
+# ``MESEN_LIB`` picks another build: MesenCE, Mesen2's successor, has the same NesConfig layout
+# (measured from the running library), in reference/build-mesence (validation.md).
+LIB = Path(
+    os.environ.get(
+        "MESEN_LIB", ROOT / "reference/build-mesen2/Mesen2/InteropDLL/obj.linux-x64/MesenCore.so"
+    )
+)
 CPU_NES = 8  # CpuType::Nes
 MAXIMUM_SPEED, CONSOLE_MODE = 0x04, 0x10
 
@@ -40,7 +47,9 @@ class TraceLoggerOptions(ctypes.Structure):
 NES_CONFIG_SIZE = 14184
 NES_CONFIG_PORT1_TYPE = 988  # ControllerType (int32) of Port1
 NES_CONFIG_PORT2_TYPE = 1980
-NES_CONTROLLER = 6  # ControllerType::NesController
+# ControllerType::NesController: 6 on Mesen2, 10 on MesenCE (found by which value gives a pad
+# of eight buttons: its list was renumbered, and with 6 no controller is plugged in).
+NES_CONTROLLER = 10 if "mesence" in str(LIB).lower() else 6
 NES_CONFIG_AUTO_CONFIGURE_INPUT = 11908  # bool, default true
 NES_CONFIG_REGION = 11912  # ConsoleRegion (int32): 0 auto, 1 NTSC, 2 PAL, 3 Dendy
 REGIONS = {"NTSC": 1, "PAL": 2, "Dendy": 3}  # by machine.Timing.name
@@ -123,6 +132,53 @@ def configure_for_comparison(m: ctypes.CDLL, region: int = 1) -> None:
     m.SetNesConfig(config)
 
 
+# Frames travel through the script log, which keeps its last 500 lines and which MesenCE wraps
+# at 300 characters: two characters a pixel, in numbered lines of 280, read as they appear.
+ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/"
+FRAMES_LUA = """
+local wanted, frame, last = {%s}, 0, %d
+local alphabet = "ALPHABET"
+local digit = {}
+for i = 1, 64 do digit[i - 1] = alphabet:sub(i, i) end
+emu.addEventCallback(function()
+  frame = frame + 1
+  if wanted[frame] then
+    local buffer = emu.getScreenBuffer()
+    local parts = {}
+    for i = 1, #buffer do
+      local v = buffer[i]
+      parts[i] = digit[(v // 64) %% 64] .. digit[v %% 64]
+    end
+    local all = table.concat(parts)
+    local count = 0
+    for at = 1, #all, 280 do
+      emu.log("L" .. frame .. "." .. count .. " " .. all:sub(at, at + 279))
+      count = count + 1
+    end
+    emu.log("E" .. frame .. " " .. count)
+  end
+  if frame == last then emu.log("DONE") end
+end, emu.eventType.endFrame)
+""".replace("ALPHABET", ALPHABET)
+
+
+def decode_frames(lines: dict[str, str]) -> dict[int, list[int]]:
+    """The complete frames among the log lines ``run_mesen`` collected."""
+    frames = {}
+    for key, text in lines.items():
+        if key.startswith("E"):
+            frame, count = int(key[1:]), int(text)
+            parts = [lines.get(f"L{frame}.{n}") for n in range(count)]
+            if None in parts:
+                continue
+            data = "".join(parts)
+            frames[frame] = [
+                ALPHABET.index(data[i]) << 6 | ALPHABET.index(data[i + 1])
+                for i in range(0, len(data), 2)
+            ]
+    return frames
+
+
 def run_mesen(
     rom: Path,
     *,
@@ -135,13 +191,15 @@ def run_mesen(
     max_speed: bool = True,
     for_comparison: bool = False,
     region: int = 1,
+    collect: dict[str, str] | None = None,
 ) -> tuple[int, str, float]:
     """Run ``rom`` at maximum speed until the Lua script stops it or ``seconds`` pass.
 
     Mesen2 discards a script's log when ``emu.stop`` ends emulation, so a script
     that reports through its log prints ``until`` as its last line instead and
     keeps running; this polls for it and then stops (stop code 0). Returns the
-    stop code (-1 on timeout), the script's log and the wall time.
+    stop code (-1 on timeout), the script's log and the wall time. ``collect`` gathers
+    lines ``KEY text`` as they pass through the log, which keeps only its last 500.
     """
     m = load_library()
     home.mkdir(parents=True, exist_ok=True)
@@ -179,6 +237,11 @@ def run_mesen(
         if until is not None:
             m.GetScriptLog(script_id, buf, len(buf))
             log = buf.value.decode(errors="replace")
+            if collect is not None:
+                for line in log.splitlines():
+                    key, _, text = line.partition(" ")
+                    if key[:1] in ("L", "E") and text:
+                        collect[key] = text
             if until in log:
                 result = 0
                 break

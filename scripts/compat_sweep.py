@@ -57,7 +57,7 @@ from pathlib import Path
 
 from count_mappers import BASE, classify
 from mesen_lockstep import lockstep_machine, mesen_path
-from mesen_run import REGIONS, ROOT, run_mesen
+from mesen_run import FRAMES_LUA, REGIONS, ROOT, decode_frames, run_mesen
 
 from famicom_python.cartridge import MAPPERS, fds_bios
 from famicom_python.ppu import HEIGHT
@@ -73,22 +73,6 @@ PRIVATE = "Nintendo - Nintendo Entertainment System (Headered) (Private)"
 FDS_SET = "Nintendo - Family Computer Disk System (FDS)"
 OUT = ROOT / "tests" / "mame_traces" / "sweep"
 WIDTH, PIXELS = 256, 256 * HEIGHT
-
-# One log line per wanted frame: Mesen2 keeps only a script's last 500 log
-# lines (Core/Debugger/ScriptingContext.cpp), too few for a frame's rows.
-FRAMES_LUA = """
-local wanted, frame, last = {%s}, 0, %d
-emu.addEventCallback(function()
-  frame = frame + 1
-  if wanted[frame] then
-    local buffer = emu.getScreenBuffer()
-    local parts = {}
-    for i = 1, #buffer do parts[i] = string.format("%%03x", buffer[i]) end
-    emu.log("F" .. frame .. " " .. table.concat(parts))
-  end
-  if frame == last then emu.log("DONE") end
-end, emu.eventType.endFrame)
-"""
 
 
 def disk_dumps(only: str | None) -> list[Path]:
@@ -149,7 +133,8 @@ def mesen_frames(rom: Path, frames: list[int], home: Path, region: int = 1) -> d
         (home / "Firmware").mkdir(exist_ok=True)
         (home / "Firmware" / "disksys.rom").write_bytes(fds_bios())
     lua = FRAMES_LUA % (", ".join(f"[{f}]=true" for f in frames), max(frames))
-    _, log, _ = run_mesen(
+    lines: dict[str, str] = {}
+    run_mesen(
         mesen_path(rom),
         lua=lua.encode(),
         lua_name="frames.lua",
@@ -158,13 +143,9 @@ def mesen_frames(rom: Path, frames: list[int], home: Path, region: int = 1) -> d
         until="DONE",
         for_comparison=True,
         region=region,
+        collect=lines,
     )
-    pictures = {}
-    for line in log.splitlines():
-        if line.startswith("F"):
-            number, data = line[1:].split(" ", 1)
-            pictures[int(number)] = [int(data[i : i + 3], 16) for i in range(0, len(data), 3)]
-    return pictures
+    return decode_frames(lines)
 
 
 def unswap_emphasis(value: int) -> int:

@@ -7,38 +7,25 @@ around it: the 2A03's sound unit, DMA and joypad ports, the 2C02 picture
 processor dot by dot, the cartridge connector and the mappers behind it, and
 the clock that ties them together.
 
-**Status (2026-10-26): all 8 milestones done**: the CPU on the board, the
-PPU dot by dot, the APU, DMA and interrupts, AccuracyCoin run in full
-(146 of 146), the big six mappers with
-their judges, lockstep with Mesen2 (six games identical instruction by
-instruction for a minute each), 31 mappers covering 95.6 % of licensed
-dumps, every one of the 2,545 swept against Mesen2: 2,463 identical, the
-other 82 each with its cause (docs/validation.md, milestone 7), and
-milestone 8: a window to play in (`famicom-python play`), the Famicom's
-sound path with the VRC6's, MMC5's and Namco 163's sound at their measured
-levels (checked against NewRisingSun's recordings of thirteen carts), its microphone and expansion-port pads, and UNROM 512 for homebrew
-(35 mappers with the VRC7 and its FM sound from ym2413-python, 96.0 % of licensed dumps). Milestone 9, the Famicom Disk
-System: the RAM adapter, its drive, sound, disk changes and saves, `.fds` and
-`.qd` images through Nintendo's BIOS (yours: `FAMICOM_FDS_BIOS`), judged by
-three FDS test disks with hardware answers; 290 of 299 licensed disks give
-Mesen2's frames, the other 9 each with its cause. One master-clock
-timeline with the PPU and APU advanced inside each CPU bus cycle, the memory
-map and open bus, both controller clocking models, OAM and DMC DMA inside the
-stalled read (get/put cycles, DMC precedence), the cartridge connector
-(every PPU fetch on it, dot by dot), the iNES/NES 2.0 loader with nes20db, and
-mappers 0, 1 (with its board wirings), 2, 3, 4 (MMC3 with both IRQs, MMC6,
-MC-ACC), 5 (MMC5, with its sound), 7, 9 and 10 (MMC2/4), 16, 157 and 159
-(Bandai, with their EEPROMs), 18, 19 (Namco 163, with its sound), 21-25
-(VRC2/4), 24 and 26 (VRC6, with its sound), 30 (UNROM 512, with its flash
-save), 32, 33, 34, 66, 69 (FME-7), 75 (VRC1), 87, 118, 155, 185, 206, 210 and
-268 ([docs/claims.md](docs/claims.md)).
-The PPU renders: background and sprite fetches,
-per-dot sprite evaluation with the overflow bug, sprite-0 hit, the odd-frame
-skip, the VBL/NMI races, the decaying I/O latch; frames come out as 9-bit
-palette values, or PNG through a `.pal` file. The APU sounds: two pulses,
-triangle, noise and DMC, the frame counter and its races, mixed with blargg's
-formula at the CPU rate, box-filtered to the host rate and through a fitted
-analogue stage per console (`--wav`).
+**Status (2026-10-30): feature complete for its scope.** The reference
+model is an NES-001 with an RP2A03G and RP2C02G, with the Famicom, PAL and
+Dendy as rows of the same table: the CPU on the board, the PPU dot by dot, the
+APU, DMA and interrupts on one master-clock timeline, AccuracyCoin 147 of
+147, lockstep with Mesen2 instruction by instruction, a window to play in
+(`famicom-python play`), expansion sound checked against NewRisingSun's
+recordings of thirteen carts and VRC7 FM from ym2413-python, and the Famicom
+Disk System with Nintendo's BIOS (yours: `FAMICOM_FDS_BIOS`).
+
+**Mappers are closed as an active effort**: 294 of them, 99.80 % of the main
+No-Intro set and every licensed dump but the StudyBox BIOS. Complete does not
+mean verified: most boards have no judge ROM, and some Mesen2 cannot load, so
+their titles were only looked at. [docs/mappers.md](docs/mappers.md) has every
+mapper's source and evidence, what is left, and how to pick it up.
+
+Not built, by choice for now: the Vs. System and PlayChoice-10, and the speed
+work (reference boards aim to be correct; `*-fast` projects are for speed).
+Open questions with no hardware answer are in
+[docs/undocumented-behavior.md](docs/undocumented-behavior.md).
 
 - **nestest**: 8,991 of 8,991 lines of `nestest.log` (PC, A, X, Y, P, SP, CYC
   and the PPU columns).
@@ -74,7 +61,7 @@ analogue stage per console (`--wav`).
   detector), `apu_mixer`'s tones agree in timing, pitch and level.
 - **APUSim, the gate-level 2A03**, runs here but is not yet a judge: 3 of 8
   `apu_test`, for a cause found in its simulation order.
-- **AccuracyCoin** (`6bee919`, 146 tests): all 146 pass, from 116 on the first
+- **AccuracyCoin** (`b4b5952`, 147 tests): all 147 pass, from 116 on the first
   run, fixed against its hardware answer keys: the frame IRQ's clear and
   inhibit, the controller strobe, the 2A03's internal data bus, its register
   decode during DMA, the DMC's reload timing, enable hold and abort bug, SHx
@@ -193,6 +180,10 @@ by the scripts that use them, not by the test suite.
 | `scripts/count_mappers.py` | mapper coverage over the local No-Intro sets, read in place ([docs/cartridge.md](docs/cartridge.md)) |
 | `scripts/mesen_lockstep.py` | a game on the board against Mesen2's trace, instruction by instruction, to the first divergence |
 | `scripts/compat_sweep.py` | every licensed dump of an implemented mapper against Mesen2, frames 60, 300 and 600 |
+| `scripts/mapper_registry.py` | generates the registry in [docs/mappers.md](docs/mappers.md) and `tests/sweep_failures.tsv` from a sweep |
+| `scripts/rom_scan.py` | a dump's header, vector banks and absolute register accesses, without running it |
+| `scripts/mapper_trial.py` | runs a dump on a chosen board and shows what it asks the cartridge for |
+| `scripts/disasm6502.py` | a small 6502 disassembler for reading bank-switching and protection code |
 | `scripts/sweep_triage.py` | the sweep's differing dumps sorted by what the board did on the differing lines |
 | `scripts/ppusim_line0.py` | line 0's stale sprite slot 0 on the board's PPU and PPUSim (C35) |
 

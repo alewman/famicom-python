@@ -2,7 +2,7 @@
 """Run all of AccuracyCoin on the board and print every test's result.
 
 AccuracyCoin (100th_Coin, MIT; pinned in scripts/pinned_repos.json) runs all
-146 tests when Start is pressed on its page index and leaves one result byte
+147 tests when Start is pressed on its page index and leaves one result byte
 per test in $0400-$04FF: low 2 bits 1 pass, 2 fail, the bits above the error
 code (the README lists each test's codes), $FF skipped. Test names and result
 addresses are read from the pinned AccuracyCoin.asm.
