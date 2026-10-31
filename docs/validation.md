@@ -2034,3 +2034,27 @@ The sweep was killed once by something outside it (no traceback, 10:33, as anoth
 project's script of the same name restarted): `compat_sweep.py` resumes from its `--out`,
 so a killed run loses nothing, but a wrapper must check that each stage finished.
 
+### mame_nes as a third detector (2026-10-30)
+
+mame_nes (theklap's MAME fork, `/data/emu/mame-nes-theklap/nes.tip`, MAME 0.289, 8033f5c, passing
+all of AccuracyCoin) runs headless as a binary: `compat_sweep.py --detector mame --slack 3`,
+`scripts/mame_frames.py`. It gives colours, not palette values, so the board's picture is
+painted with `scripts/mame_nes_colours.json`, mame_nes's colour for each of the 512 values,
+measured with a ROM showing each as a blank screen and anchored on known colours: a
+hold of 8 frames fits any multiple of 8, so `$0F` black and `$20` white pick the offset. Its frame
+numbers are Mesen2's, and its CPU/PPU alignment is random unless set (`ALIGNMENT`). On
+eight well-known games, every frame was identical once it was set up.
+
+Of the 109 dumps Mesen2 and MesenCE refuse, it loads 39: **34 identical**, the first machine
+check those boards have had. Of the 5: *Zhanguo Fengyun* and *Jingke Xin Zhuan* (551) are the same
+picture; the two 374 dumps match from the next game, because mame_nes starts a reset-based
+cart one reset on, and turned up the board's 512 KiB dump being taken for SUROM; and
+396.3 found two board bugs, its power-on bank (the last, whose reset stub writes `$800F = 0`) and its
+mirroring, the page's "vertical arrangement", the wiki trap again. All are fixed; 396.3 is identical.
+
+Of the 422 dumps where the board and MesenCE differ and it loads, **119 are identical to the board**:
+among them *Super Hang-On* (258), *Klax* (64), *KlashBall*, *Tatakai no Banka* (C32, within a frame),
+13 of 319, 7 of 163, 4 of 199, 519. So on those the Mesens are the odd ones out, though this does not make
+the board right, only outvoted in its favour. 303 differ from all: C48's *Flintstones* and *Jetsons*
+are not settled by it. *30 Games* (314) is within 28 pixels, supporting C61.
+

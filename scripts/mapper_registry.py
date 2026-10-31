@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Generate docs/mappers.md's registry: one row for every mapper, implemented or not.
 
-    NO_INTRO_DIR=... python scripts/mapper_registry.py --results tests/mame_traces/sweep-final
+    NO_INTRO_DIR=... python scripts/mapper_registry.py --results tests/mame_traces/sweep-final \\
+        --mame tests/mame_traces/sweep-m2 --mame tests/mame_traces/sweep-m3
 
 For each mapper number found in the No-Intro sets or in ``MAPPERS``: the class and
 module, how many dumps use it, what the last sweep said, where its description
@@ -90,11 +91,13 @@ def describe(factory) -> tuple[str, str, str]:
     )
 
 
-def evidence(mapper: int, tally: collections.Counter) -> str:
+def evidence(mapper: int, tally: collections.Counter, mame: collections.Counter) -> str:
     if mapper in JUDGED:
         return "judge ROM"
     if tally["identical"]:
         return "matches Mesen2"
+    if mame[mapper]:
+        return "matches mame_nes"
     if tally["differs"] or tally["crash"]:
         return "differs, by eye"
     if tally["error"]:
@@ -109,7 +112,7 @@ def row_mapper(row: dict, dumps: dict) -> int | None:
     return dumps.get(row["rom"], (None, ""))[0]
 
 
-def registry(dumps: dict, rows: list[dict]) -> str:
+def registry(dumps: dict, rows: list[dict], mame: collections.Counter) -> str:
     sets: dict[int, collections.Counter] = collections.defaultdict(collections.Counter)
     tallies: dict[int, collections.Counter] = collections.defaultdict(collections.Counter)
     for mapper, name in dumps.values():
@@ -126,7 +129,7 @@ def registry(dumps: dict, rows: list[dict]) -> str:
         swept = f"{tally['identical']} / {tally['differs'] + tally['crash']} / {tally['error']}"
         if mapper in MAPPERS:
             name, module, sources = describe(MAPPERS[mapper])
-            proof = evidence(mapper, tally)
+            proof = evidence(mapper, tally, mame)
         else:
             name, module, sources, proof = "**not implemented**", "", "", ""
             swept = ""
@@ -150,12 +153,18 @@ def write_failures(dumps: dict, rows: list[dict]) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--results", type=Path)
+    parser.add_argument("--mame", type=Path, action="append", default=[], help="mame_nes sweeps")
     args = parser.parse_args()
     dumps = dump_mappers()
     rows = sweep(args.results)
+    mame: collections.Counter[int] = collections.Counter()
+    for directory in args.mame:
+        for row in sweep(directory):
+            if row["status"] == "identical":
+                mame[row_mapper(row, dumps)] += 1
     text = DOC.read_text()
     start, end = text.index(BEGIN) + len(BEGIN), text.index(END)
-    DOC.write_text(text[:start] + "\n\n" + registry(dumps, rows) + "\n\n" + text[end:])
+    DOC.write_text(text[:start] + "\n\n" + registry(dumps, rows, mame) + "\n\n" + text[end:])
     if rows:
         print(write_failures(dumps, rows), "non-identical of", len(rows))
 

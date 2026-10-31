@@ -1101,15 +1101,19 @@ class YY850437C(Banked):
     """Mapper 396: J.Y.'s YY850437C and Realtec's GN-51: UNROM with an outer bank.
 
     NES_2.0_Mapper_396.wiki: the outer register at $A000-$BFFF ($8000-$BFFF on
-    submapper 3): D2-D0 PRG A19-A17, D6 (1), D5 (2, 3) or either (0) 1 for
-    vertical mirroring. The inner register, every other address, D2-D0 the
-    bank at $8000; the inner bank 7 is at $C000.
+    submapper 3): D2-D0 PRG A19-A17, D6 (1), D5 (2, 3) or either (0) 1 for the
+    page's vertical arrangement, which is horizontal mirroring. The inner register, every
+    other address, D2-D0 the
+    bank at $8000; the inner bank 7 is at $C000. The page gives no power-on state;
+    396.3 starts in the last outer bank: the dump's reset stub is there, and it
+    writes $800F = 0 to go to the first (compared with mame_nes, validation.md).
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
         super().__init__(image, cpu_cycle_ticks)
         self.submapper = image.board.submapper
-        self.outer = self.inner = 0
+        self.outer = 7 if self.submapper == 3 else 0
+        self.inner = 0
         self.map_chr(0, 8, 0)
         self._update()
 
@@ -1124,7 +1128,7 @@ class YY850437C(Banked):
         if outer:
             self.outer = value & 7
             bits = {0: 0x60, 1: 0x40}.get(self.submapper, 0x20)
-            self.set_mirroring(VERTICAL if value & bits else HORIZONTAL)
+            self.set_mirroring(HORIZONTAL if value & bits else VERTICAL)
         else:
             self.inner = value & 7
         self._update()
@@ -1302,12 +1306,16 @@ class ResetMMC1(MMC1):
     """Mapper 374: reset-based MMC1 multicarts: each game an MMC1 in 128 KiB of PRG and of CHR.
 
     NES_2.0_Mapper_374.wiki: an interruption of M2 (:meth:`m2_gap`) steps the higher
-    address lines. The page gives only that; the games sit in order.
+    address lines. The page gives only that; the games sit in order. Each game's MMC1 sees 128
+    KiB, so a dump's 512 KiB does not make it a SUROM.
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
         self.outer = 0
         super().__init__(image, cpu_cycle_ticks)
+
+    def chr_bit_is_prg_a18(self) -> bool:
+        return False
 
     def m2_gap(self, t: int) -> None:
         self.outer = (self.outer + 1) % max(len(self.prg) // 0x20000, 1)
