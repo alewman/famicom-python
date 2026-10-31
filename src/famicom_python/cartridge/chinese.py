@@ -2,7 +2,8 @@
 wiki page.
 
 No judge ROM exists for any of them; the claims rest on sweeps against Mesen2,
-a detector (docs/claims.md). The TMS5220-compatible speech chips some
+a detector, or on looking where it refuses them (docs/mappers.md). The TMS5220-compatible
+speech chips some
 educational cartridges mount are not modelled: their status reads are open bus.
 """
 
@@ -63,7 +64,7 @@ class Hengge(Banked):
 class Education178(Banked):
     """Mapper 178: the educational-computer and Waixing FS305 board.
 
-    INES_Mapper_178.wiki: $4800 ``.....SSM``: the arrangement (0 vertical, 1
+    INES_Mapper_178.wiki: $4800 ``.....SSM``: the mirroring (0 vertical, 1
     horizontal) and the PRG mode (0 32 KiB, 1 UNROM with 111 fixed, 2 16 KiB
     mirrored, 3 UNROM with the low bit of the fixed bank selectable); $4801
     PRG A16-A14, $4802 PRG A24-A17, $4803 the 8 KiB PRG-RAM bank. The bank
@@ -233,7 +234,8 @@ class Huang116(Banked):
 class SL1632(Huang116):
     """Mapper 14: Gouder's SL-1632 (Samurai Spirits, 8 characters): the Huang-1 as VRC2b or MMC3.
 
-    INES_Mapper_014.wiki: the supervisor is at $A131 (overlapping the chips'
+    INES_Mapper_014.wiki, its mirroring from Nestopia's source as the page says: the supervisor
+    is at $A131 (overlapping the chips'
     registers, which also take the write): D1 the chip (0 VRC2b, 1 MMC3), and
     CHR A18 for PPU $0000-$0FFF (D3), $1000-$17FF (D5) and $1800-$1FFF (D7).
     Power-on supervisor 0 (VRC2b).
@@ -307,7 +309,8 @@ class FDSConversion108(Banked):
 class Daou156(Banked):
     """Mapper 156: Daou Infosys' DIS23C01 (Metal Force, Buzz & Waldog).
 
-    INES_Mapper_156.wiki (from FCEUX's implementation, fully decoded):
+    INES_Mapper_156.wiki (from FCEUX's implementation, which the page calls probably
+    inaccurate, fully decoded):
     $C000-$C003/$C008-$C00B the low bytes and $C004-$C007/$C00C-$C00F the
     high bits of the eight 1 KiB CHR banks; $C010 the 16 KiB PRG bank at
     $8000 (the last fixed); $C014 the mirroring (vertical, horizontal,
@@ -541,7 +544,7 @@ class Dance2000(Banked):
 
     NES_2.0_Mapper_518.wiki: $5000 ``REPPPPPP``: the 16/32 KiB PRG bank (E is
     PRG A20 of the combined main+expansion image; R, the SB-97's secondary
-    RAM, is not modelled); $5200 ``.....SBM``: the arrangement (M: 0 vertical
+    RAM, is not modelled); $5200 ``.....SBM``: the mirroring (M: 0 vertical
     mirroring), CHR-RAM auto-bankswitch (B), 32 KiB banks (S; else 16 KiB at
     $8000 with $C000 the first bank). CHR-RAM: $0000-$0FFF 4 KiB (with B,
     reads take CHR A12 from the CIRAM A10 latched at PPU A13's last rise),
@@ -699,7 +702,7 @@ class Sangokushi330(Banked):
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
         super().__init__(image, cpu_cycle_ticks)
-        self.nametables = [0, 0, 1, 1]
+        self.nametables = [0, 0, 1, 1]  # not given: horizontal
         self.counter = 0
         self.counting = False
         self.map_prg(3, 8, len(self.prg) // 0x2000 - 1)

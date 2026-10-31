@@ -2,10 +2,12 @@
 
 Mappers 347, 368, 415, 418, 535, 538, 539, 548, 549, 554, 557.
 
-Each from its NESdev wiki page (NES_2.0_Mapper_*.wiki). A disk game expects 32 KiB of RAM at
+Most from their NESdev wiki pages (NES_2.0_Mapper_*.wiki), others as their class says. A disk
+game expects 32 KiB of RAM at
 $6000-$DFFF and these boards spend as little as they can on it, so ROM and a
 few KiB of RAM are quilted across the CPU's space. None has a judge ROM; the
-claims rest on sweeps against Mesen2, a detector (docs/claims.md).
+claims rest on sweeps against Mesen2, a detector, or on looking where it refuses them
+(docs/mappers.md).
 """
 
 from __future__ import annotations
@@ -139,7 +141,7 @@ class Palthena539(Conversion):
 
     Fixed 8 KiB banks $D at $6000, $C at $8000, $E at $C000, $F at $E000;
     $A000 (mask unknown; the $A000-$BFFF region here) D3-D0 the bank at
-    $A000; $FFFF D3 the arrangement (0 vertical, 1 horizontal).
+    $A000; $FFFF D3 the mirroring (0 vertical, 1 horizontal).
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
@@ -294,7 +296,7 @@ class KS7030(Banked):
     $6C00, 4 KiB at $7000, the fixed ROM to $B7FF, 2 KiB of RAM at $B800,
     3 KiB of ROM at $C000, 3 KiB of RAM at $CC00, the fixed ROM to the end:
     the same 8 KiB of RAM, read in order. By address: $8000-$8FFF: A2-A0 the
-    4 KiB bank at $7000 from the third part of the file, A3 the arrangement (0
+    4 KiB bank at $7000 from the second part of the file, A3 the mirroring (0
     vertical); $9000-$9FFF: A3-A0 a 4 KiB bank of the file's first part. The page gives
     the chip's true layout: 64 KiB of those banks (3 KiB at $C000, then 1 KiB
     at $6C00), 32 KiB of the other, the last 32 KiB fixed.

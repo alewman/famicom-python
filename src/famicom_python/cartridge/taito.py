@@ -19,7 +19,7 @@ class TC0190(Banked):
     """Mapper 33: two 8 KiB PRG banks and the last two fixed; CHR 2 KiB x 2 and 1 KiB x 4.
 
     INES_Mapper_033.wiki (register mask $A003): $8000 D5-D0 selects $8000 and
-    D6 the arrangement (0 vertical, 1 horizontal); $8001 selects $A000;
+    D6 the mirroring (0 vertical, 1 horizontal); $8001 selects $A000;
     $8002/$8003 the 2 KiB CHR banks at $0000/$0800, numbered in 2 KiB units
     (unlike the MMC3's); $A000-$A003 the 1 KiB banks at $1000-$1C00. No IRQ,
     no PRG-RAM. Power-on registers unspecified: 0 here.
@@ -54,7 +54,7 @@ class TC0690(MMC3):
     $8000/$A000 (the last two fixed); $8002/$8003 the 2 KiB CHR banks in 2 KiB
     units; $A000-$A003 the 1 KiB banks at $1000-$1C00; $C000 the reload value,
     inverted; $C001 as the MMC3's $C001, $C002 as its $E001, $C003 as its
-    $E000; $E000 D6 the arrangement (0 vertical, 1 horizontal). The counter
+    $E000; $E000 D6 the mirroring (0 vertical, 1 horizontal). The counter
     is the MMC3's, its /IRQ :data:`TC0690_IRQ_DELAY` CPU cycles later.
     """
 
@@ -181,7 +181,7 @@ class X1017(Banked):
 
     Taito_X1-017.wiki: write-only registers at $7EF0-$7EFF: $7EF0/$7EF1 the
     2 KiB CHR banks (D0 ignored), $7EF2-$7EF5 the 1 KiB ones; $7EF6 D0 the
-    arrangement (as the X1-005's, 1 vertical) and D1 swaps the 2 KiB and
+    mirroring (as the X1-005's, 1 vertical) and D1 swaps the 2 KiB and
     1 KiB halves; $7EF7/8/9 enable the RAM at $6000-$67FF ($CA), $6800-$6FFF
     ($69) and $7000-$73FF ($84); $7EFA/B/C the 8 KiB banks at $8000, $A000,
     $C000 (the last fixed): on 82 PRG A16-A13 from D5-D2, on 552 (the mask

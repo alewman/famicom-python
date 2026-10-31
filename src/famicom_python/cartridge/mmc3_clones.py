@@ -872,7 +872,8 @@ class Board513(MMC3):
     (the fixed ones stay in bank 0); taken from the register for PPU $0000
     (R0, or R2 with A12 inversion), as the registers are meant to agree.
     Outer bank 3 of the 1536 KiB dump mirrors 2 (as FCEUX; on hardware it
-    would enable two chips at once).
+    would enable two chips at once). The page's CHR-RAM has a battery: that is
+    what is saved.
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
@@ -894,6 +895,12 @@ class Board513(MMC3):
     def map_chr(self, window: int, size_kib: int, bank: int) -> None:
         for i in range(size_kib):
             super().map_chr(window + i, 1, (bank * size_kib + i) & 0x1F)
+
+    def battery_ram(self) -> bytes | None:
+        return bytes(self.chr) if self.battery else None
+
+    def _restore(self, data: bytes) -> None:
+        self.chr[:] = data
 
 
 class XorRAM254(MMC3):
@@ -1026,7 +1033,8 @@ class Outer52(MMC3):
 class HPxx260(MMC3):
     """NES 2.0 mapper 260 (BMC-HPxx, BMC-HP2018-A multicarts).
 
-    NES_2.0_Mapper_260.wiki (mask $F003): $5000 ``L....MMM``: the mode (0-3
+    NES_2.0_Mapper_260.wiki, whose CNROM mode is from FCEUX's source and which no
+    ROM uses (mask $F003): $5000 ``L....MMM``: the mode (0-3
     MMC3 with 256 or 128 KiB PRG and CHR, 4 NROM-128, 5 NROM-256, 6/7 CNROM),
     L locks the $5xxx registers; $5001 the 16 KiB PRG base; $5002 the 8 KiB
     CHR base; reads of $5000 give the DIP switches (D1-D0, 0 here). The MMC3
@@ -1569,8 +1577,8 @@ class Rinco594(MMC3):
     NES_2.0_Mapper_594.wiki: $9000 (mask $F001): an 8 KiB bank at $6000; $B000 D7-D6 the
     PRG and CHR windows of the bank at $6000 and the MMC3 (:data:`RINCO_MODES`).
     The FIFO and MSM6585 ADPCM behind $5000/$5001 are not modelled: a read of
-    $5001 reports the FIFO at least half full on D6, as the console does when
-    idle, so the games' fill loops end, and the speech is silent.
+    $5001 reports the FIFO at least half full on D6, a choice of ours so that the
+    games' fill loops end (an idle FIFO would be empty), and the speech is silent.
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:

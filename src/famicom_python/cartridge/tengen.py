@@ -24,7 +24,7 @@ class RAMBO1(MMC3):
     makes $0000-$0FFF four 1 KiB banks (R0, R8, R1, R9) instead of two 2 KiB
     ones, P swaps R6 and RF (the banks at $8000 and $C000; R7 at $A000, the
     last fixed), C inverts CHR A12; $8001 writes it, all eight bits. $A000
-    D0 the arrangement (1 horizontal). $C000 the reload value; $C001 D0 the
+    D0 the mirroring (1 horizontal). $C000 the reload value; $C001 D0 the
     counter's clock (0: PPU A12, filtered as the MMC3's; 1: every 4 CPU
     cycles, the prescaler restarting) and a reload at the next clock;
     $E000 disables and acknowledges, $E001 enables.

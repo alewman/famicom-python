@@ -45,8 +45,9 @@ class Camerica(Banked):
     to $C000-$FFFF selects the 16 KiB bank at $8000, the last fixed.
     71.1 (Fire Hawk): $9000-$9FFF D4 selects the one-screen nametable. 71.0
     says nothing, and some dumps of Fire Hawk carry it, so the arrangement
-    stays hard-wired until the first write to $9000-$9FFF (the wiki's FCEUX
-    rule: other games write $8000, never $9000). 232: $8000-$BFFF D4-D3
+    stays hard-wired until the first write to $9000-$9FFF (a compatibility
+    heuristic the wiki reports from FCEUX, not hardware: other games write $8000, never $9000).
+    232: $8000-$BFFF D4-D3
     select a 64 KiB outer bank (swapped on 232.1, the Aladdin Deck Enhancer),
     the inner bank D1-D0, and $C000 is the outer bank's last 16 KiB. Power-on
     banks unspecified: 0 here.
@@ -92,7 +93,7 @@ class NINA03(Banked):
     NINA-003-006.wiki, INES_Mapper_113.wiki: the register answers when A14 is
     high, A15 and A13 low and A8 high ($4100-$41FF, $4300-$43FF, ... $5Fxx).
     79: ``....PCCC``, the 32 KiB PRG bank and the 8 KiB CHR bank. 113:
-    ``MCPPPCCC``: PRG from D5-D3, CHR from D6 and D2-D0, and the arrangement
+    ``MCPPPCCC``: PRG from D5-D3, CHR from D6 and D2-D0, and the mirroring
     (0 horizontal, 1 vertical). Power-on banks unspecified: 0 here.
     """
 

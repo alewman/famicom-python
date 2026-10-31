@@ -16,7 +16,7 @@ class G101(Banked):
     INES_Mapper_032.wiki (register mask $F000, $F007 for CHR): $8000 selects
     8 KiB at $8000, or at $C000 when $9000 D1 (the PRG mode) is set, the
     second-last bank taking the other place; $A000 selects $A000; $B000-$B007
-    the CHR banks; $9000 D0 the nametable arrangement (0 vertical, 1
+    the CHR banks; $9000 D0 the mirroring (0 vertical, 1
     horizontal). Submapper 1 (Major League): CIRAM A10 tied high, a single
     screen, and $9000 disabled. Power-on registers unspecified: 0 here.
     """
@@ -102,7 +102,7 @@ class TAMS1(Banked):
     """Mapper 97: Irem TAM-S1 (Kaiketsu Yanchamaru): the last 16 KiB at $8000, $C000 switched.
 
     INES_Mapper_097.wiki: a write to $8000-$BFFF sets ``M..PPPPP``, the 16 KiB
-    bank at $C000 and the arrangement (0 horizontal, 1 vertical); no bus
+    bank at $C000 and the mirroring (0 horizontal, 1 vertical); no bus
     conflicts. Power-on bank unspecified: 0 here.
     """
 
@@ -127,7 +127,7 @@ class H3001(Banked):
     when $9000 D7 is set (the second-last bank taking the other place); $A000
     the bank at $A000; the last fixed. (Disch's notes' switchable $C000 does
     not exist, the wiki's forum citation.) $B000-$B007 the CHR banks; $9001
-    D7-D6 the arrangement (00 vertical, 10 horizontal, x1 one-screen A).
+    D7-D6 the mirroring (00 vertical, 10 horizontal, x1 one-screen A).
     $9005/$9006 the reload value's high and low bytes; $9004 copies it into
     the counter; $9003 D7 enables. Both acknowledge. Enabled, the 16-bit
     counter decrements every CPU cycle and asserts /IRQ on reaching 0, where

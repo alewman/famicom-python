@@ -18,7 +18,8 @@ class Kaiser42(Banked):
     (ignored with CHR-RAM); $E000 D3-D0 the 8 KiB PRG bank at $6000; $E001
     D3 the mirroring (0 vertical, 1 horizontal); $E002 D1 enables the 15-bit
     M2 counter (clear: acknowledges and resets it); /IRQ is asserted while
-    its two high bits are set (24,576 cycles in, for 8,192), as FCEUX has it.
+    its two high bits are set (24,576 cycles in, for 8,192), as the page says
+    FCEUX's source implies.
 
     42.2 (Green Beret, Kaiser and Whirlwind Manu): the page has nothing, and
     the game decides (C65): both dumps write $8000 = 5 then a bank to $8001,
@@ -245,7 +246,8 @@ class Board09034A(Banked):
 class NTDEC2722(Banked):
     """Mapper 40: NTDEC 2722 (SMB2J conversions) and 40.1, the 2752 multicart.
 
-    INES_Mapper_040.wiki (mask $E000): $8000 disables and acknowledges the
+    INES_Mapper_040.wiki, from FCEUX's and Nestopia's source as the page says (mask $E000):
+    $8000 disables and acknowledges the
     counter, $A000 enables it, $E000 the 8 KiB bank at $C000; $6000 is bank 6,
     $8000 4, $A000 5, $E000 7. The counter (a CD4020) asserts /IRQ 4096 M2
     cycles after enabling and releases it 4096 later. 40.1: $C000 latches its
@@ -418,13 +420,15 @@ class Kaiser306(Banked):
 
     NES_2.0_Mapper_306.wiki (mask $D903, FCEUX's): A3-A2 bits 0-1 of the 8
     KiB bank at $6000; A6 set: A5-A4 bits 2-3, clear: bits 2-3 are 10.
-    Banks $0C-$0F mirror $0B. $8000-$FFFF is 32 KiB bank 3; 8 KiB CHR-RAM.
+    Banks $0C-$0F mirror $0B. $8000-$FFFF is 32 KiB bank 3; 8 KiB CHR-RAM;
+    mirroring hard-wired vertical.
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
         super().__init__(image, cpu_cycle_ticks)
         self.prg_ram_enabled = False
-        self.bank6000 = 8
+        self.bank6000 = 8  # not given: A6-A2 clear
+        self.set_mirroring(VERTICAL)
         self.map_prg(0, 32, 3)
         self.map_chr(0, 8, 0)
 
@@ -715,7 +719,8 @@ class SMB3Bootleg106(Banked):
     $800C D0 the mirroring (0 vertical); a 16-bit counter counts every M2
     cycle until $FFFF, where it stays and asserts /IRQ while enabled; $800D
     clears it and disables, $800E/$800F set its low/high byte ($800F
-    enables). 8 KiB of PRG-RAM. Power-on registers 0 (the game does not care).
+    enables). 8 KiB of PRG-RAM. Power-on registers 0 (the page has its 74LS670s
+    powering up all $F; the game does not care).
     """
 
     counts_m2 = True

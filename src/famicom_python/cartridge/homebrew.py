@@ -332,10 +332,12 @@ class BATMAPSRR(Banked):
     $8000 and $A000 8 KiB banks; $D000-$FFFF ROM at $7000; CHR 4 KiB banked at
     $0000, bank $3D at $1000. $E000-$FFFF: D7-D6 pick the $6000, $8000, $A000 or
     CHR bank, D5-D0 the bank. $8000 the counter's latch, $9000 clears the
-    counter, $A000 disables and acknowledges, $B000 enables: an MMC3-like IRQ,
-    on PPU A12 here as MAME's hblank approximates. $C000: D7 shifts into the
+    counter, $A000 disables and acknowledges, $B000 enables: an MMC3-like IRQ;
+    MAME says the details are unclear, and PPU A12 is our guess at its clock. $C000: D7 shifts
+    into the
     pointer into the Misc ROM of DPCM; reads of $4800-$4FFF and $C000-$CFFF
-    give its next byte and step it. $D000 is unexplained, stored nowhere.
+    give its next byte and step it. $D000 is unexplained, stored nowhere; MAME notes
+    other sources say D1 stops the pointer stepping.
     """
 
     watches_ppu_address = True

@@ -230,8 +230,8 @@ class UN1ROM(UxROM):
 class UNROM180(NROM):
     """Mapper 180: UNROM with an AND gate (Crazy Climber): the first 16 KiB fixed, $C000 switched.
 
-    INES_Mapper_180.wiki: D2-D0 select the bank at $C000. The page says
-    nothing of bus conflicts: as UxROM, by submapper (2 has them).
+    INES_Mapper_180.wiki: D2-D0 select the bank at $C000. The page's table
+    says it has bus conflicts; here, as UxROM, only submapper 2 models them.
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
