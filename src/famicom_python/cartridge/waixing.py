@@ -273,8 +273,9 @@ class MixedCHR(MMC3):
 
     74 (43-393), 192 (FS308), 194: banks 8-9, 8-B and 0-1 are RAM, the rest
     ROM (MMC3_with_CHR_ROM_and_CHR_RAM.wiki). 195 (FS303): a write to a CHR-ROM
-    bank moves the RAM window: D7-D6, D3 and D1 pick 2 or 4 banks from the
-    page's table (D4: ROM only), $80 at power-on; the RAM sees CHR A12-A10
+    bank moves the RAM window, by that bank's number and not the data (the page's
+    ``CHRB~``): D7-D6, D3 and D1 pick 2 or 4 banks from its table (D4: ROM only),
+    $80 at power-on; the RAM sees CHR A12-A10
     only, so windows that differ only above A12 share it. 191 (Xianfeng's
     Dǔshén): CHR A17 (bank bit 7) picks 2 KiB of RAM; 191.1 adds the outer
     register at $90AA (mask $F0FF): D1-D0 move the fixed PRG banks
@@ -292,6 +293,7 @@ class MixedCHR(MMC3):
         self.rom = image.chr
         self.chr_ram = bytearray(max(board.chr_ram + board.chr_nvram, 0x2000))
         self.chr_ram_window = [False] * 8
+        self.window_banks = [0] * 8
         super().__init__(image, cpu_cycle_ticks)
         self.low_ram = bytearray(0x1000) if self.kind == 195 and board.prg_ram == 0x1000 else None
 
@@ -305,6 +307,7 @@ class MixedCHR(MMC3):
             self._map_1k(window + i, bank * size_kib + i)
 
     def _map_1k(self, window: int, bank: int) -> None:
+        self.window_banks[window] = bank
         if self.kind == 191:
             if self.dushen_outer and self.outer < 3:
                 ram, bank = False, bank | 0x80
@@ -350,8 +353,9 @@ class MixedCHR(MMC3):
         window = address >> 10
         if self.chr_ram_window[window]:
             self.chr_ram[self.chr_offsets[window] + (address & 0x3FF)] = value
-        elif self.kind == 195 and value & 0x80:
-            self.window = None if value & 0x10 else FS303_WINDOWS[value & 0xCA]
+        elif self.kind == 195 and self.window_banks[window] & 0x80:
+            bank = self.window_banks[window]
+            self.window = None if bank & 0x10 else FS303_WINDOWS[bank & 0xCA]
             self._update()
 
 

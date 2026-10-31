@@ -393,9 +393,10 @@ class Event2(TQROM):
     """Mapper 555: NES-EVENT2 (Nintendo Campus Challenge 1991): MMC3, TQROM and a timer.
 
     The page is a stub; MAME's event.cpp (BSD-3, from RetroZone's reproduction). $5000-$57FF
-    2 KiB of RAM after the 8 KiB at $6000. $5800-$5BFF: D1-D2 = %01 the TQROM
-    mode, D2 PRG A17 and CHR A17 base, D1-D0 the PRG mask's D4-D3, D3 runs the
-    30-bit M2 timer (0 clears it). Reads of $5800-$5FFF: D7 set once the timer
+    2 KiB of RAM after the 8 KiB at $6000, which the MMC3's $A001 does not gate.
+    $5800-$5BFF: D2-D1 = %01 the TQROM mode, D2 PRG A18 and CHR A17 base, D1-D0
+    the PRG mask's D4-D3, D3 runs the M2 timer (0 clears it). Reads of $5800-$5FFF: D7 set once
+    the timer
     passes (16 + DIP) * 2^25, the DIPs here MAME's default, 6:15.5. What the
     RJ11 to the scoreboard does is not known and not modelled.
     """
@@ -429,11 +430,15 @@ class Event2(TQROM):
             return 0x80 if self.timer >= (0x10 | self.DIP) << 25 else 0
         if 0x5000 <= address < 0x5800:
             return self.prg_ram[0x2000 + (address & 0x7FF)]
+        if 0x6000 <= address < 0x8000:
+            return self.prg_ram[address & 0x1FFF]
         return super().cpu_read(address, t)
 
     def cpu_write(self, address: int, value: int, t: int) -> None:
         if 0x5000 <= address < 0x5800:
             self.prg_ram[0x2000 + (address & 0x7FF)] = value
+        elif 0x6000 <= address < 0x8000:
+            self.prg_ram[address & 0x1FFF] = value
         elif 0x5800 <= address < 0x5C00:
             self.tq_mode = value & 6 == 2
             self.prg_base = (value & 4) << 3

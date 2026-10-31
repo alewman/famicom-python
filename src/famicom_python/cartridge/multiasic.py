@@ -273,10 +273,12 @@ class Mindkids446(Composite):
     D5-D4 CHR-RAM's inner mask (0x 256, 10 128, 11 32 KiB), D0 the mirroring
     (1 vertical); $5005 D2 protects CHR-RAM; $5006 D4-D0 its outer 8 KiB bank.
 
-    Only the MMC1 and MMC3 boards and H3001 are here, the ones the dumps ask for.
-    Until the mapper is chosen the board acts as an UNROM (mapper 0 on the
-    table; the page gives no reset state, the games decide): the outer bank at
-    $8000, from which they copy their CHR to CHR-RAM, and the last 16 KiB fixed.
+    Only the MMC1 boards, plain MMC3 boards and H3001 are here, the ones the dumps
+    ask for; TKSROM, 189 and the rest are not, and an unknown value is ignored.
+    The page gives no state before a mapper is chosen. The games decide (C70):
+    the outer bank at $8000, from which they copy their CHR to CHR-RAM, and the
+    last 16 KiB fixed, which looks like an UNROM with its latch at 0; no latch
+    is modelled, since they only ever write 0 to it.
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
@@ -293,12 +295,16 @@ class Mindkids446(Composite):
         self.map_prg(2, 16, len(self.prg) // 0x4000 - 1)
         self._map_outer()
 
+    def m2_gap(self, t: int) -> None:
+        self.locked = False  # the page: locked until reset; the chosen mapper stays
+
     def _map_outer(self) -> None:
         self.map_prg(0, 8, self.outer)
         self.map_prg(1, 8, self.outer + 1)
 
     def prg_bank(self, asic: Any, window: int, bank: int) -> int:
-        mask = ~self.mask & 0xFFFF if self.submapper == 2 else self.mask
+        # The mask covers A20-A13: the outer bank's high byte always applies.
+        mask = ~self.mask & 0xFFFF if self.submapper == 2 else self.mask | 0xFF00
         return (bank & ~mask & 0xFFFF) | (self.outer & mask)
 
     def chr_bank(self, asic: Any, bank: int) -> int:
@@ -340,6 +346,8 @@ class Mindkids446(Composite):
                 self.mask = value
             elif register == 4:
                 self.flags = value
+                if not self.asic:
+                    self.set_mirroring(VERTICAL if value & 1 else HORIZONTAL)
             elif register == 5:
                 self.protect = value & 4
                 self.chr_writable = not self.protect

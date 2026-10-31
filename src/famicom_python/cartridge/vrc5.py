@@ -11,7 +11,8 @@ from __future__ import annotations
 from .banked import HORIZONTAL, VERTICAL, Banked
 from .ines import RomImage
 
-#: JIS X 0208 rows' 256-code pages to Kanji ROM pages (the page's pageTable).
+#: JIS X 0208 rows' 256-code pages to Kanji ROM pages (the page's pageTable, which it
+#: says FCEUX replicates from the hardware).
 PAGES = (
     0x0, 0x0, 0x2, 0x2, 0x1, 0x1, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xA, 0xB, 0xC, 0xD, 0xE, 0xF,
     0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xA, 0xB, 0xC, 0xD, 0xE, 0xF, 0xD, 0xD,
@@ -44,7 +45,14 @@ class QTa(Banked):
     takes a byte there which picks where its pattern comes from, D6 the kanji
     ROM or CHR-RAM, then D5-D0 or D0 the 4 KiB bank; PPU A12 means nothing
     then. The PPU's fetches tell themselves apart: background patterns follow
-    an attribute fetch, sprites' follow two nametable fetches.
+    an attribute fetch, sprites' follow two nametable fetches (our inference
+    from the PPU's fetch order; the page says only "the next CHR pattern data").
+    Pattern writes come from the CPU, never from rendering, so they end it.
+    Power-on registers are not given: 0 here.
+
+    A limit: while $DA00 D0 is set, reads of $2000-$2FFF also come from QTRAM,
+    though the page redirects writes only. The connector has one ``ciram_a10``
+    for both directions, and the games set it with rendering off.
 
     $DB00 (corner, attribute), $DC00, $DD00 (JIS column and row) go in, and
     $DC00 and $DD00 read back the tile for CIRAM and the byte for QTRAM. The
@@ -167,4 +175,5 @@ class QTa(Banked):
             a10 = Banked.ciram_a10(self, address)
             self.qtram[(a10 or 0) << 10 | (address & 0x3FF)] = value
         else:
+            self.background = False
             self.chr_ram[self._chr_ram_offset(address)] = value

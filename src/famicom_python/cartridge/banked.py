@@ -25,7 +25,11 @@ class Banked(Cartridge):
         board = image.board
         self.image = image
         self.cpu_cycle_ticks = cpu_cycle_ticks
+        # A smaller PRG chip repeats through the 8 KiB window, its high lines unconnected
+        # (NES Pong's 4 KiB, and its header's NES 2.0 exponent form).
         self.prg = image.prg
+        if image.prg and len(image.prg) < 0x2000:
+            self.prg = image.prg * (0x2000 // len(image.prg))
         chr_ram = board.chr_ram + board.chr_nvram
         self.chr_writable = not image.chr
         self.chr: bytes | bytearray = bytearray(chr_ram or 0x2000) if not image.chr else image.chr

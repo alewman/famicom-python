@@ -234,7 +234,8 @@ class AddressLatch59(Banked):
 class AddressLatch212(Banked):
     """Mapper 212 (BMC Super HiK 300-in-1): an address latch with a read-back quirk.
 
-    INES_Mapper_212.wiki ``1o.. .... .... MBBb``: A2-A0 are PRG A16-A14 (o
+    INES_Mapper_212.wiki, from FCEUX's source as the page says, ``1o.. .... .... MBBb``: A2-A0
+    are PRG A16-A14 (o
     set: 32 KiB, BB) and CHR A15-A13; M the mirroring (0 vertical, 1
     horizontal). Reads of $6000-$7FFF (mask $E010) return A4 inverted in D7
     and the solder pads (D3-D0, 0 here); D6-D4 open bus. Power-on latch 0.
@@ -960,7 +961,7 @@ class Super700(Banked):
         self._latch(0, 0)
 
     def _latch(self, address: int, value: int) -> None:
-        bank = (address >> 6) & 0x40 | (address >> 8) & 0x3F
+        bank = address & 0x40 | (address >> 8) & 0x3F
         if address & 0x20:
             self.map_prg(0, 16, bank)
             self.map_prg(2, 16, bank)
@@ -1044,6 +1045,9 @@ class Latch380(Banked):
         self.set_mirroring(HORIZONTAL if a & 2 else VERTICAL)
         self.chr_writable = not a & 0x80
         self.pads_replace = bool(m) and self.submapper == 0
+
+    def m2_gap(self, t: int) -> None:
+        self._latch(0)  # the page: all bits cleared on reset
 
     def cpu_read(self, address: int, t: int) -> int | None:
         if self.pads_replace and address >= 0x8000:

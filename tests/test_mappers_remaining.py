@@ -282,7 +282,13 @@ def test_fs306_chr_ram_window_moves_on_a_write_to_rom() -> None:
     cart.cpu_write(0xB000, 4, 0)
     cart.cpu_write(0xB400, 0, 0)  # bank 4: ROM until $C8 picks it
     assert not cart.chr_ram_window[0]
-    cart.ppu_write(0x0000, 0xC8, 0)
+    cart.ppu_write(0x0000, 0xC8, 0)  # the data does not choose
+    assert not cart.chr_ram_window[0]
+    cart.cpu_write(0xB000, 8, 0)
+    cart.cpu_write(0xB400, 0x0C, 0)  # bank $C8: a write there does
+    cart.ppu_write(0x0000, 0, 0)
+    cart.cpu_write(0xB000, 4, 0)
+    cart.cpu_write(0xB400, 0, 0)
     assert cart.chr_ram_window[0]
 
 
@@ -553,3 +559,66 @@ def test_mapper_555_outer_bank_and_timer() -> None:
     assert cart.cpu_read(0x5800, 0) == 0x80
     cart.cpu_write(0x5000, 0x5A, 0)
     assert cart.cpu_read(0x5000, 0) == 0x5A
+
+
+# -- from the independent review -------------------------------------------
+
+
+def test_mapper_62_p_is_a6() -> None:
+    cart = build(62, prg_kib=2048, chr_kib=512)
+    cart.cpu_write(0x8040, 0, 0)
+    assert cart.prg_offsets[0] == 0x100000
+    cart.cpu_write(0x9000, 0, 0)  # A12 is a low bank bit, not P
+    assert cart.prg_offsets[0] == 0x10 * 0x4000
+
+
+def test_mapper_195_a_chr_write_chooses_by_bank_number() -> None:
+    cart = build(195, prg_kib=256, chr_kib=256)
+    cart.map_chr(0, 1, 2)
+    cart.ppu_write(0x0000, 0x82, 0)  # the data is not what chooses
+    assert cart.window == (0x28, 4)
+    cart.map_chr(0, 1, 0x82)
+    cart.ppu_write(0x0000, 0, 0)  # bank $82 is: the window moves to banks 0-3
+    assert cart.window == (0x00, 4)
+
+
+def test_mapper_380_reset_clears_the_latch() -> None:
+    cart = build(380, prg_kib=512, chr_kib=0)
+    cart.cpu_write(0x8000 | 5 << 2, 0, 0)
+    cart.m2_gap(0)
+    assert cart.prg_offsets[0] == 0
+
+
+def test_mapper_446_keeps_its_high_outer_byte_and_unlocks_on_reset() -> None:
+    cart = build(446, prg_kib=4096, chr_kib=0)
+    cart.cpu_write(0x5001, 0x20, 0)
+    cart.cpu_write(0x5002, 1, 0)
+    cart.cpu_write(0x5003, 0xE0, 0)
+    cart.cpu_write(0x5000, 0x81, 0)
+    assert cart.asic.prg_offsets[0] == 0x120 * 0x2000
+    cart.m2_gap(0)
+    cart.cpu_write(0x5001, 0, 0)
+    assert cart.outer == 0x100
+
+
+def test_mapper_547_a_cpu_chr_write_ignores_qtram() -> None:
+    cart = build(547, prg_kib=640, chr_kib=128)
+    cart.qtram[0] = 1
+    cart.ciram_a10(0x2000)
+    cart.ciram_a10(0x23C0)  # the CPU in the attribute table
+    cart.cpu_write(0xD500, 0, 0)
+    cart.ppu_write(0x0123, 0x5A, 0)
+    assert cart.chr_ram[0x0123] == 0x5A
+
+
+def test_mapper_555_ram_is_not_gated_by_the_mmc3() -> None:
+    cart = build(555, prg_kib=512, chr_kib=256)
+    cart.cpu_write(0xA001, 0, 0)
+    cart.cpu_write(0x6000, 0x5A, 0)
+    assert cart.cpu_read(0x6000, 0) == 0x5A
+
+
+def test_a_prg_chip_under_8_kib_repeats_through_the_window() -> None:
+    cart = build(0, prg_kib=4, chr_kib=8)
+    assert len(cart.prg) == 0x2000
+    assert cart.cpu_read(0xFFFF, 0) == cart.prg[0x0FFF]

@@ -23,7 +23,7 @@ class VRC1(Banked):
     """Mapper 75: three 8 KiB PRG banks and the last fixed; two 4 KiB CHR banks of five bits.
 
     VRC1.wiki: $8000, $A000 and $C000 select PRG for their own windows; $9000
-    D0 is the nametable arrangement (0 vertical, 1 horizontal; ignored when
+    D0 is the mirroring (0 vertical, 1 horizontal; ignored when
     the board has four-screen VRAM) and D1/D2 the CHR banks' high bits;
     $E000 and $F000 their low four bits. Each register decodes $x000-$xFFF.
     Power-on registers unspecified: 0 here.
@@ -730,6 +730,7 @@ class Ninja222(VRC24):
     reaches 15 the high one (so $0E goes to $1F, then $10). When the high one
     reaches 15, /IRQ asserts and holds the '4020 at 0. 222.2 writes a whole
     CHR bank to both $B000 and $B001 and the board takes it (forum, and the game).
+    The submapper numbers are those of the dumps' headers; no page defines them.
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
@@ -916,8 +917,9 @@ class FS306(VRC24):
     NES_2.0_Mapper_544.wiki: the clone's A0 and A1 are CPU A10 and A11. Its External
     Select, $9C00 in that wiring: with A2 clear D4-D0 the 8 KiB bank at $C000;
     with A2 set D0 the CIRAM page for the nametable A1-A0 names. A write to
-    a CHR-ROM bank with D7 set moves 2 KiB of CHR-RAM (:data:`FS306_WINDOWS`,
-    D4: ROM only). 8 KiB of battery RAM at $6000 always. The page's IRQ "one
+    a CHR-ROM bank numbered with D7 set moves 2 KiB of CHR-RAM, the bank's
+    number and not the data choosing where (the page's ``CHRB~``;
+    :data:`FS306_WINDOWS`, D4: ROM only). 8 KiB of battery RAM at $6000 always. The page's IRQ "one
     M2 later than a VRC4" is not modelled.
     """
 
@@ -983,6 +985,7 @@ class FS306(VRC24):
         window = address >> 10
         if self.chr_ram_window[window]:
             self.chr_ram[self.chr_offsets[window] + (address & 0x3FF)] = value
-        elif value & 0x80:
-            self.ram_range = None if value & 0x10 else FS306_WINDOWS[value & 0xCA]
+        elif self.chr_banks[window] & 0x80:
+            bank = self.chr_banks[window]
+            self.ram_range = None if bank & 0x10 else FS306_WINDOWS[bank & 0xCA]
             self._remap()
