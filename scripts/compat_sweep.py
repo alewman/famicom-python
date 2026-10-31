@@ -56,6 +56,7 @@ import zipfile
 from pathlib import Path
 
 from count_mappers import BASE, classify
+from mame_frames import COLOURS, mame_frames
 from mesen_lockstep import lockstep_machine, mesen_path
 from mesen_run import FRAMES_LUA, REGIONS, ROOT, decode_frames, run_mesen
 
@@ -169,6 +170,7 @@ def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "nes
     # PAL's border (line 0, x 0-1 and 254-255) is not compared.
     keep = [i for i in range(PIXELS) if not (border and (i < 256 or i % 256 in (0, 1, 254, 255)))]
     began = time.monotonic()
+    use_mame = os.environ.get("FAMICOM_DETECTOR") == "mame"
     with tempfile.TemporaryDirectory(prefix="mesen-home-") as home:
         # A fresh home each run: Mesen2 keeps battery saves there. Its own log
         # (every uninitialized RAM read) goes to the process's output: drop it.
@@ -176,7 +178,16 @@ def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "nes
         null = os.open(os.devnull, os.O_WRONLY)
         os.dup2(null, 1), os.dup2(null, 2)
         try:
-            theirs = mesen_frames(rom, frames, Path(home), REGIONS[machine.timing.name])
+            if use_mame:
+                with zipfile.ZipFile(rom) as archive:
+                    member = next(n for n in archive.namelist() if n.lower().endswith(".nes"))
+                    extracted = Path(home) / "rom.nes"
+                    extracted.write_bytes(archive.read(member))
+                theirs = mame_frames(extracted, frames)
+                if not theirs:
+                    raise SystemExit("LoadRom failed")
+            else:
+                theirs = mesen_frames(rom, frames, Path(home), REGIONS[machine.timing.name])
             if machine.timing.swapped_emphasis:
                 theirs = {f: [unswap_emphasis(v) for v in p] for f, p in theirs.items()}
         finally:
@@ -199,6 +210,8 @@ def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "nes
                 if candidate not in ours:
                     system.run_frames(candidate - system.board.ppu.frame)
                     ours[candidate] = finished_picture(system)
+                    if use_mame:
+                        ours[candidate] = [COLOURS[v & 0x1FF] for v in ours[candidate]]
             if frame not in theirs or len(theirs[frame]) != PIXELS:
                 report.append({"frame": frame, "error": "Mesen2 gave no 256x240 frame"})
                 continue
@@ -218,7 +231,7 @@ def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "nes
         # A frame matches if any board frame within the slack does.
         differing = [e for e in report if e.get("closest_diff", e.get("diff", 1))]
         result["status"] = "differs" if differing else "identical"
-        if differing and "diff" in differing[0]:
+        if differing and "diff" in differing[0] and not use_mame:
             first = differing[0]
             frame = first["frame"]
             best = frame - 1 + first.get("closest", 0)
@@ -259,6 +272,7 @@ def main() -> int:
     parser.add_argument("--every", type=int, default=1, help="keep one dump in N")
     parser.add_argument("--fds", action="store_true", help="the licensed FDS set instead")
     parser.add_argument("--slack", type=int, default=1, help="board frames tried either side")
+    parser.add_argument("--detector", choices=("mesen", "mame"), default="mesen")
     parser.add_argument("--list", type=Path, help="only the dumps named in this file")
     parser.add_argument("--machine", choices=("nes", "pal"), default="nes")
     parser.add_argument(
@@ -284,6 +298,7 @@ def main() -> int:
         roms = [r for r in roms if r.name in wanted]
     roms = [r for r in roms if r.name not in done]
     print(f"{len(roms)} dumps to run ({len(done)} already in {args.out})", flush=True)
+    os.environ["FAMICOM_DETECTOR"] = args.detector
     # One process per dump: MesenCore keeps global state between loads.
     context = multiprocessing.get_context("spawn")
     with context.Pool(args.jobs, maxtasksperchild=1) as pool, args.out.open("a") as out:

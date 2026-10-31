@@ -622,3 +622,19 @@ def test_a_prg_chip_under_8_kib_repeats_through_the_window() -> None:
     cart = build(0, prg_kib=4, chr_kib=8)
     assert len(cart.prg) == 0x2000
     assert cart.cpu_read(0xFFFF, 0) == cart.prg[0x0FFF]
+
+
+def test_mapper_374_a_big_dump_is_not_a_surom() -> None:
+    cart = build(374, prg_kib=512, chr_kib=512)
+    cart.chr0 = 0x10
+    cart._update()
+    assert cart.prg_offsets[3] == 0x1E000  # still the first game's 128 KiB
+    cart.m2_gap(0)
+    assert cart.prg_offsets[3] == 0x3E000
+
+
+def test_mapper_396_3_starts_in_the_last_outer_bank() -> None:
+    cart = build(396, submapper=3, prg_kib=256, chr_kib=0)
+    assert cart.prg_offsets[3] == 0x3E000
+    cart.cpu_write(0x800F, 0, 0)
+    assert cart.prg_offsets[3] == 0x1E000

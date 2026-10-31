@@ -107,10 +107,13 @@ class MMC1(Banked):
             enabled = enabled and not self.chr0 & 0x10
         self.prg_ram_enabled = enabled
 
+    def chr_bit_is_prg_a18(self) -> bool:
+        return len(self.prg) > 0x40000
+
     def _update_prg(self, control: int) -> None:
         # SUROM, SXROM: with 512 KiB of PRG, CHR register bit 4 is PRG A18,
         # for the whole of $8000-$FFFF ("outer bank").
-        outer = (self.chr0 & 0x10) if len(self.prg) > 0x40000 else 0
+        outer = (self.chr0 & 0x10) if self.chr_bit_is_prg_a18() else 0
         bank = (self.prg_bank & 0x0F) | outer
         mode = (control >> 2) & 3
         if mode < 2:  # 32 KiB, the low bit ignored

@@ -16,9 +16,9 @@ Of the licensed dumps only the StudyBox BIOS (186) is left.
 The final sweep, every dump in the four No-Intro sets against Mesen2: **8,221 of 8,807
 identical**, 477 differ, 109 refused, no crash, no regression among the 1,312 dumps with
 an earlier result. By evidence, of the 294: 19 mappers have a judge ROM, 200 match
-Mesen2 on at least one dump, 13 differ on every dump it runs, 56 only by eye because
-Mesen2 and MesenCE refuse them, and 6 have no dump, so unit tests only. MesenCE closes
-52 of the differences. All 198 slow tests pass, and AccuracyCoin 147 of 147.
+Mesen2 on at least one dump, 31 match only mame_nes, 11 differ wherever they run, 27 are
+by eye alone because no detector runs them, and 6 have no dump, so unit tests only.
+MesenCE closes 52 of the differences; mame_nes agrees with the board on 119 more. All 198 slow tests pass, and AccuracyCoin 147 of 147.
 
 ## How far to trust a row
 
@@ -33,6 +33,9 @@ is what the code's own docstrings cite.
   frames say nothing about a game's later levels. MesenCE, its successor, is the
   second detector: `MESEN_LIB` selects it, and it closes the single-pixel differences
   (upstream-findings.md).
+- **matches mame_nes**: no Mesen matches, but at least one dump's frames are identical
+  on mame_nes within three frames of slack (validation.md): the third detector, and
+  the only machine check some of these boards have.
 - **differs, by eye**: every dump Mesen2 runs differs. Often it is Mesen2 that is
   blank: plain green is palette entry $09, the 2C02's power-on value, with
   rendering off, so it never got as far as drawing.
@@ -136,7 +139,8 @@ itself.
 ## Registry
 
 Generated: `NO_INTRO_DIR=... python scripts/mapper_registry.py --results
-tests/mame_traces/sweep-final`. Do not edit by hand. The non-identical dumps are
+tests/mame_traces/sweep-final --mame tests/mame_traces/sweep-m2 --mame
+tests/mame_traces/sweep-m3`. Do not edit by hand. The non-identical dumps are
 in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 
 <!-- registry begin -->
@@ -166,7 +170,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 24 | VRC6 | konami | 3 | 6 | 0 | 6 / 4 / 0 | wiki | matches Mesen2 |
 | 25 | VRC24 | konami | 15 | 1 | 0 | 15 / 1 / 0 | wiki | judge ROM |
 | 26 | VRC6 | konami | 2 | 4 | 0 | 9 / 0 / 0 | wiki | matches Mesen2 |
-| 27 | MiHunChe27 | chinese | 3 | 0 | 0 | 0 / 3 / 0 | wiki | differs, by eye |
+| 27 | MiHunChe27 | chinese | 3 | 0 | 0 | 0 / 3 / 0 | wiki | matches mame_nes |
 | 28 | Action53 | homebrew | 0 | 40 | 0 | 50 / 4 / 0 | wiki | judge ROM |
 | 29 | SealieRET | homebrew | 0 | 3 | 0 | 3 / 0 / 0 | wiki | matches Mesen2 |
 | 30 | UNROM512 | discrete | 1 | 1045 | 316 | 1557 / 4 / 0 | wiki | matches Mesen2 |
@@ -213,7 +217,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 78 | JF16 | jaleco | 2 | 0 | 0 | 2 / 0 / 0 | wiki | matches Mesen2 |
 | 79 | NINA03 | unlicensed | 59 | 0 | 1 | 58 / 2 / 0 | wiki | matches Mesen2 |
 | 80 | X1005 | taito | 10 | 0 | 0 | 10 / 0 / 0 | wiki | matches Mesen2 |
-| 81 | NTDEC81 | multicart | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
+| 81 | NTDEC81 | multicart | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 82 | X1017 | taito | 0 | 0 | 0 | 4 / 0 / 0 | wiki | matches Mesen2 |
 | 83 | Cony | cony | 10 | 0 | 0 | 10 / 0 / 0 | wiki | matches Mesen2 |
 | 85 | VRC7 | konami | 5 | 0 | 0 | 5 / 0 / 0 | wiki | matches Mesen2 |
@@ -307,7 +311,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 196 | MRCM196 | mmc3_clones | 12 | 0 | 0 | 10 / 11 / 0 | wiki | matches Mesen2 |
 | 197 | Rewired197 | mmc3_clones | 5 | 0 | 0 | 4 / 1 / 0 | wiki | matches Mesen2 |
 | 198 | Xiangfeng198 | waixing | 3 | 0 | 0 | 3 / 0 / 0 | wiki | matches Mesen2 |
-| 199 | FS309 | waixing | 1 | 5 | 0 | 0 / 7 / 0 | wiki | differs, by eye |
+| 199 | FS309 | waixing | 1 | 5 | 0 | 0 / 7 / 0 | wiki | matches mame_nes |
 | 205 | JC016 | mmc3_clones | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 206 | Namco108 | namco | 76 | 0 | 0 | 74 / 3 / 0 | wiki | matches Mesen2 |
 | 207 | X1005 | taito | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
@@ -369,37 +373,37 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 305 | Kaiser305 | kaiser | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 306 | Kaiser306 | kaiser | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 307 | Kaiser307 | kaiser | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
-| 308 | TH2131 | konami | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
+| 308 | TH2131 | konami | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 309 | Whirlwind309 | kaiser | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 312 | KS7013B | kaiser | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 313 | ResetTxROM | mmc3_clones | 2 | 0 | 0 | 1 / 1 / 0 | wiki | matches Mesen2 |
 | 314 | NoRepeat314 | multicart | 1 | 2 | 0 | 1 / 2 / 0 | wiki, MAME (C61) | matches Mesen2 |
 | 319 | HP898F | multicart | 2 | 15 | 0 | 8 / 15 / 0 | wiki | matches Mesen2 |
-| 326 | Contra326 | kaiser | 1 | 0 | 0 | 0 / 0 / 1 | wiki, forum | by eye (Mesen2 refuses) |
+| 326 | Contra326 | kaiser | 1 | 0 | 0 | 0 / 0 / 1 | wiki, forum | matches mame_nes |
 | 328 | RT01 | chinese | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
-| 330 | Sangokushi330 | chinese | 1 | 0 | 0 | 0 / 0 / 1 | wiki, forum | by eye (Mesen2 refuses) |
+| 330 | Sangokushi330 | chinese | 1 | 0 | 0 | 0 / 0 / 1 | wiki, forum | matches mame_nes |
 | 332 | WS332 | multicart | 5 | 0 | 0 | 6 / 0 / 0 | wiki | matches Mesen2 |
-| 334 | Multicart334 | mmc3_clones | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
+| 334 | Multicart334 | mmc3_clones | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 346 | KS7012 | kaiser | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
-| 347 | KS7030 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 351 | Techline351 | multiasic | 1 | 1 | 0 | 0 / 0 / 2 | wiki | by eye (Mesen2 refuses) |
+| 347 | KS7030 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
+| 351 | Techline351 | multiasic | 1 | 1 | 0 | 0 / 0 / 2 | wiki | matches mame_nes |
 | 355 | Block355 | pic16c54 | 2 | 0 | 0 | 0 / 0 / 2 | wiki, data sheet | by eye (Mesen2 refuses) |
 | 359 | SB5013 | multicart | 0 | 0 | 0 | 0 / 0 / 0 | wiki | unit tests only |
-| 368 | Yung08 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
+| 368 | Yung08 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 374 | ResetMMC1 | multicart | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 380 | Latch380 | multicart | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 389 | Caltron389 | multicart | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
+| 380 | Latch380 | multicart | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
+| 389 | Caltron389 | multicart | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 394 | HSK007 | multiasic | 3 | 0 | 0 | 0 / 0 / 3 | wiki | by eye (Mesen2 refuses) |
-| 396 | YY850437C | multicart | 2 | 0 | 0 | 0 / 0 / 2 | wiki | by eye (Mesen2 refuses) |
-| 399 | BATMAP399 | mmc3_clones | 0 | 1 | 1 | 0 / 0 / 2 | wiki | by eye (Mesen2 refuses) |
+| 396 | YY850437C | multicart | 2 | 0 | 0 | 0 / 0 / 2 | wiki | matches mame_nes |
+| 399 | BATMAP399 | mmc3_clones | 0 | 1 | 1 | 0 / 0 / 2 | wiki | matches mame_nes |
 | 400 | RetroUSB400 | multicart | 0 | 1 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
 | 406 | Haradius406 | mmc3_clones | 0 | 0 | 3 | 0 / 0 / 3 | wiki | by eye (Mesen2 refuses) |
-| 409 | DPCMCart409 | multicart | 0 | 0 | 1 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
+| 409 | DPCMCart409 | multicart | 0 | 0 | 1 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 412 | Henggedianzi412 | mmc3_clones | 0 | 5 | 0 | 0 / 0 / 5 | wiki | by eye (Mesen2 refuses) |
-| 413 | BATMAPSRR | homebrew | 0 | 1 | 0 | 0 / 0 / 1 | wiki, MAME | by eye (Mesen2 refuses) |
-| 415 | Board0353 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 417 | FineStudio417 | chinese | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 418 | LH42 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | by eye (Mesen2 refuses) |
+| 413 | BATMAPSRR | homebrew | 0 | 1 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes |
+| 415 | Board0353 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
+| 417 | FineStudio417 | chinese | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
+| 418 | LH42 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes |
 | 422 | ING003C | mmc3_clones | 1 | 0 | 4 | 0 / 0 / 5 | wiki | by eye (Mesen2 refuses) |
 | 446 | Mindkids446 | multiasic | 4 | 0 | 2 | 0 / 0 / 6 | wiki, the game (C70) | by eye (Mesen2 refuses) |
 | 451 | Haratyler451 | mmc3_clones | 0 | 0 | 2 | 0 / 0 / 2 | wiki | by eye (Mesen2 refuses) |
@@ -407,37 +411,37 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 471 | ImpactSoft471 | multicart | 0 | 0 | 2 | 0 / 0 / 2 | wiki | by eye (Mesen2 refuses) |
 | 487 | NINA08 | unlicensed | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 493 | Maxivision493 | multicart | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 512 | Zhongguo512 | mmc3_clones | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
+| 512 | Zhongguo512 | mmc3_clones | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 513 | Board513 | mmc3_clones | 1 | 0 | 0 | 0 / 1 / 0 | wiki | differs, by eye |
 | 515 | Noraebang515 | chinese | 5 | 0 | 0 | 0 / 0 / 5 | wiki | by eye (Mesen2 refuses) |
-| 516 | Cocoma516 | mmc3_clones | 2 | 0 | 0 | 0 / 0 / 2 | wiki | by eye (Mesen2 refuses) |
+| 516 | Cocoma516 | mmc3_clones | 2 | 0 | 0 | 0 / 0 / 2 | wiki | matches mame_nes |
 | 517 | UxROM | discrete | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
 | 518 | Dance2000 | chinese | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 519 | Latch519 | multicart | 4 | 0 | 0 | 4 / 1 / 0 | wiki | matches Mesen2 |
 | 521 | Board521 | kaiser | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 522 | Kaiser522 | kaiser | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 523 | Jncota523 | waixing | 0 | 1 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 525 | KS7021A | kaiser | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
+| 525 | KS7021A | kaiser | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 526 | Board526 | kaiser | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
 | 529 | T230 | konami | 2 | 0 | 0 | 1 / 1 / 0 | wiki | matches Mesen2 |
 | 530 | AX5705 | konami | 1 | 0 | 0 | 1 / 0 / 0 | wiki, the game (C66) | matches Mesen2 |
-| 533 | Sachen3014 | sachen | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
+| 533 | Sachen3014 | sachen | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 534 | ING003C | mmc3_clones | 1 | 4 | 0 | 0 / 0 / 5 | wiki | by eye (Mesen2 refuses) |
 | 535 | LH53 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
 | 538 | SoccerChampion538 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 539 | Palthena539 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
+| 539 | Palthena539 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 540 | SB5013 | multicart | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 541 | LittleCom541 | multicart | 0 | 1 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
+| 541 | LittleCom541 | multicart | 0 | 1 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
 | 544 | FS306 | konami | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
 | 547 | QTa | vrc5 | 4 | 0 | 0 | 0 / 0 / 4 | wiki | by eye (Mesen2 refuses) |
 | 548 | CTC15 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 549 | KS7016B | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, forum, MAME | by eye (Mesen2 refuses) |
-| 551 | Jncota551 | chinese | 1 | 3 | 0 | 0 / 0 / 4 | wiki | by eye (Mesen2 refuses) |
+| 549 | KS7016B | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, forum, MAME | matches mame_nes |
+| 551 | Jncota551 | chinese | 1 | 3 | 0 | 0 / 0 / 4 | wiki | matches mame_nes |
 | 552 | X1017 | taito | 4 | 0 | 0 | 4 / 0 / 0 | wiki | matches Mesen2 |
-| 553 | Sachen3013 | sachen | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 554 | KS7010 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
-| 555 | Event2 | mmc3 | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | by eye (Mesen2 refuses) |
-| 557 | LH42 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | by eye (Mesen2 refuses) |
+| 553 | Sachen3013 | sachen | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
+| 554 | KS7010 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
+| 555 | Event2 | mmc3 | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes |
+| 557 | LH42 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes |
 | 558 | YC0309 | nanjing | 4 | 6 | 0 | 0 / 0 / 10 | wiki | by eye (Mesen2 refuses) |
 | 559 | **not implemented** |  | 1 | 0 | 0 |  |  |  |
 | 563 | **not implemented** |  | 1 | 0 | 0 |  |  |  |
