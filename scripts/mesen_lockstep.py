@@ -24,7 +24,7 @@ page branch, and perfect6502 shows NMIs wait too (C29); and it ignores a DMC
 rate written in the timer's reload cycle, which AccuracyCoin's hardware answer
 key applies (validation.md, milestone 6). The board runs with Mesen2's power-
 on (``MACHINE``); Mesen2 runs with ``configure_for_comparison`` (RAM zeroed,
-the first frame's PPU writes ignored) and its trace goes to ``--trace-dir``
+the first frame's PPU writes ignored where the machine holds the PPU's reset) and its trace goes to ``--trace-dir``
 (gitignored ``tests/mame_traces/lockstep`` by default; about 80 bytes an
 instruction, 1.7 GB a minute).
 """
@@ -261,7 +261,7 @@ def main() -> int:
         action="store_true",
         help="pass over a register differing only after a rendering-time $2007 read (C31)",
     )
-    parser.add_argument("--machine", choices=("nes", "pal", "dendy"), default="nes")
+    parser.add_argument("--machine", choices=("nes", "famicom", "pal", "dendy"), default="nes")
     parser.add_argument("--ppu-dot", type=int, help="the board's power-on PPU dot (a sweep)")
     parser.add_argument("--ppu-ticks", type=int, help="... and master ticks into it (PAL)")
     args = parser.parse_args()
@@ -282,6 +282,7 @@ def main() -> int:
             trace=trace,
             for_comparison=True,
             region=REGIONS[machine.timing.name],
+            ppu_reset_at_power=machine.ppu_reset_at_power,
         )
         print(f"Mesen2: stop code {code}, {wall:.0f} s, {trace.stat().st_size:,} bytes of trace")
     start = time.perf_counter()

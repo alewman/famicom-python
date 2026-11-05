@@ -221,3 +221,12 @@ def test_nes_event_unlocks_after_i_goes_0_then_1() -> None:
     assert prg(cart, 0x8000) == 0
     mmc1(0xA000, 0x12)  # I = 1: unlocked
     assert prg(cart, 0x8000) == 32
+
+
+def test_242_protects_chr_ram_in_nrom_modes_only_on_the_512_kib_multicart() -> None:
+    for prg_kib, protected in ((512, True), (640, True), (256, False)):
+        cart = build(242, prg_kib=prg_kib, chr_kib=0)
+        cart.cpu_write(0x8081, 0, 0)  # NROM-256
+        assert cart.chr_writable is not protected
+        cart.cpu_write(0x8000, 0, 0)  # UNROM-like
+        assert cart.chr_writable
