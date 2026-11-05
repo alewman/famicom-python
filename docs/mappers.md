@@ -150,10 +150,10 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | Mapper | Class | Module | Main | Aftermarket | Private | Identical / differs or blank / refused | Described by | Evidence |
 | ---: | --- | --- | ---: | ---: | ---: | --- | --- | --- |
 | 0 | NROM | discrete | 438 | 636 | 71 | 1256 / 60 / 0 | wiki | judge ROM |
-| 1 | MMC1 | mmc1 | 923 | 108 | 16 | 1051 / 42 / 0 | wiki | judge ROM |
+| 1 | MMC1 | mmc1 | 923 | 108 | 16 | 1054 / 39 / 0 | wiki | judge ROM |
 | 2 | UxROM | discrete | 388 | 291 | 49 | 803 / 19 / 0 | wiki | judge ROM |
 | 3 | CNROM | discrete | 236 | 81 | 5 | 340 / 10 / 0 | wiki | judge ROM |
-| 4 | mmc3_for | mmc3 | 1037 | 240 | 60 | 1335 / 91 / 0 | wiki | judge ROM |
+| 4 | mmc3_for | mmc3 | 1037 | 240 | 60 | 1338 / 88 / 0 | wiki | judge ROM |
 | 5 | MMC5 | mmc5 | 33 | 5 | 0 | 27 / 15 / 0 | wiki, forum | matches Mesen2 |
 | 7 | AxROM | discrete | 77 | 14 | 1 | 93 / 3 / 0 | wiki | judge ROM |
 | 9 | MMC2 | mmc2 | 10 | 0 | 0 | 10 / 0 / 0 | wiki, forum | judge ROM |
@@ -175,7 +175,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 27 | MiHunChe27 | chinese | 3 | 0 | 0 | 0 / 3 / 0 | wiki | matches mame_nes |
 | 28 | Action53 | homebrew | 0 | 40 | 0 | 50 / 4 / 0 | wiki | judge ROM |
 | 29 | SealieRET | homebrew | 0 | 3 | 0 | 3 / 0 / 0 | wiki | matches Mesen2 |
-| 30 | UNROM512 | discrete | 1 | 1045 | 316 | 1554 / 7 / 0 | wiki | matches Mesen2 |
+| 30 | UNROM512 | discrete | 1 | 1045 | 316 | 1557 / 4 / 0 | wiki | matches Mesen2 |
 | 31 | NSF31 | homebrew | 0 | 3 | 0 | 3 / 0 / 0 | wiki | judge ROM |
 | 32 | G101 | irem | 7 | 0 | 0 | 7 / 0 / 0 | wiki | matches Mesen2 |
 | 33 | TC0190 | taito | 11 | 0 | 0 | 11 / 0 / 0 | wiki | matches Mesen2 |
@@ -278,7 +278,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 153 | BandaiFCGRAM | bandai | 1 | 0 | 0 | 0 / 1 / 0 | wiki | matches mame_nes |
 | 154 | Namco3433 | namco | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 155 | MMC1A | mmc1 | 2 | 0 | 0 | 2 / 0 / 0 | wiki | judge ROM |
-| 156 | Daou156 | chinese | 5 | 0 | 0 | 3 / 2 / 0 | wiki | matches Mesen2 |
+| 156 | Daou156 | chinese | 5 | 0 | 0 | 5 / 0 / 0 | wiki | matches Mesen2 |
 | 157 | Datach | bandai | 7 | 0 | 0 | 7 / 0 / 0 | wiki | matches Mesen2 |
 | 158 | RAMBO1TLS | tengen | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 159 | BandaiX24C01 | bandai | 7 | 0 | 0 | 7 / 0 / 0 | wiki | matches Mesen2 |
