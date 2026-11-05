@@ -89,3 +89,8 @@ Most rest on what a game does, not on hardware; an edit should say so.
   may be the cause: check further before saying anything (undocumented-behavior.md,
   open item 2).
 - **Visual 2C02**: wrong in the sprite overflow scan, through its `spr_d` conflict hack.
+- **Breaknes PPUSim**: at the end of a sprite's copy into secondary OAM its OAM counter
+  always clears m (the step's BlockCount), so a misaligned copy realigns even when its X
+  byte is in range; the console does not (AccuracyCoin "Misaligned OAM behavior" test 6,
+  hardware-captured: the board fails it with PPUSim's rule). Traced with the shim's
+  counter fields (`ppusim_shim.cpp`, `oam_main`), C73. Not reported.

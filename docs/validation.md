@@ -2168,3 +2168,13 @@ Cricket*, the last undiagnosed licensed difference, *Cobra Triangle*, *Elite*, *
 Hockey*...). The other two PAL, *Bayou Billy* and *Blue Shadow*, are the VBL race of
 milestone 10, part 4, where the board matches PPUSim's 2C07; the other Dendy eight were
 as far off as on NTSC (mappers 4, 163, 176, 268 pirates). The rest are to be run again.
+
+`$2003` during sprite evaluation, at PPUSim's gates (open item 23, C73). The shim's trace
+now carries the OAM main counter and its controls (`oam_main`, `oam_wires`), which showed
+the mechanism: the counter steps on alternate dots, a `$2003` load meets a step, and the
+step takes the next value its latch held from before the write. The board models it in
+`PPU._write_oam_addr`: the `oamaddr` scene goes from 13 of 33 cases matching to 29. The
+other four end a copy on an X byte in range of the line, where PPUSim realigns the address
+and the console does not (AccuracyCoin "Misaligned OAM behavior" test 6, which fails with
+PPUSim's rule); *Melanchony of Existance*'s writes are one of them. AccuracyCoin 147 of 147,
+PPU test ROMs 42 of 42.

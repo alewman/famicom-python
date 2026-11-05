@@ -730,6 +730,17 @@ before the board takes a side.
   RAM at power varies by console (`CPU_power_up_state.wiki`); the board keeps
   zeros (`PowerOn.ram_fill`) rather than tune RAM to one game.
 
+- **C73. A misaligned copy's end, and `$2003` during sprite evaluation.** At the
+  end of a sprite's copy into secondary OAM, PPUSim's OAM counter always clears the
+  low two bits; the console clears them only when the X byte just copied is out of
+  range of the line (AccuracyCoin "Misaligned OAM behavior" test 6,
+  hardware-captured). *Board*: the console's rule; with PPUSim's, test 6 fails.
+  The same counter decides what a `$2003` write does during evaluation (open item
+  23): it steps on alternate dots, a load and a step meet, and the step wins with
+  the next value its latch held. The board's model of that matches PPUSim in all 33
+  cases of the `oamaddr` scene but the four whose copy ends on an in-range X byte,
+  where it follows the console instead.
+
 ## Open items
 
 1. **Settle on PPUSim (die-derived)**: *done in milestone 2* for C13, C15, C21,
@@ -851,8 +862,10 @@ before the board takes a side.
     $FF, as Visual 2C02 and PPUSim both drive I/OAM2 there
     (`scripts/visual2c02/compare.py prerender2004`); the board now returns
     it, writing nothing to secondary OAM.
-23. **A `$2003` write during sprite evaluation** (`ppusim_compare.py
-    oamaddr_render`, 2026-11-05). The board took any OAMADDR below 4 after a
+23. **A `$2003` write during sprite evaluation**: *done 2026-11-05* (below, and C73:
+    the counter's load and step, from PPUSim's gates; 29 of the `oamaddr` scene's 33
+    cases match it, the other four are C73's conflict). As first found
+    (`ppusim_compare.py oamaddr_render`): The board took any OAMADDR below 4 after a
     copy for n having wrapped, so `$2003 = 0` mid-evaluation stopped it after
     one more sprite; it now tracks the carry out of n, and a write landing
     on an even dot (the counter's step) matches PPUSim from dot 66 to 130.
@@ -862,6 +875,8 @@ before the board takes a side.
     a half-cycle matter the board's per-dot counter does not model; dot 86
     differs too. A write in the first sprite's Y check makes PPUSim skip
     sprite 0 altogether. *Melanchony of Existance* writes on odd dots: its
-    five pixels on line 19 are this. The scene `oamaddr` (tests/ppusim_scenes.py)
-    keeps PPUSim's answers in the goldens: 13 of 33 cases match, and the 20
-    that do not are listed in `tests/test_ppusim_goldens.py` as known.
+    five pixels on line 19 are this. The model now in `PPU._write_oam_addr`: a
+    write on an odd dot meets the counter's step, shows for the next OAM read
+    only, and the next step takes the latch's stale value (+1 from the address the
+    step before started at while copying, else n+1 and m+1 uncarried, m cleared
+    by a Y check); on an even dot it follows the step and sticks.

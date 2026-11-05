@@ -73,6 +73,8 @@ class TraceEntry(ctypes.Structure):
         ("pins", ctypes.c_uint8),
         ("inner", ctypes.c_uint8 * 5),  # internal signals (ppusim_shim.cpp)
         ("background", ctypes.c_uint8 * 8),  # the background path (ppusim_shim.cpp)
+        ("oam_main", ctypes.c_uint8),  # OAMADDR, the main counter
+        ("oam_wires", ctypes.c_uint8),  # its controls (ppusim_shim.cpp)
     ]
 
 

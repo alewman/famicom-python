@@ -96,8 +96,6 @@ class PPU:
     ) -> None:
         self.timing = timing
         self.cartridge = cartridge
-        self.lines = timing.lines
-        self.vblank_line = timing.vblank_line
         self.prerender_line = timing.lines - 1
         self.dot_ticks = timing.dot_divider
         self.ciram = bytearray(0x800)
@@ -166,6 +164,10 @@ class PPU:
         self._oam2_fetch = 0
         self._fetch_y = 0
         self._copying = 0  # bytes of an in-range sprite still to copy
+        # A $2003 write that met the OAM counter's step: the address to go back
+        # to at the next step, or -1 (:meth:`_write_oam_addr`).
+        self._eval_stall = -1
+        self._step_from = 0  # OAMADDR before the last evaluation step
         self._eval_done = False
         self._sprite_count = 0
         self._sprite0_next = False
@@ -227,7 +229,7 @@ class PPU:
             line = self.line
             if 1 <= dot < DOTS - 4 and (
                 not (self._on or self.mask & 0x18 or self._fading)
-                or self.vblank_line - 1 <= line < self.prerender_line
+                or self.timing.vblank_line - 1 <= line < self.prerender_line
             ):
                 # Idle until the line's end: no fetches and no events on dots
                 # 2-337; visible lines show the backdrop.
@@ -323,7 +325,7 @@ class PPU:
         if refresh and not dot & 1 and dot and refresh[0] <= line <= refresh[1]:
             self.oam_addr = (self.oam_addr + 1) & 0xFF
         if dot == 1:
-            if line == self.vblank_line:
+            if line == self.timing.vblank_line:
                 if not self._vbl_suppress:
                     self.status |= VBL
                     self.nmi = bool(self.ctrl & 0x80)
@@ -362,7 +364,7 @@ class PPU:
         if line < HEIGHT and self.timing.border:
             self._blank_border(line)
         line += 1
-        if line == self.lines:
+        if line == self.timing.lines:
             line = 0
             self.frame += 1
         self.line = line
@@ -603,11 +605,21 @@ class PPU:
                 self._copying = 0
                 self._eval_done = False
                 self._sprite0_next = False
+                self._eval_stall = -1
+                self._step_from = self.oam_addr  # no steps on dots 1-64
+            if self._eval_stall >= 0:
+                # The step after a $2003 write that met one (_write_oam_addr):
+                # the counter takes its stale next value, the address before
+                # the write, with m cleared if the step was a Y check.
+                stall = self._eval_stall
+                self._eval_stall = -1
+                self.oam_addr = stall if self._copying & 3 else stall & 0xFC
             self.oam_bus = self.oam[self.oam_addr]
             return
         # Even: write secondary OAM, or read it once it is full.
         value = self.oam_bus
         address = self.oam_addr
+        self._step_from = address
         index = self._oam2_index
         height = 16 if self.ctrl & 0x20 else 8
         if self._eval_done:
@@ -640,6 +652,7 @@ class PPU:
                         # The X byte gets Y's range check too: out of range, the
                         # address is masked back into alignment (AccuracyCoin
                         # "Misaligned OAM behavior" 4-7; aligned OAM cannot tell).
+                        # PPUSim masks in range too, and test 6 fails that way.
                         address &= 0xFC
                     if self._copying & COPY_WRAPPED:
                         self._eval_done = True  # n wrapped: all 64 seen
@@ -934,6 +947,28 @@ class PPU:
     def _set_oam_addr(self, value: int) -> None:
         self.oam_addr = value
 
+    def _write_oam_addr(self, value: int) -> None:
+        """$2003 on NTSC. During sprite evaluation the OAM counter steps on
+        each even dot, and the write is a load that a step overrides; between
+        steps a latch takes the counter's next value (PPUSim's OAMCounterBit).
+        A write on an odd dot meets a step: the load shows for the next read
+        only, and the next step takes what the latch held from before the
+        write, not clocked since. On an even dot the load follows the step and
+        sticks (ppusim_compare.py oamaddr_render; the oamaddr scene, C73)."""
+        dot = self.dot
+        if dot & 1 and 65 <= dot < WIDTH and self.line < HEIGHT and self.mask & 0x18:
+            # The stale latch: the step before computed from, +1 while copying,
+            # else n+1 with m+1 uncarried (cleared only as a step takes it).
+            start = self._step_from
+            if self._copying & 3:
+                self._eval_stall = (start + 1) & 0xFF
+            else:
+                self._eval_stall = ((start & 0xFC) + 4 | (start + 1) & 3) & 0xFF
+            self.oam_addr = value
+            self.oam_bus = self.oam[value]  # dot's read, made after the load
+        else:
+            self.oam_addr = value
+
     def _write_oam_refreshing(self, value: int) -> None:
         """A $2004 write landing inside the 2C07's refresh: the write and the
         refresh step one counter, so on a dot that steps anyway (the next, even
@@ -1132,7 +1167,7 @@ class PPU:
     def read_register(self, register: int) -> int:
         if register == 2:
             value = (self.status & 0xE0) | (self._decayed_latch() & 0x1F)
-            if self.line == self.vblank_line and self.dot == 0:
+            if self.line == self.timing.vblank_line and self.dot == 0:
                 # One dot before the set: reads clear and the flag never sets
                 # this frame (NMI.wiki "Race condition").
                 self._vbl_suppress = True
@@ -1323,7 +1358,7 @@ class PPU:
                     picture[index] = (self._last_value & first) | (picture[index] & 0x1C0)
         elif register == 3:
             if not self.timing.delayed_oamaddr:
-                self._set_oam_addr(value)
+                self._write_oam_addr(value)
             elif (
                 not (refresh := self.timing.oam_refresh)
                 or not refresh[0] <= self.line <= refresh[1]
