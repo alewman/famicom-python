@@ -32,8 +32,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--machine",
         choices=["auto", *sorted(MACHINES)],
-        default="nes",
-        help="the console (default nes; auto: as the cartridge's header or nes20db says)",
+        default="auto",
+        help="the console (default auto: PAL or Dendy as the cartridge's header or nes20db"
+        " says, else the Famicom)",
     )
     parser.add_argument("--frames", type=int, default=600, help="frames to run (default 600)")
     parser.add_argument(

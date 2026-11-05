@@ -37,7 +37,10 @@ Sources: `Family_Computer.wiki`, `PPU_power_up_state.wiki` l.49/76,
 hardware-corrected suite, targets "an NTSC console with an RP2A03G CPU and
 RP2C02G PPU" (`src/AccuracyCoin/README.md` l.4); so do Visual 2A03/2C02 and
 PPUSim. **The reference model is NES-001 with RP2A03G + RP2C02G**, and the
-Famicom differences are fields on it.
+Famicom differences are fields on it. A cartridge runs on the Famicom unless its header
+names PAL or Dendy (`System.machine_for`): it runs every cartridge, and Famicom
+games that write the PPU in the first frame hang on the NES-001 (C72). The
+judges' test ROMs still run on the NES-001, the console they were measured on.
 
 Fields the machine table needs (each with its source in a comment, as
 sms-python does):

@@ -147,18 +147,18 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 
 <!-- registry begin -->
 
-| Mapper | Class | Module | Main | Aftermarket | Private | Identical / differs / refused | Described by | Evidence |
+| Mapper | Class | Module | Main | Aftermarket | Private | Identical / differs or blank / refused | Described by | Evidence |
 | ---: | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| 0 | NROM | discrete | 438 | 636 | 71 | 1282 / 33 / 0 | wiki | judge ROM |
-| 1 | MMC1 | mmc1 | 923 | 108 | 16 | 1056 / 37 / 0 | wiki | judge ROM |
-| 2 | UxROM | discrete | 388 | 291 | 49 | 804 / 18 / 0 | wiki | judge ROM |
-| 3 | CNROM | discrete | 236 | 81 | 5 | 341 / 9 / 0 | wiki | judge ROM |
-| 4 | mmc3_for | mmc3 | 1037 | 240 | 60 | 1348 / 78 / 0 | wiki | judge ROM |
+| 0 | NROM | discrete | 438 | 636 | 71 | 1256 / 60 / 0 | wiki | judge ROM |
+| 1 | MMC1 | mmc1 | 923 | 108 | 16 | 1051 / 42 / 0 | wiki | judge ROM |
+| 2 | UxROM | discrete | 388 | 291 | 49 | 803 / 19 / 0 | wiki | judge ROM |
+| 3 | CNROM | discrete | 236 | 81 | 5 | 340 / 10 / 0 | wiki | judge ROM |
+| 4 | mmc3_for | mmc3 | 1037 | 240 | 60 | 1335 / 91 / 0 | wiki | judge ROM |
 | 5 | MMC5 | mmc5 | 33 | 5 | 0 | 27 / 15 / 0 | wiki, forum | matches Mesen2 |
 | 7 | AxROM | discrete | 77 | 14 | 1 | 93 / 3 / 0 | wiki | judge ROM |
 | 9 | MMC2 | mmc2 | 10 | 0 | 0 | 10 / 0 / 0 | wiki, forum | judge ROM |
 | 10 | MMC4 | mmc2 | 5 | 0 | 0 | 5 / 0 / 0 | wiki | judge ROM |
-| 11 | ColorDreams | unlicensed | 64 | 4 | 2 | 68 / 5 / 0 | wiki | matches Mesen2 |
+| 11 | ColorDreams | unlicensed | 64 | 4 | 2 | 66 / 7 / 0 | wiki | matches Mesen2 |
 | 12 | SL5020B | mmc3_clones | 1 | 0 | 0 | 0 / 1 / 0 | wiki | differs, by eye |
 | 13 | CPROM | discrete | 3 | 0 | 0 | 3 / 0 / 0 | wiki | matches Mesen2 |
 | 14 | SL1632 | chinese | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
@@ -168,14 +168,14 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 19 | Namco163 | namco | 32 | 0 | 0 | 32 / 0 / 0 | wiki | matches Mesen2 |
 | 21 | VRC24 | konami | 3 | 0 | 0 | 3 / 0 / 0 | wiki | judge ROM |
 | 22 | VRC24 | konami | 2 | 0 | 0 | 2 / 0 / 0 | wiki | judge ROM |
-| 23 | VRC24 | konami | 25 | 0 | 0 | 25 / 0 / 0 | wiki | judge ROM |
-| 24 | VRC6 | konami | 3 | 6 | 0 | 6 / 4 / 0 | wiki | matches Mesen2 |
-| 25 | VRC24 | konami | 15 | 1 | 0 | 15 / 1 / 0 | wiki | judge ROM |
+| 23 | VRC24 | konami | 25 | 0 | 0 | 23 / 2 / 0 | wiki | judge ROM |
+| 24 | VRC6 | konami | 3 | 6 | 0 | 5 / 5 / 0 | wiki | matches Mesen2 |
+| 25 | VRC24 | konami | 15 | 1 | 0 | 14 / 2 / 0 | wiki | judge ROM |
 | 26 | VRC6 | konami | 2 | 4 | 0 | 9 / 0 / 0 | wiki | matches Mesen2 |
 | 27 | MiHunChe27 | chinese | 3 | 0 | 0 | 0 / 3 / 0 | wiki | matches mame_nes |
 | 28 | Action53 | homebrew | 0 | 40 | 0 | 50 / 4 / 0 | wiki | judge ROM |
 | 29 | SealieRET | homebrew | 0 | 3 | 0 | 3 / 0 / 0 | wiki | matches Mesen2 |
-| 30 | UNROM512 | discrete | 1 | 1045 | 316 | 1557 / 4 / 0 | wiki | matches Mesen2 |
+| 30 | UNROM512 | discrete | 1 | 1045 | 316 | 1554 / 7 / 0 | wiki | matches Mesen2 |
 | 31 | NSF31 | homebrew | 0 | 3 | 0 | 3 / 0 / 0 | wiki | judge ROM |
 | 32 | G101 | irem | 7 | 0 | 0 | 7 / 0 / 0 | wiki | matches Mesen2 |
 | 33 | TC0190 | taito | 11 | 0 | 0 | 11 / 0 / 0 | wiki | matches Mesen2 |
@@ -200,7 +200,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 59 | AddressLatch59 | multicart | 8 | 0 | 0 | 7 / 4 / 0 | wiki | matches Mesen2 |
 | 60 | ResetMulticart60 | multicart | 4 | 1 | 0 | 5 / 0 / 0 | wiki | matches Mesen2 |
 | 61 | Latch61 | multicart | 0 | 1 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
-| 62 | Super700 | multicart | 1 | 0 | 0 | 0 / 1 / 0 | wiki | differs, by eye |
+| 62 | Super700 | multicart | 1 | 0 | 0 | 0 / 1 / 0 | wiki | matches mame_nes |
 | 63 | Powerful63 | multicart | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 64 | RAMBO1 | tengen | 10 | 0 | 0 | 2 / 8 / 0 | wiki | matches Mesen2 |
 | 65 | H3001 | irem | 3 | 0 | 0 | 3 / 0 / 0 | wiki, forum | matches Mesen2 |
@@ -241,14 +241,14 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 106 | SMB3Bootleg106 | kaiser | 1 | 0 | 0 | 0 / 1 / 0 | wiki | differs, by eye |
 | 107 | MagicDragon107 | chinese | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 108 | FDSConversion108 | chinese | 5 | 1 | 0 | 6 / 0 / 0 | wiki | matches Mesen2 |
-| 111 | GTROM | homebrew | 0 | 11 | 64 | 79 / 0 / 0 | wiki | matches Mesen2 |
+| 111 | GTROM | homebrew | 0 | 11 | 64 | 78 / 1 / 0 | wiki | matches Mesen2 |
 | 112 | Asder112 | chinese | 7 | 0 | 0 | 5 / 2 / 0 | wiki | matches Mesen2 |
 | 113 | NINA03 | unlicensed | 4 | 4 | 0 | 8 / 0 / 0 | wiki | matches Mesen2 |
 | 114 | SuperGame | mmc3_clones | 6 | 0 | 0 | 5 / 1 / 0 | wiki | matches Mesen2 |
 | 115 | Kasheng | mmc3 | 9 | 0 | 0 | 9 / 0 / 0 | wiki | matches Mesen2 |
 | 116 | Huang116 | chinese | 6 | 0 | 0 | 4 / 2 / 0 | wiki | matches Mesen2 |
 | 117 | FutureMedia117 | chinese | 2 | 0 | 0 | 3 / 0 / 0 | wiki | matches Mesen2 |
-| 118 | TxSROM | mmc3 | 12 | 0 | 0 | 12 / 0 / 0 | wiki | judge ROM |
+| 118 | TxSROM | mmc3 | 12 | 0 | 0 | 11 / 1 / 0 | wiki | judge ROM |
 | 119 | TQROM | mmc3 | 5 | 0 | 0 | 5 / 0 / 0 | wiki | matches Mesen2 |
 | 120 | LH15 | kaiser | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 121 | A9711 | mmc3_clones | 10 | 0 | 0 | 10 / 0 / 0 | wiki | matches Mesen2 |
@@ -275,24 +275,24 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 149 | SachenLatch | sachen | 2 | 0 | 0 | 2 / 0 / 0 | wiki | matches Mesen2 |
 | 150 | SachenLS374N | sachen | 20 | 0 | 0 | 19 / 1 / 0 | wiki | matches Mesen2 |
 | 152 | Bandai74161 | bandai | 6 | 0 | 0 | 5 / 1 / 0 | wiki | matches Mesen2 |
-| 153 | BandaiFCGRAM | bandai | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
+| 153 | BandaiFCGRAM | bandai | 1 | 0 | 0 | 0 / 1 / 0 | wiki | matches mame_nes |
 | 154 | Namco3433 | namco | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 155 | MMC1A | mmc1 | 2 | 0 | 0 | 2 / 0 / 0 | wiki | judge ROM |
-| 156 | Daou156 | chinese | 5 | 0 | 0 | 5 / 0 / 0 | wiki | matches Mesen2 |
+| 156 | Daou156 | chinese | 5 | 0 | 0 | 3 / 2 / 0 | wiki | matches Mesen2 |
 | 157 | Datach | bandai | 7 | 0 | 0 | 7 / 0 / 0 | wiki | matches Mesen2 |
 | 158 | RAMBO1TLS | tengen | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 159 | BandaiX24C01 | bandai | 7 | 0 | 0 | 7 / 0 / 0 | wiki | matches Mesen2 |
 | 162 | FS304 | nanjing | 0 | 10 | 0 | 7 / 3 / 0 | wiki | matches Mesen2 |
 | 163 | FC001 | nanjing | 4 | 66 | 0 | 21 / 50 / 0 | wiki | matches Mesen2 |
 | 164 | Dongda164 | nanjing | 5 | 0 | 0 | 4 / 1 / 0 | wiki | matches Mesen2 |
-| 165 | Latched165 | mmc3_clones | 6 | 0 | 0 | 5 / 1 / 0 | wiki | matches Mesen2 |
+| 165 | Latched165 | mmc3_clones | 6 | 0 | 0 | 6 / 0 / 0 | wiki | matches Mesen2 |
 | 167 | Subor167 | unlicensed | 1 | 0 | 0 | 0 / 1 / 0 | wiki | differs, by eye |
 | 168 | Racermate | unlicensed | 6 | 0 | 0 | 0 / 6 / 0 | wiki | differs, by eye |
 | 169 | **not implemented** |  | 2 | 0 | 0 |  |  |  |
 | 170 | Fujiya170 | discrete | 1 | 0 | 0 | 1 / 0 / 0 | wiki, the game (C69) | matches Mesen2 |
 | 172 | ProtectedLatch | txc | 3 | 0 | 0 | 3 / 0 / 0 | wiki | matches Mesen2 |
 | 173 | ProtectedLatch | txc | 7 | 0 | 0 | 7 / 0 / 0 | wiki | matches Mesen2 |
-| 176 | FK23C | waixing | 52 | 44 | 0 | 84 / 20 / 0 | wiki | matches Mesen2 |
+| 176 | FK23C | waixing | 52 | 44 | 0 | 83 / 21 / 0 | wiki | matches Mesen2 |
 | 177 | Hengge | chinese | 8 | 6 | 0 | 14 / 0 / 0 | wiki | matches Mesen2 |
 | 178 | Education178 | chinese | 13 | 26 | 0 | 41 / 0 / 0 | wiki | matches Mesen2 |
 | 180 | UNROM180 | discrete | 1 | 0 | 1 | 2 / 0 / 0 | wiki | matches Mesen2 |
@@ -309,7 +309,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 192 | MixedCHR | waixing | 3 | 1 | 0 | 4 / 0 / 0 | wiki | matches Mesen2 |
 | 193 | TC112 | chinese | 4 | 0 | 0 | 4 / 0 / 0 | wiki | matches Mesen2 |
 | 194 | MixedCHR | waixing | 0 | 4 | 0 | 6 / 0 / 0 | wiki | matches Mesen2 |
-| 195 | MixedCHR | waixing | 2 | 6 | 0 | 5 / 3 / 0 | wiki | matches Mesen2 |
+| 195 | MixedCHR | waixing | 2 | 6 | 0 | 4 / 4 / 0 | wiki | matches Mesen2 |
 | 196 | MRCM196 | mmc3_clones | 12 | 0 | 0 | 10 / 11 / 0 | wiki | matches Mesen2 |
 | 197 | Rewired197 | mmc3_clones | 5 | 0 | 0 | 4 / 1 / 0 | wiki | matches Mesen2 |
 | 198 | Xiangfeng198 | waixing | 3 | 0 | 0 | 3 / 0 / 0 | wiki | matches Mesen2 |
@@ -324,9 +324,9 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 212 | AddressLatch212 | multicart | 5 | 0 | 0 | 6 / 0 / 0 | wiki | matches Mesen2 |
 | 213 | AddressLatch58 | multicart | 0 | 0 | 0 | 0 / 0 / 0 | wiki | unit tests only |
 | 215 | SuperGame | mmc3_clones | 14 | 0 | 0 | 13 / 1 / 0 | wiki | matches Mesen2 |
-| 216 | RCM216 | unlicensed | 5 | 0 | 0 | 4 / 1 / 0 | wiki, forum, MAME, the game | matches Mesen2 |
+| 216 | RCM216 | unlicensed | 5 | 0 | 0 | 2 / 3 / 0 | wiki, forum, MAME, the game | matches Mesen2 |
 | 218 | MagicFloor | homebrew | 0 | 2 | 0 | 2 / 0 / 0 | wiki | matches Mesen2 |
-| 219 | A9461 | mmc3_clones | 1 | 0 | 0 | 0 / 1 / 0 | wiki | differs, by eye |
+| 219 | A9461 | mmc3_clones | 1 | 0 | 0 | 0 / 1 / 0 | wiki | matches mame_nes |
 | 221 | N625092 | multicart | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 222 | Ninja222 | konami | 3 | 0 | 0 | 3 / 0 / 0 | wiki, forum | matches Mesen2 |
 | 224 | mindkids_224 | mmc3 | 4 | 37 | 0 | 40 / 1 / 0 | wiki | matches Mesen2 |
@@ -341,7 +341,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 238 | ContraFighter238 | mmc3_clones | 1 | 0 | 0 | 1 / 0 / 0 | wiki, the game (C68) | matches Mesen2 |
 | 240 | Latch240 | chinese | 3 | 2 | 0 | 5 / 0 / 0 | wiki | matches Mesen2 |
 | 241 | Hengge | chinese | 10 | 10 | 2 | 18 / 5 / 0 | wiki | matches Mesen2 |
-| 242 | AddressLatch242 | multicart | 12 | 0 | 0 | 8 / 7 / 0 | wiki | matches Mesen2 |
+| 242 | AddressLatch242 | multicart | 12 | 0 | 0 | 7 / 8 / 0 | wiki | matches Mesen2 |
 | 243 | SachenLS374N | sachen | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 244 | Decathlon244 | chinese | 1 | 0 | 0 | 1 / 0 / 0 | wiki, MAME, the game (C69) | matches Mesen2 |
 | 245 | F003 | mmc3_clones | 2 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
@@ -358,14 +358,14 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 263 | Rex263 | mmc3_clones | 2 | 0 | 0 | 2 / 0 / 0 | wiki | matches Mesen2 |
 | 264 | Cony | cony | 2 | 0 | 0 | 2 / 0 / 0 | wiki | matches Mesen2 |
 | 266 | CityFighter266 | konami | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
-| 268 | AA6023 | mmc3 | 25 | 67 | 7 | 107 / 34 / 0 | wiki | matches Mesen2 |
+| 268 | AA6023 | mmc3 | 25 | 67 | 7 | 103 / 38 / 0 | wiki | matches Mesen2 |
 | 272 | KidDracula272 | konami | 1 | 0 | 0 | 0 / 0 / 1 | wiki, forum | by eye (Mesen2 refuses) |
 | 284 | DripGame | homebrew | 0 | 4 | 0 | 0 / 7 / 0 | wiki | differs, by eye |
 | 285 | A65AS | multicart | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 286 | BS5 | multicart | 0 | 10 | 0 | 20 / 0 / 0 | wiki | matches Mesen2 |
 | 289 | Champion289 | multicart | 1 | 2 | 0 | 4 / 0 / 0 | wiki | matches Mesen2 |
 | 290 | Asder290 | multicart | 1 | 0 | 0 | 2 / 0 / 0 | wiki | matches Mesen2 |
-| 292 | BMW8544 | mmc3_clones | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
+| 292 | BMW8544 | mmc3_clones | 1 | 0 | 0 | 0 / 1 / 0 | wiki | differs, by eye |
 | 298 | TF1201 | konami | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 299 | Latch299 | multicart | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 301 | AddressLatch242 | multicart | 1 | 0 | 0 | 0 / 0 / 0 | wiki | unit tests only |
@@ -414,7 +414,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 487 | NINA08 | unlicensed | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 493 | Maxivision493 | multicart | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |
 | 512 | Zhongguo512 | mmc3_clones | 1 | 0 | 0 | 0 / 0 / 1 | wiki | matches mame_nes |
-| 513 | Board513 | mmc3_clones | 1 | 0 | 0 | 0 / 1 / 0 | wiki | differs, by eye |
+| 513 | Board513 | mmc3_clones | 1 | 0 | 0 | 0 / 1 / 0 | wiki | matches mame_nes |
 | 515 | Noraebang515 | chinese | 5 | 0 | 0 | 0 / 0 / 5 | wiki | by eye (Mesen2 refuses) |
 | 516 | Cocoma516 | mmc3_clones | 2 | 0 | 0 | 0 / 0 / 2 | wiki | matches mame_nes |
 | 517 | UxROM | discrete | 1 | 0 | 0 | 0 / 0 / 1 | wiki | by eye (Mesen2 refuses) |

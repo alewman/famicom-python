@@ -375,7 +375,8 @@ def main(argv: list[str] | None = None) -> int:
         "--machine",
         choices=["auto", *sorted(MACHINES)],
         default="auto",
-        help="the console (default: as the cartridge's header or nes20db says)",
+        help="the console (default: PAL or Dendy as the cartridge's header or nes20db says,"
+        " else the Famicom)",
     )
     parser.add_argument(
         "--palette", type=Path, help="a .pal file (default: the machine's, from pally)"

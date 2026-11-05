@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from conftest import nrom_image
 
-from famicom_python.machine import MACHINES, NES_001
+from famicom_python.machine import MACHINES
 from famicom_python.system import System
 
 
@@ -17,11 +17,11 @@ def nes20(timing: int) -> bytes:
 
 
 def test_the_header_timing_picks_the_machine() -> None:
-    assert System.machine_for(nes20(0)) is NES_001
+    assert System.machine_for(nes20(0)) is MACHINES["famicom"]
     assert System.machine_for(nes20(1)) is MACHINES["pal"]
-    assert System.machine_for(nes20(2)) is NES_001  # multi-region: NTSC
+    assert System.machine_for(nes20(2)) is MACHINES["famicom"]  # multi-region: NTSC
     assert System.machine_for(nes20(3)) is MACHINES["dendy"]
 
 
 def test_a_plain_ines_image_is_an_nes() -> None:
-    assert System.machine_for(nrom_image(b"\x4c\x00\x80")) is NES_001
+    assert System.machine_for(nrom_image(b"\x4c\x00\x80")) is MACHINES["famicom"]

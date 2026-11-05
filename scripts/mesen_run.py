@@ -86,7 +86,9 @@ def load_library() -> ctypes.CDLL:
     return m
 
 
-def configure_for_comparison(m: ctypes.CDLL, region: int = 1) -> None:
+def configure_for_comparison(
+    m: ctypes.CDLL, region: int = 1, ppu_reset_at_power: bool = True
+) -> None:
     """Make Mesen2's frames comparable with the board's, pixel value for pixel value.
 
     - A 512-entry identity palette: headless, nothing loads a palette (the UI
@@ -94,7 +96,9 @@ def configure_for_comparison(m: ctypes.CDLL, region: int = 1) -> None:
       ``emu.getScreenBuffer()`` returns palette value | emphasis << 6, the
       board's own pixel format.
     - The PPU ignores $2000/$2001/$2005/$2006 writes until the first pre-render
-      line, as hardware does (PPU_power_up_state.wiki); Mesen2 does not by default.
+      line if ``ppu_reset_at_power``, as the NES-001 does (Machine.ppu_reset_at_power);
+      Mesen2 does not by default. Pass the board's value: forcing it on against a
+      board without it, or a board with it, hides every game that hangs on it.
     - Work RAM powers on as zeros, the board's default ``PowerOn.ram_fill``;
       Mesen2's default is random.
     - A standard controller in each port, as the board has, and no input
@@ -122,7 +126,7 @@ def configure_for_comparison(m: ctypes.CDLL, region: int = 1) -> None:
     raw[NES_CONFIG_AUTO_CONFIGURE_INPUT] = 0
     for port in (NES_CONFIG_PORT1_TYPE, NES_CONFIG_PORT2_TYPE):
         raw[port : port + 4] = [NES_CONTROLLER, 0, 0, 0]
-    raw[NES_CONFIG_RESTRICT_FIRST_FRAME] = 1
+    raw[NES_CONFIG_RESTRICT_FIRST_FRAME] = int(ppu_reset_at_power)
     raw[NES_CONFIG_RAM_POWER_ON] = 1
     raw[NES_CONFIG_OAM_ROW_CORRUPTION] = 1
     raw[NES_CONFIG_FULL_COLOR_PALETTE] = 1
@@ -191,6 +195,7 @@ def run_mesen(
     max_speed: bool = True,
     for_comparison: bool = False,
     region: int = 1,
+    ppu_reset_at_power: bool = True,
     collect: dict[str, str] | None = None,
 ) -> tuple[int, str, float]:
     """Run ``rom`` at maximum speed until the Lua script stops it or ``seconds`` pass.
@@ -208,7 +213,7 @@ def run_mesen(
     m.Pause()
     m.SetEmulationFlag(CONSOLE_MODE, True)
     if for_comparison:
-        configure_for_comparison(m, region)
+        configure_for_comparison(m, region, ppu_reset_at_power)
     if not m.LoadRom(str(rom.resolve()).encode(), b""):
         raise SystemExit("LoadRom failed")
     m.InitializeDebugger()
