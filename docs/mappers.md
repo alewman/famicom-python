@@ -127,7 +127,7 @@ sorted against MesenCE by `scripts/sweep_triage.py`:
 | 1 | An M2-counted IRQ one cycle apart (C33): *TMNT 2* | open, no judge |
 | 1 | The render-start OAM copy (C32): *Tatakai no Banka* | open |
 | 1 | *Bionic Commando* Mini Mix `[b]` | a bad dump |
-| 2 | *International Cricket* (sprite-shaped blocks at frame 600), *KlashBall* (6 pixels) | undiagnosed; both stay in CPU lockstep with Mesen2 for 620 frames, so neither is a mapper or game-logic matter |
+| 2 | *International Cricket* (sprite-shaped blocks at frame 600), *KlashBall* (6 pixels) | *International Cricket* is a PAL game the sweep ran as NTSC: identical on PAL (2026-11-05). *KlashBall* matches mame_nes, so the Mesens are the odd ones out |
 
 The differences on the unlicensed and homebrew sets are listed dump by dump in
 `tests/sweep_failures.tsv`; they are mostly the same PPU classes on pirate dumps of the same
