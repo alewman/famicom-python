@@ -3,8 +3,8 @@
 ``scripts/ppusim_goldens.py`` ran each scene of ppusim_scenes.py on PPUSim
 (skew 3) and kept its pixels, ALE addresses and PPUSTATUS reads in
 ``ppusim_goldens.json.gz``; here our PPU replays the scenes alone. A case in
-KNOWN differs from PPUSim, as recorded (docs/undocumented-behavior.md open
-item 18): it must keep differing, so the list stays true.
+KNOWN differs from PPUSim, as recorded (docs/undocumented-behavior.md C73): it
+must keep differing, so the list stays true.
 """
 
 from __future__ import annotations
@@ -20,16 +20,12 @@ GOLDENS = json.loads(
     gzip.decompress((Path(__file__).parent / "ppusim_goldens.json.gz").read_bytes())
 )
 
-# Each scene's setup turns rendering off and on again around dot 200 of the
-# line before; PPUSim's sprite evaluation, so interrupted, copies a misaligned
-# entry (53 02 65 68) into secondary OAM and ours copies none (open item 18).
-KNOWN = {"mux 1E>0E +6", "mux 0E>1E +5"}
 # A $2003 write during sprite evaluation that leaves a copy ending on an X byte
 # in range of the line: PPUSim realigns the address, the console does not
 # (AccuracyCoin "Misaligned OAM behavior" test 6, hardware-captured), and the
 # board follows the console (C73). The names are the dots asked for; each write
 # lands a dot or two earlier.
-KNOWN |= {"oamaddr 72", "oamaddr 87", "oamaddr 89", "oamaddr 73+91+163+181"}
+KNOWN = {"oamaddr 72", "oamaddr 87", "oamaddr 89", "oamaddr 73+91+163+181"}
 
 
 @pytest.mark.parametrize("scene", SCENES)

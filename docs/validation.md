@@ -2178,3 +2178,9 @@ other four end a copy on an X byte in range of the line, where PPUSim realigns t
 and the console does not (AccuracyCoin "Misaligned OAM behavior" test 6, which fails with
 PPUSim's rule); *Melanchony of Existance*'s writes are one of them. AccuracyCoin 147 of 147,
 PPU test ROMs 42 of 42.
+
+Rendering turned off during sprite evaluation (open item 18, C73): traced the same way,
+PPUSim's counter steps once more after the `$2001` write, unrealigned, and a copy in
+progress runs out with its secondary-OAM bytes skipped. Modelled in `PPU._last_eval_step`:
+the goldens' two `mux` cases, kept as known since 2026-10-24, now match, so every scene
+matches PPUSim but C73's four. AccuracyCoin 147 of 147, PPU test ROMs 42 of 42.
