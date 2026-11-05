@@ -160,6 +160,11 @@ struct TraceEntry {
     // tile) shifters, 2 and 7 their first (next tile) ones; bit n is the
     // pixel n dots on.
     uint8_t background[8];
+    // The OAM main counter (OAMADDR) and its controls: 0 OMSTEP, 1 OMOUT,
+    // 2 OMFG, 3 a $2003 write (/W3 and /DBE low), 4 PCLK, 5 DO_COPY,
+    // 6 COPY_OVF, 7 OVZ.
+    uint8_t oam_main;
+    uint8_t oam_wires;
 };
 static_assert(sizeof(TraceEntry) == 32);
 
@@ -223,6 +228,17 @@ struct Board {
                                | (out[(size_t)OutputPad::n_INT] == Zero) << 3);
             PPUSimUnitTest::UnitTest::inner(ppu, e.inner);
             PPUSimUnitTest::UnitTest::background(ppu, e.background);
+            PPU_Registers regs{};
+            ppu.GetDebugInfo_Regs(regs);
+            e.oam_main = (uint8_t)regs.MainOAMCounter;
+            OAMEvalWires eval{};
+            ppu.GetDebugInfo_OAMEval(eval);
+            PPU_Interconnects wires{};
+            ppu.GetDebugInfo_Wires(wires);
+            e.oam_wires = (uint8_t)((eval.OMSTEP & 1) | (eval.OMOUT & 1) << 1 | (eval.OMFG & 1) << 2
+                                    | (!wires.n_W3 && !wires.n_DBE) << 3 | (wires.PCLK & 1) << 4
+                                    | (eval.DO_COPY & 1) << 5 | (eval.COPY_OVF & 1) << 6
+                                    | (eval.OVZ & 1) << 7);
             trace.push_back(e);
         }
         half++;
