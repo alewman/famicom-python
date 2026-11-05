@@ -437,6 +437,40 @@ def evalwrite() -> Schedule:
     return s
 
 
+def rowcopy() -> Schedule:
+    """C26, open item 24: OAM written $00-$FF with rendering off, OAMADDR set
+    to ROW_ADDR (default 0), rendering on at ROW_ON ("line,dot", default
+    "5,30") and off again at ROW_OFF (default "6,330", where both OAM addresses
+    are 0), then all of OAM read back with rendering off: which row was copied
+    where? ROW_PRE ("line,dot,line,dot") first turns rendering on and off once,
+    to freeze the secondary OAM address somewhere known; ROW_ON_SHIFT,
+    ROW_OFF_SHIFT and ROW_PRE_SHIFT move a write by half-cycles (the CPU/PPU
+    alignment, which the board does not model); ROW_PROBE ("line,line") records
+    the OAM address per dot."""
+    s = Schedule()
+
+    def place(text: str) -> list[int]:
+        return [int(n) for n in text.split(",")]
+
+    s.write(1, 0x00)
+    s.oam(bytes(range(256)))
+    if pre := os.environ.get("ROW_PRE"):
+        on_line, on_dot, off_line, off_dot = place(pre)
+        s.write(1, 0x1E, at(on_line, on_dot))
+        s.write(1, 0x00, at(off_line, off_dot) + int(os.environ.get("ROW_PRE_SHIFT", "0")))
+    s.write(3, int(os.environ.get("ROW_ADDR", "0"), 0))
+    on_shift = int(os.environ.get("ROW_ON_SHIFT", "0"))
+    off_shift = int(os.environ.get("ROW_OFF_SHIFT", "0"))
+    s.write(1, 0x1E, at(*place(os.environ.get("ROW_ON", "5,30"))) + on_shift)
+    s.write(1, 0x00, at(*place(os.environ.get("ROW_OFF", "6,330"))) + off_shift)
+    for address in range(256):
+        s.write(3, address)
+        s.read(4)
+    s.probe = place(os.environ.get("ROW_PROBE", "")) if os.environ.get("ROW_PROBE") else []
+    s.end = s.t + 16 * DOT
+    return s
+
+
 def overflow9() -> Schedule:
     """Nine sprites in range of line 7 (Y 0-8 -> all but the last cover it):
     evaluation fills OAM2, then the overflow scan. No reads; the line's
@@ -510,6 +544,7 @@ SCENARIOS = {
     "c73": c73,
     "evalwrite": evalwrite,
     "oamread": oamread,
+    "rowcopy": rowcopy,
 }
 
 

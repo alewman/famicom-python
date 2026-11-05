@@ -31,8 +31,9 @@ GOLDENS = json.loads(
 # 2C02's OAM data reads $E0 while it is off, not the byte at the address, so the
 # check as rendering returns finds nothing (C73, not modelled).
 KNOWN = {"off copy 96"}
-# Visual 2C02 copies OAM's row 0 over row $20 in these schedules (rendering
-# turned on at line 5, dot 30; open item 24): the C73 cases reach row $20 on
+# Visual 2C02's saved state has the secondary OAM address frozen at row 4, so
+# rendering's start at line 5, dot 30 copies OAM's row 0 over row $20 (C26, open
+# item 24); the board starts with nothing frozen. The C73 cases reach row $20 on
 # dot 89, so they are compared up to there.
 LAST_DOT = {"C73 X in range": 87, "C73 X out of range": 87}
 
