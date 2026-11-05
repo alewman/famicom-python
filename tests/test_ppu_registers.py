@@ -11,6 +11,7 @@ from itertools import pairwise
 
 from conftest import nrom_system
 
+from famicom_python.machine import MACHINES, NES_001
 from famicom_python.ppu import VBL
 
 
@@ -84,6 +85,22 @@ def test_writes_are_ignored_until_the_first_prerender_line() -> None:
     assert ppu.ctrl == 0 and ppu.w == 0
     board.write_byte(0x2003, 0x10)  # $2003 works at once
     assert ppu.oam_addr == 0x10
+
+
+def test_only_consoles_that_hold_the_ppus_reset_at_power_ignore_writes() -> None:
+    for machine in (NES_001, MACHINES["pal"]):
+        assert nrom_system(b"", machine).board.ppu.resetting
+    for name in ("famicom", "av-famicom", "nes-101", "dendy"):
+        system = nrom_system(b"", MACHINES[name])
+        system.board.write_byte(0x2000, 0x80)
+        assert system.board.ppu.ctrl == 0x80
+
+
+def test_the_famicoms_reset_button_leaves_the_ppu_alone() -> None:
+    system = nrom_system(b"", MACHINES["famicom"])
+    system.board.write_byte(0x2000, 0x80)
+    system.reset()
+    assert system.board.ppu.ctrl == 0x80 and not system.board.ppu.resetting
 
 
 def test_2007_reads_are_buffered_except_palette() -> None:

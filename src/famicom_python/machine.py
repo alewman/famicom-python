@@ -158,6 +158,15 @@ class Machine:
     # reset line; on the Famicom and NES-101 it reaches the CPU only
     # (PPU_power_up_state.wiki l.49/76, specification tier).
     reset_resets_ppu: bool
+    # The PPU's /RST is held at power, so $2000, $2001, $2005 and $2006 ignore
+    # writes until the first pre-render line. On the NES-001 the CPU and PPU are
+    # released together (blargg's 29658 cycles). The Famicom ties the PPU's /RST
+    # to 5V: no such window, and F-1 Race, Metal Gear, Argus and more write $2000
+    # inside it and hang without NMI, as Magic John and The Lord of King do on an
+    # NES (PPU_power_up_state.wiki "Famicom", specification tier; hardware
+    # reports, forum p=247896). The PPU there also starts some 11 ms or more
+    # before the CPU, unmeasured and not modelled (C72).
+    ppu_reset_at_power: bool
     # Every read cycle of $4016/$4017 clocks the pad (RF Famicom), rather than a
     # run of back-to-back reads clocking it once (hardware-captured by Fiskbit,
     # cited in DMA.wiki "Register conflicts"; AccuracyCoin "Controller Clocking").
@@ -218,6 +227,7 @@ NES_001 = Machine(
     cpu_variant="RP2A03G",
     ppu_variant="RP2C02G",
     reset_resets_ppu=True,
+    ppu_reset_at_power=True,
     joypad_oe_per_cycle=False,
     famicom_audio_through_cart=False,
     dmc_unexpected_reload_bug=False,
@@ -229,6 +239,7 @@ FAMICOM = Machine(
     cpu_variant="RP2A03G",
     ppu_variant="RP2C02G",
     reset_resets_ppu=False,
+    ppu_reset_at_power=False,
     joypad_oe_per_cycle=True,
     famicom_audio_through_cart=True,
     dmc_unexpected_reload_bug=False,
@@ -243,7 +254,8 @@ AV_FAMICOM = Machine(
     timing=NTSC,
     cpu_variant="RP2A03G",
     ppu_variant="RP2C02G",
-    reset_resets_ppu=False,  # UNVERIFIED for this model (docs/start-here.md)
+    reset_resets_ppu=False,  # booted through resets and power cycles (forum p=247896)
+    ppu_reset_at_power=False,  # the same report, rev. H
     joypad_oe_per_cycle=False,
     famicom_audio_through_cart=True,
     dmc_unexpected_reload_bug=False,
@@ -256,6 +268,7 @@ NES_101 = Machine(
     cpu_variant="RP2A03G",
     ppu_variant="RP2C02G",
     reset_resets_ppu=False,
+    ppu_reset_at_power=False,  # Magic John: boots on rev. H; rev. G only when warm (forum p=247896)
     joypad_oe_per_cycle=False,
     famicom_audio_through_cart=False,
     dmc_unexpected_reload_bug=False,
@@ -269,6 +282,7 @@ PAL_NES = Machine(
     cpu_variant="RP2A07",
     ppu_variant="RP2C07",
     reset_resets_ppu=True,
+    ppu_reset_at_power=True,  # about 33132 cycles (PPU_power_up_state.wiki)
     joypad_oe_per_cycle=False,
     famicom_audio_through_cart=False,
     dmc_unexpected_reload_bug=False,
@@ -283,6 +297,7 @@ DENDY_CLONE = Machine(
     cpu_variant="UA6527P",
     ppu_variant="UA6538",
     reset_resets_ppu=False,
+    ppu_reset_at_power=False,  # UNVERIFIED: as the reset button
     joypad_oe_per_cycle=True,
     famicom_audio_through_cart=False,
     dmc_unexpected_reload_bug=False,

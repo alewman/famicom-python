@@ -80,6 +80,8 @@ def lockstep_machine(name: str, ppu_dot: int | None, ppu_ticks: int | None = Non
     """The board as Mesen2 powers on, for ``name`` (a key of MACHINES)."""
     if name == "nes":
         machine = MACHINE
+    elif name == "famicom":
+        machine = replace(MACHINES["famicom"], power_on=MACHINE.power_on)
     elif name == "pal":
         base = MACHINES["pal"]
         machine = replace(base, power_on=replace(base.power_on, **PAL_POWER_ON))

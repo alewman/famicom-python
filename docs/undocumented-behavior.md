@@ -50,6 +50,10 @@ start-here.md; tiers in [validation.md](validation.md).
   until the reset flag clears at the first pre-render line; $2002, $2003, $2004,
   $2007 and $4014 work at once (`PPU_power_up_state.wiki`, blargg 2008). The
   internal reset clears PPUCTRL, PPUMASK, t, x, w and the read buffer, **not v**.
+  **Only where the PPU's /RST is held at power** (`Machine.ppu_reset_at_power`):
+  the NES-001 and PAL NES. The Famicom ties it to 5V, so there is no window at
+  all, and the reset button leaves the PPU running (`PPU_power_up_state.wiki`
+  "Famicom"). See C72.
 - PPUSTATUS at power `+0+x xxxx` (VBL often set); the board powers on with
   overflow set and VBL clear, as PPUSim does (milestone 4). Palette RAM: undefined at
   power, unchanged at reset; blargg's console:
@@ -683,6 +687,35 @@ before the board takes a side.
   banks `$88`, `$C2`, `$C8` move the RAM's bank numbers. *Board*: so, which
   cures *Shenhua Jian Yun*'s hang (identical to Mesen2 now). The five other
   253 dumps differ only in the phase of an animated intro.
+- **C72. The power-on window is the NES-001's, not the Famicom's.** The board
+  ignored PPU writes for the first frame on every console. On the Famicom the
+  PPU's /RST is tied to 5V and the CPU's reset is delayed by a 0.47 µF
+  capacitor, so the PPU is already running when the CPU starts
+  (`PPU_power_up_state.wiki` "Famicom", specification tier). Hardware reports
+  agree (forum p=247896): *Magic John* and *The Lord of King* boot every time on
+  an AV Famicom, and freeze on a front-loader after a quick power cycle.
+  *Board*: `ppu_reset_at_power` per machine, and the Famicom is the default for
+  a cartridge whose header names no region. *F-1 Race*, *Metal Gear*, *Argus*,
+  *Air Fortress*, *Elysion* and more write $2000 inside the window and hung on
+  the NES-001 row. Mesen2 does not have the window by default; the harness had
+  forced it on to match the board, so both hung alike and the sweep scored two
+  blank screens as identical. mame_nes, which has no window, exposed it. Open:
+  how long before the CPU the Famicom's PPU starts (11.4 ms or more by
+  Fiskbit's count, "not measured, may vary"); the board starts both together.
+  The other side: a few carts need the window, and run with `--machine nes`.
+  *The Adventures of Dr. Franken* (USA prototype) writes $2000 = $80 at $E079
+  inside it and goes blank without it; so do the educational pirates *CNEDC
+  Family Computer System v2.1*, *Jiating Diannao Jiaoxue Jianpan* and *Tangguo
+  Mao 2*, on Mesen2 as on the board. mame_nes, with no window either, draws
+  *Dr. Franken*: something else at power, perhaps the PPU's head start, may
+  carry it through, and that is open. Whether the clones the pirates were
+  sold for hold the PPU's reset is not known (the Dendy row is unverified). *Minna no
+  Taabou no Nakayoshi Daisakusen* enables NMI at its first instruction, and its
+  handler walks a list in uninitialised zero page until it finds $FF: with RAM
+  powered on as zeros it loops for ever, with $FF it boots. RAM at power is
+  unreliable and varies by console (`CPU_power_up_state.wiki`), so on a
+  Famicom it is a coin toss; the board keeps zeros (`PowerOn.ram_fill`) rather
+  than tune RAM to one game.
 
 ## Open items
 

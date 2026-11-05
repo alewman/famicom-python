@@ -129,7 +129,9 @@ def licensed_dumps(
     return found
 
 
-def mesen_frames(rom: Path, frames: list[int], home: Path, region: int = 1) -> dict[int, list[int]]:
+def mesen_frames(
+    rom: Path, frames: list[int], home: Path, region: int = 1, ppu_reset_at_power: bool = True
+) -> dict[int, list[int]]:
     if rom.name.lower().endswith((".fds", ".fds.zip")) or rom.parent.name == FDS_SET:
         (home / "Firmware").mkdir(exist_ok=True)
         (home / "Firmware" / "disksys.rom").write_bytes(fds_bios())
@@ -144,6 +146,7 @@ def mesen_frames(rom: Path, frames: list[int], home: Path, region: int = 1) -> d
         until="DONE",
         for_comparison=True,
         region=region,
+        ppu_reset_at_power=ppu_reset_at_power,
         collect=lines,
     )
     return decode_frames(lines)
@@ -163,7 +166,7 @@ def finished_picture(system: System) -> list[int]:
     return list(ppu.picture)
 
 
-def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "nes") -> dict:
+def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "famicom") -> dict:
     result: dict = {"rom": rom.name, "set": rom.parent.name}
     machine = lockstep_machine(machine_name, None)
     border = machine.timing.border
@@ -187,7 +190,13 @@ def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "nes
                 if not theirs:
                     raise SystemExit("LoadRom failed")
             else:
-                theirs = mesen_frames(rom, frames, Path(home), REGIONS[machine.timing.name])
+                theirs = mesen_frames(
+                    rom,
+                    frames,
+                    Path(home),
+                    REGIONS[machine.timing.name],
+                    machine.ppu_reset_at_power,
+                )
             if machine.timing.swapped_emphasis:
                 theirs = {f: [unswap_emphasis(v) for v in p] for f, p in theirs.items()}
         finally:
@@ -230,7 +239,9 @@ def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "nes
     if "status" not in result:
         # A frame matches if any board frame within the slack does.
         differing = [e for e in report if e.get("closest_diff", e.get("diff", 1))]
-        result["status"] = "differs" if differing else "identical"
+        # Two blank screens are not a match: both may be hung the same way.
+        blank = all(len(set(theirs[e["frame"]])) == 1 for e in report if "diff" in e)
+        result["status"] = "differs" if differing else "blank" if blank else "identical"
         if differing and "diff" in differing[0] and not use_mame:
             first = differing[0]
             frame = first["frame"]
@@ -274,7 +285,7 @@ def main() -> int:
     parser.add_argument("--slack", type=int, default=1, help="board frames tried either side")
     parser.add_argument("--detector", choices=("mesen", "mame"), default="mesen")
     parser.add_argument("--list", type=Path, help="only the dumps named in this file")
-    parser.add_argument("--machine", choices=("nes", "pal"), default="nes")
+    parser.add_argument("--machine", choices=("famicom", "nes", "pal"), default="famicom")
     parser.add_argument(
         "--programs", action="store_true", help="the test carts and programs instead"
     )

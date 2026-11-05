@@ -61,7 +61,7 @@ Open questions with no hardware answer are in
   detector), `apu_mixer`'s tones agree in timing, pitch and level.
 - **APUSim, the gate-level 2A03**, runs here but is not yet a judge: 3 of 8
   `apu_test`, for a cause found in its simulation order.
-- **AccuracyCoin** (`b4b5952`, 147 tests): all 147 pass, from 116 on the first
+- **AccuracyCoin** (`b037b41`, 147 tests): all 147 pass, from 116 on the first
   run, fixed against its hardware answer keys: the frame IRQ's clear and
   inhibit, the controller strobe, the 2A03's internal data bus, its register
   decode during DMA, the DMC's reload timing, enable hold and abort bug, SHx

@@ -1984,6 +1984,13 @@ with "DMA Landing on Write" code 1, the common behaviour, as an RP2A03G should. 
 new test's numbers are the die's: `scripts/apu_period_roms.py` decodes the
 same table from the 2A03's masks.
 
+Repinned to `b037b41` (2026-11-02): no new tests. Its four commits fix the ROM
+itself: the DMA Sync pretest now checks that `$4000` reads open bus before
+relying on it, a subroutine moved out of a DMC sample's range, and Misaligned
+OAM Behavior's failure path no longer pulls the stack when it should not. The
+board passes **147 of 147** on it, with the Famicom power-on change (C72); the
+test ROMs run on the NES-001.
+
 Others, for scale (detectors, not judges). **MesenCE** `4b8a196`, run here by
 `scripts/mesen_accuracycoin.py`: 143 of 147; it passes the new test and fails DMC Reload
 Timing, ALE + Read, Hybrid Addresses and Frozen OAM2 Increment. Our patched Mesen2
@@ -2058,3 +2065,58 @@ among them *Super Hang-On* (258), *Klax* (64), *KlashBall*, *Tatakai no Banka* (
 the board right, only outvoted in its favour. 303 differ from all: C48's *Flintstones* and *Jetsons*
 are not settled by it. *30 Games* (314) is within 28 pixels, supporting C61.
 
+
+### The Famicom at power, and two blank screens are not a match (2026-11-05)
+
+mame_nes over every dump, the board on the NES-001 (`tests/mame_traces/sweep-mfull`):
+**7,557 of 8,808 identical**. Of the main set's licensed dumps that differed, most were
+identical on Mesen2, and the reason was one setting. The board ignored PPU writes until
+the first pre-render line on every console, and the harness forced Mesen2's
+`RestrictPpuAccessOnFirstFrame` on to match. *Metal Gear*, *F-1 Race*, *Argus*, *Magic
+John* and more write `$2000` inside that window and hung, on both alike, and the sweep
+scored their two blank screens as identical. mame_nes has no window. The window is the
+NES-001's; the Famicom has none (C72). So a cartridge now runs on the Famicom unless its
+header or nes20db names PAL or the Dendy, Mesen2 runs with the window only where the
+board's machine has it, and a dump whose detector frames are all one colour scores
+**blank**, not identical, and goes on the failures list. The test ROMs still run on the
+NES-001.
+
+Of the 765 dumps the window dropped a meaningful write for (`$2000`, `$2001`, `$2005` or
+`$2006`), against mame_nes: **87 went from differing to identical**, among them both
+*Metal Gear*s, *F-1 Race*, *Argus*, *Air Fortress*, *Magic John*, *The Lord of King*,
+*Lode Runner*, *Elysion*, *Eggerland*, *Dragon Slayer IV* and Namco's *Star Wars*. With the
+rows of that run in place of the old, mame_nes is identical on 7,632 of 8,808. The other
+rows of `sweep-mfull` were scored before "blank" existed, so some of its identical rows
+may yet be two blank screens.
+
+Against Mesen2, every dump (`tests/mame_traces/sweep-fam`): **8,152 of 8,808 identical**,
+496 differ, 51 blank, 109 refused. Licensed (main set, no Unl, Pirate or Aftermarket in
+the name): 2,938 identical, 96 differ, 20 blank of 3,054; the last sweep, on the same
+definition, 2,960 and 93. No dump went from identical to refused. What changed:
+
+- **51 blank**, every one identical before. 46 are blank on the board on both consoles at
+  frames 60, 300 and 600: most because their attract sequences are black at just those
+  frames (*Tecmo Super Bowl* and *Ghostbusters II* run 30 seconds and draw), some because
+  they wait for a keyboard or a cart (*Family BASIC*, the Pro Action Replay with no cart).
+  Five boot on the NES-001 and not on the Famicom: *The Adventures of Dr. Franken* (USA
+  prototype), three educational pirates and *Minna no Taabou no Nakayoshi Daisakusen*.
+  They need the window or a RAM fill; see C72. Run them with `--machine nes`.
+- **20 differ**. 11 (*Parodius Da!*, its European beta, *NESnake 2* in four builds, *Project
+  PAL* twice, *Retrogathering 2010*, *Mom, My Ears Are Bleeding!*, *Juhannusolumppialaiset
+  2017*) are identical with `joypad_oe_per_cycle` off: the RF Famicom clocks the pad on
+  every read cycle (hardware-captured), and Mesen2 here runs NES-001 pads. The other 9
+  were hung on the NES-001 on both, and now boot and differ: *Wenzi Guangchang + Pailei*
+  and *Videopoker Bonza* (twice) differ from Mesen2 and mame_nes by the same counts, so
+  the board is the odd one out there; *NTF2 Test Cartridge*, *Super Donkey Kong - Xiang
+  Jiao Chuan*, *Balda* (Subor keyboard) and *Melanchony of Existance* by 1 to 5 pixels;
+  *Dragon Fighter* and *Mouser* by more. All are on `tests/sweep_failures.tsv`.
+
+Re-scored by mame_nes as well, 7 of the 765 went from identical to differing: three
+boot on the board where mame_nes is blank (*Sansuu 2 Nen*, *Tetris* (China), *Koudai
+Jingling*), *Lex and Grim* by a pixel, *Tokoro-san no Mamoru mo Semeru mo* starting
+later than mame_nes (blank at 60, its title by 120; the Famicom's PPU starting before the
+CPU is not modelled, C72), *Minna no Taabou*, and *Dr. Franken*, which mame_nes draws
+with no window while the board and Mesen2 stay blank: open, in C72.
+
+Slow suite 198 of 198 (the FDS three with `NO_INTRO_DIR` for the BIOS), quick 218, mappers 202,
+AccuracyCoin 147 of 147 at `b037b41`, on PyPy.

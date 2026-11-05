@@ -98,7 +98,7 @@ def evidence(mapper: int, tally: collections.Counter, mame: collections.Counter)
         return "matches Mesen2"
     if mame[mapper]:
         return "matches mame_nes"
-    if tally["differs"] or tally["crash"]:
+    if tally["differs"] or tally["blank"] or tally["crash"]:
         return "differs, by eye"
     if tally["error"]:
         return "by eye (Mesen2 refuses)"
@@ -120,13 +120,14 @@ def registry(dumps: dict, rows: list[dict], mame: collections.Counter) -> str:
     for row in rows:
         tallies[row_mapper(row, dumps)][row["status"]] += 1
     lines = [
-        "| Mapper | Class | Module | Main | Aftermarket | Private | Identical / differs / "
-        "refused | Described by | Evidence |",
+        "| Mapper | Class | Module | Main | Aftermarket | Private | Identical / differs or "
+        "blank / refused | Described by | Evidence |",
         "| ---: | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
     ]
     for mapper in sorted(set(MAPPERS) | set(sets)):
         count, tally = sets[mapper], tallies[mapper]
-        swept = f"{tally['identical']} / {tally['differs'] + tally['crash']} / {tally['error']}"
+        other = tally["differs"] + tally["blank"] + tally["crash"]
+        swept = f"{tally['identical']} / {other} / {tally['error']}"
         if mapper in MAPPERS:
             name, module, sources = describe(MAPPERS[mapper])
             proof = evidence(mapper, tally, mame)

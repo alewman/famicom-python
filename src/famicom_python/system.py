@@ -53,19 +53,18 @@ class System:
     @staticmethod
     def machine_for(rom: str | Path | bytes) -> Machine:
         """The console a cartridge asks for: the NES 2.0 header's or nes20db's
-        timing (1 PAL, 3 Dendy), else a Famicom when the cartridge carries a
-        sound chip or is a disk (its sound reaches the mix only through the
-        Famicom's cartridge pins 45 and 46), else the NES-001. Neither source
-        tells a Famicom cartridge from an NES one otherwise."""
+        timing (1 PAL, 3 Dendy), else a Famicom. Neither source tells a Famicom
+        cartridge from an NES one, and the Famicom runs both: a sound chip or a
+        disk reaches the mix only through its cartridge pins 45 and 46, and
+        games that write the PPU too early hang on the NES-001
+        (Machine.ppu_reset_at_power)."""
         loaded = load(rom)
         timing = loaded.image.board.timing
         if timing == 1:
             return MACHINES["pal"]
         if timing == 3:
             return MACHINES["dendy"]
-        if loaded.cartridge.expansion_audio:
-            return MACHINES["famicom"]
-        return NES_001
+        return MACHINES["famicom"]
 
     @classmethod
     def from_rom(

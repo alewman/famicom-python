@@ -1172,8 +1172,8 @@
  {
   "path": "reference/nesdev-wiki/Color_Dreams.wiki",
   "url": "https://www.nesdev.org/w/index.php?title=Color_Dreams&action=raw",
-  "sha256": "2934dff2ea418860b402c4fec032a77a65ab07306217e0e8a90eff9351f7c4f1",
-  "size": 2729,
+  "sha256": "8663fdeb463598f773d4abdf424b8d23c821bcfa58fc001f293a19e602133000",
+  "size": 3359,
   "kind": "live-wiki",
   "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
   "note": "NESdev wiki snapshot 2026-10-05: Color_Dreams"
@@ -1505,8 +1505,8 @@
  {
   "path": "reference/nesdev-wiki/INES_Mapper_148.wiki",
   "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_148&action=raw",
-  "sha256": "d9c703b1b06ac6c980a8fcbaefdc272c3b3ef5fd9ff750a52704dbc3899343d5",
-  "size": 937,
+  "sha256": "072d564d95363e620b19ddcf740596129636999be384cb5f44edfb4f25212b60",
+  "size": 976,
   "kind": "live-wiki",
   "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
   "note": "NESdev wiki snapshot 2026-10-05: INES_Mapper_148"
@@ -2126,8 +2126,8 @@
  {
   "path": "reference/nesdev-wiki/Taito_X1-005.wiki",
   "url": "https://www.nesdev.org/w/index.php?title=Taito_X1-005&action=raw",
-  "sha256": "828ec19254daeb72c3d5c93effa8d76214e3c24ddff89c395aa66c2ddeb1ad95",
-  "size": 3174,
+  "sha256": "219525073da29fbb9c679de9d509f986fe3251c69a457e38961a711e62d4530b",
+  "size": 3565,
   "kind": "live-wiki",
   "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
   "note": "NESdev wiki snapshot 2026-10-05: Taito_X1-005"
@@ -2431,8 +2431,8 @@
  },
  {
   "path": "tests/test_roms/AccuracyCoin/AccuracyCoin.nes",
-  "url": "https://raw.githubusercontent.com/100thCoin/AccuracyCoin/b4b5952f8ef57618d798c8d97cd099ab352e62e6/AccuracyCoin.nes",
-  "sha256": "86ec57789bd7421108cd76d22290d8a24e91b49f8b8b3ddcf09df7847357c6d8",
+  "url": "https://raw.githubusercontent.com/100thCoin/AccuracyCoin/b037b4180fdf1c4d35898bc511afc1046a9e6737/AccuracyCoin.nes",
+  "sha256": "291e8572219a205aa96cc6c4376b1db26bdb1abc3ec63db38c0eefb067b729f8",
   "size": 40976,
   "kind": "test-rom",
   "license": "MIT (Chris Siebert 2025)",

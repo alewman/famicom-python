@@ -107,6 +107,7 @@ class Board:
 
     def power(self) -> None:
         self.apu.power()
+        self.ppu.resetting = self.machine.ppu_reset_at_power
 
     def reset(self) -> None:
         """The reset button: the APU always, the PPU only where the console wires it,
