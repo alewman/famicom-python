@@ -24,9 +24,9 @@ page branch, and perfect6502 shows NMIs wait too (C29); and it ignores a DMC
 rate written in the timer's reload cycle, which AccuracyCoin's hardware answer
 key applies (validation.md, milestone 6). The board runs with Mesen2's power-
 on (``MACHINE``); Mesen2 runs with ``configure_for_comparison`` (RAM zeroed,
-the first frame's PPU writes ignored where the machine holds the PPU's reset) and its trace goes to ``--trace-dir``
-(gitignored ``tests/mame_traces/lockstep`` by default; about 80 bytes an
-instruction, 1.7 GB a minute).
+the first frame's PPU writes ignored where the machine holds the PPU's reset)
+and its trace goes to ``--trace-dir`` (gitignored ``tests/mame_traces/lockstep``
+by default; about 80 bytes an instruction, 1.7 GB a minute).
 """
 
 from __future__ import annotations

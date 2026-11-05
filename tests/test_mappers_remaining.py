@@ -638,3 +638,14 @@ def test_mapper_396_3_starts_in_the_last_outer_bank() -> None:
     assert cart.prg_offsets[3] == 0x3E000
     cart.cpu_write(0x800F, 0, 0)
     assert cart.prg_offsets[3] == 0x1E000
+
+
+def test_mmc3_clones_keep_the_irq_reload_value_through_their_own_latches() -> None:
+    # 292's data latch, 260's CNROM latch and 176's discrete latch once shared
+    # the MMC3's name for its reload value: every other write overwrote it.
+    for mapper, sizes in ((292, {}), (260, {}), (176, {"chr_kib": 0})):
+        cart = build(mapper, **sizes)
+        cart.cpu_write(0xC000, 0x68, 0)
+        cart.cpu_write(0x8000, 0x06, 0)
+        cart.cpu_write(0xA000, 0x01, 0)
+        assert cart.latch == 0x68, mapper

@@ -164,8 +164,8 @@ class Machine:
     # to 5V: no such window, and F-1 Race, Metal Gear, Argus and more write $2000
     # inside it and hang without NMI, as Magic John and The Lord of King do on an
     # NES (PPU_power_up_state.wiki "Famicom", specification tier; hardware
-    # reports, forum p=247896). The PPU there also starts some 11 ms or more
-    # before the CPU, unmeasured and not modelled (C72).
+    # reports, forum p=247896). The PPU there starts at least 11.4 ms before the
+    # CPU, unmeasured; taken as a frame or more, no window is left (C72).
     ppu_reset_at_power: bool
     # Every read cycle of $4016/$4017 clocks the pad (RF Famicom), rather than a
     # run of back-to-back reads clocking it once (hardware-captured by Fiskbit,
