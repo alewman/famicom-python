@@ -739,7 +739,13 @@ before the board takes a side.
   23): it steps on alternate dots, a load and a step meet, and the step wins with
   the next value its latch held. The board's model of that matches PPUSim in all 33
   cases of the `oamaddr` scene but the four whose copy ends on an in-range X byte,
-  where it follows the console instead.
+  where it follows the console instead. Rendering turned off during evaluation
+  (open item 18) is the same counter: secondary OAM stops filling at once, but the
+  counter steps once more, as BLNK rises before the visible-line gate closes and
+  turns off the Y check's realignment (+1, or a Y check's uncarried n+1 and m+1
+  after an odd-dot write); the copy's Johnson counter runs on the dot clock, so a
+  copy in progress is over by the time rendering is back, its bytes skipped in
+  secondary OAM, unwritten. The `mux` scene's two cases now match.
 
 ## Open items
 
@@ -828,8 +834,8 @@ before the board takes a side.
     earlier). Left of C12: when rendering stops during sprite evaluation and
     restarts before the line ends, PPUSim's secondary OAM takes one more,
     misaligned, entry (`53 02 65 68`) and ours none (the goldens' two
-    `mux` cases, kept as KNOWN in `tests/test_ppusim_goldens.py`): the
-    same corner as "Misaligned OAM2 Address", unmodelled.
+    `mux` cases): the same corner as "Misaligned OAM2 Address". *Modelled
+    2026-11-05* (C73, `PPU._last_eval_step`): both cases match PPUSim.
 19. **Milestone 7's open three**: the render-start OAM copy (C32), the M2
     edge of cycle-counting IRQs (C33), the MMC5's in-frame onset (C34). Each
     needs a hardware-corrected test; none was found.

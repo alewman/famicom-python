@@ -698,6 +698,27 @@ class PPU:
                 self._eval_done = True
         self.oam_addr = address
 
+    def _last_eval_step(self) -> None:
+        """Rendering turned off during sprite evaluation: secondary OAM stops
+        filling at once, but the OAM counter steps once more, at its next step
+        after a write on an odd dot, two dots on after one on an even dot, as
+        BLNK rises before the visible-line gate closes. BLNK also turns off the
+        Y check's mode, so that step is not realigned: after an even-dot write,
+        or in a copy, the latch counts +1; after an odd-dot write a Y check's
+        latch holds n+1 and m+1, uncarried, and the step takes it whole.
+        The copy's own counter (a Johnson counter on the dot clock) runs on
+        with rendering off, and secondary OAM's address with it, unwritten: a
+        copy in progress has ended by the time it is back, its bytes skipped
+        (PPUSim; open item 18)."""
+        address = self.oam_addr
+        left = self._copying & 3
+        if self.dot & 1 and not left:
+            self.oam_addr = ((address & 0xFC) + 4 | (address + 1) & 3) & 0xFF
+        else:
+            self.oam_addr = (address + 1) & 0xFF
+        self._oam2_index = min(self._oam2_index + left, 32)
+        self._copying = 0
+
     def _set_overflow(self) -> None:
         self.status |= OVERFLOW
 
@@ -1315,6 +1336,8 @@ class PPU:
         elif register == 1:
             if not self.resetting:
                 if self.rendering_now and not value & 0x18:
+                    if self.line < HEIGHT and 65 <= self.dot < WIDTH and self.mask & 0x18:
+                        self._last_eval_step()
                     # Rendering turned off mid-line freezes the secondary OAM
                     # address; if it is still frozen when rendering begins at
                     # the pre-render line, OAM's row there is overwritten.
