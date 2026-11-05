@@ -25,9 +25,13 @@ dump in N, in name order.
     nice pypy3 scripts/compat_sweep.py --fds --frames 1200,2400 --slack 12 --jobs 12
     nice pypy3 scripts/compat_sweep.py --machine pal --only Europe --out PAL.jsonl
 
-``--machine pal`` runs both on PAL (Mesen2's region, the board's PAL row on
-Mesen2's power-on, ``mesen_lockstep.lockstep_machine``), PAL's border left out
-of the comparison (the board's is PPUSim's, docs/validation.md milestone 10).
+``--machine`` is the console both run, ``auto`` by default: the one the board
+picks for the dump (``System.machine_for``: PAL or Dendy as the header or
+nes20db says, else the Famicom), recorded in each row; until 2026-11-05 every
+dump ran on one console, so PAL games ran as NTSC. ``--machine pal`` runs both
+on PAL (Mesen2's region, the board's PAL row on Mesen2's power-on,
+``mesen_lockstep.lockstep_machine``), PAL's border left out of the comparison
+(the board's is PPUSim's, docs/validation.md milestone 10).
 
 ``--fds`` sweeps the licensed Famicom Disk System dumps (milestone 9): both
 sides get the BIOS (FAMICOM_FDS_BIOS or No-Intro's) and neither changes disks
@@ -61,6 +65,7 @@ from mesen_lockstep import lockstep_machine, mesen_path
 from mesen_run import FRAMES_LUA, REGIONS, ROOT, decode_frames, run_mesen
 
 from famicom_python.cartridge import MAPPERS, fds_bios
+from famicom_python.machine import MACHINES
 from famicom_python.ppu import HEIGHT
 from famicom_python.system import System
 from famicom_python.video import load_palette, write_png
@@ -166,8 +171,20 @@ def finished_picture(system: System) -> list[int]:
     return list(ppu.picture)
 
 
-def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "famicom") -> dict:
+def console_for(rom: Path) -> str:
+    """The MACHINES key the board would choose for ``rom`` (System.machine_for)."""
+    try:
+        chosen = System.machine_for(rom)
+    except Exception:  # the board refuses it: Mesen2's verdict is still wanted
+        return "famicom"
+    return next(name for name, machine in MACHINES.items() if machine is chosen)
+
+
+def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "auto") -> dict:
     result: dict = {"rom": rom.name, "set": rom.parent.name}
+    if machine_name == "auto":
+        machine_name = console_for(rom)
+    result["machine"] = machine_name
     machine = lockstep_machine(machine_name, None)
     border = machine.timing.border
     # PAL's border (line 0, x 0-1 and 254-255) is not compared.
@@ -285,7 +302,12 @@ def main() -> int:
     parser.add_argument("--slack", type=int, default=1, help="board frames tried either side")
     parser.add_argument("--detector", choices=("mesen", "mame"), default="mesen")
     parser.add_argument("--list", type=Path, help="only the dumps named in this file")
-    parser.add_argument("--machine", choices=("famicom", "nes", "pal"), default="famicom")
+    parser.add_argument(
+        "--machine",
+        choices=("auto", "famicom", "nes", "pal", "dendy"),
+        default="auto",
+        help="the console (auto: as the board picks, PAL or Dendy by header or nes20db)",
+    )
     parser.add_argument(
         "--programs", action="store_true", help="the test carts and programs instead"
     )

@@ -2158,3 +2158,12 @@ from the Castlevania Anniversary Collection, *Ganbare Goemon Gaiden*'s Virtual C
 release). *Strider*'s NMI handler returns with the stack pointer wrapped, its RTI lands in
 RAM at `$038A` and the CPU jams; these appear to rely on their host emulator. They stay on
 the failures list as blank.
+
+Every sweep so far ran every dump on one console, so the 515 dumps whose header or
+nes20db says PAL, and the 606 that say Dendy, ran as NTSC: 157 of the differences and 7
+of the blanks are theirs. `compat_sweep.py --machine auto`, now the default, runs each on
+the console the board picks (`System.machine_for`) and records it. Twenty of the
+differing ones, run again: 8 of 10 PAL and 2 of 10 Dendy are identical (*International
+Cricket*, the last undiagnosed licensed difference, *Cobra Triangle*, *Elite*, *Ice
+Hockey*...); the other Dendy eight were as far off as NTSC (mappers 4, 163, 176, 268
+pirates). The rest are to be run again.
