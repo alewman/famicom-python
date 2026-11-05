@@ -2165,5 +2165,6 @@ of the blanks are theirs. `compat_sweep.py --machine auto`, now the default, run
 the console the board picks (`System.machine_for`) and records it. Twenty of the
 differing ones, run again: 8 of 10 PAL and 2 of 10 Dendy are identical (*International
 Cricket*, the last undiagnosed licensed difference, *Cobra Triangle*, *Elite*, *Ice
-Hockey*...); the other Dendy eight were as far off as NTSC (mappers 4, 163, 176, 268
-pirates). The rest are to be run again.
+Hockey*...). The other two PAL, *Bayou Billy* and *Blue Shadow*, are the VBL race of
+milestone 10, part 4, where the board matches PPUSim's 2C07; the other Dendy eight were
+as far off as on NTSC (mappers 4, 163, 176, 268 pirates). The rest are to be run again.
