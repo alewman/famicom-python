@@ -377,6 +377,66 @@ def misaligned_oam2() -> Schedule:
     return s
 
 
+def c73() -> Schedule:
+    """C73: line 7's evaluation starts misaligned at OAMADDR 1, where a sprite's
+    Y (3) is in range; its copy ends on OAM[4], the X byte, in range of the
+    line (C73_X=$02, the default) or not ($80). PPUSim realigns the address
+    after the copy either way; the console only when X is out of range
+    (AccuracyCoin "Misaligned OAM behavior" 6). The OAM address per dot of
+    line 7 is the comparison."""
+    s = Schedule()
+    x = int(os.environ.get("C73_X", "0x02"), 0)
+    s.write(1, 0x00)
+    s.oam(bytes([0xFF, 3, 0x01, 0x00, x, 0xFF, 0xFF, 0xFF]) + bytes([0xFF] * 248))
+    s.write(1, 0x1E, at(5, 30))
+    s.write(3, 0x01, at(6, 330))  # after line 6's sprite fetches, before line 7's evaluation
+    s.probe = [7]
+    s.end = at(8, 0)
+    return s
+
+
+def oamread() -> Schedule:
+    """OAM as written: 256 bytes ($00-$FF, each its own address) through $2004
+    with rendering off, then OAMADDR set and $2004 read for 0-$3F and $E0-$FF."""
+    s = Schedule()
+    s.write(1, 0x00)
+    s.oam(bytes(range(256)))
+    for address in list(range(0x40)) + list(range(0xE0, 0x100)):
+        s.write(3, address)
+        s.read(4)
+    s.end = s.t + 16 * DOT
+    return s
+
+
+def evalwrite() -> Schedule:
+    """C73: a write during line 7's evaluation, sixteen sprites in range (Y
+    0-3): $2003 = 0 (EVAL_REG=3) or rendering off and on again at dot 246
+    (EVAL_REG=1), at EVAL_DOT (default 85). The OAM address per dot of line 7
+    shows what the OAM counter did; the board's model of it came from PPUSim."""
+    s = Schedule()
+    register = int(os.environ.get("EVAL_REG", "3"))
+    dot = int(os.environ.get("EVAL_DOT", "85"))
+    table = []
+    # EVAL_OAM=alt: odd sprites out of range, so copies and Y checks alternate
+    # while the search is on. (Visual 2C02's OAM did not hold a 64-sprite table
+    # as written; sixteen, then $F8, it does.)
+    alternate = os.environ.get("EVAL_OAM") == "alt"
+    for n in range(16):
+        y = 0xF8 if alternate and n & 1 else n % 4
+        table += [y, 0x41 + n, n & 3, n * 15]
+    s.write(1, 0x00)
+    s.oam(bytes(table + [0xF8] * (256 - len(table))))
+    s.write(1, 0x1E, at(5, 30))
+    if register == 3:
+        s.write(3, 0x00, at(7, dot))
+    else:
+        s.write(1, 0x00, at(7, dot))
+        s.write(1, 0x1E, at(7, 246))
+    s.probe = [7]
+    s.end = at(8, 0)
+    return s
+
+
 def overflow9() -> Schedule:
     """Nine sprites in range of line 7 (Y 0-8 -> all but the last cover it):
     evaluation fills OAM2, then the overflow scan. No reads; the line's
@@ -447,6 +507,9 @@ SCENARIOS = {
     "oam2_trace": oam2_trace,
     "misaligned_oam2": misaligned_oam2,
     "overflow9": overflow9,
+    "c73": c73,
+    "evalwrite": evalwrite,
+    "oamread": oamread,
 }
 
 
@@ -470,6 +533,7 @@ def run_board(s: Schedule) -> dict:
     reads: list[int] = []
     lines: dict[str, list[int]] = {}
     skips: list[bool] = []
+    probes: dict[str, list[int]] = {}  # OAMADDR as each dot of a probed line ends
     previous = (ppu.line, ppu.dot)
 
     def advance(to: int) -> None:
@@ -478,6 +542,8 @@ def run_board(s: Schedule) -> dict:
             ppu.run_to(min(ppu.time + 4, to))
             position = (ppu.line, ppu.dot)
             if position != previous:
+                if position[0] in s.probe:
+                    probes[f"{position[0]}:{position[1]}"] = [ppu.oam_addr, 0, 0]
                 if previous[0] == 261 and position[0] == 0:
                     skips.append(previous[1] < 340)
                 if position[0] == previous[0] + 1 and previous[0] in s.lines:
@@ -489,7 +555,8 @@ def run_board(s: Schedule) -> dict:
                 previous = position
 
     for when, rnw, register, value in s.events:
-        advance(origin + when // 2 + PPU_ACCESS_TICKS)
+        lead = 0 if rnw else ppu.write_lead(register)
+        advance(origin + when // 2 + PPU_ACCESS_TICKS - lead)
         if rnw:
             result = ppu.read_register(register)
             advance(origin + (when + 24) // 2)
@@ -497,7 +564,7 @@ def run_board(s: Schedule) -> dict:
         else:
             ppu.write_register(register, value)
     advance(origin + s.end // 2)
-    return {"reads": reads, "lines": lines, "skips": skips}
+    return {"reads": reads, "lines": lines, "skips": skips, "probes": probes}
 
 
 def run_ppusim(s: Schedule) -> dict:

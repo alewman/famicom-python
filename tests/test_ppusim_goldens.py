@@ -20,12 +20,10 @@ GOLDENS = json.loads(
     gzip.decompress((Path(__file__).parent / "ppusim_goldens.json.gz").read_bytes())
 )
 
-# A $2003 write during sprite evaluation that leaves a copy ending on an X byte
-# in range of the line: PPUSim realigns the address, the console does not
-# (AccuracyCoin "Misaligned OAM behavior" test 6, hardware-captured), and the
-# board follows the console (C73). The names are the dots asked for; each write
-# lands a dot or two earlier.
-KNOWN = {"oamaddr 72", "oamaddr 87", "oamaddr 89", "oamaddr 73+91+163+181"}
+# Rendering turned off during sprite evaluation and on again: PPUSim's OAM
+# counter takes a last step Visual 2C02's does not (C73); the board follows
+# Visual 2C02 (tests/test_visual2c02_goldens.py, "off overflow 210").
+KNOWN = {"mux 1E>0E +5", "mux 1E>0E +6"}
 
 
 @pytest.mark.parametrize("scene", SCENES)

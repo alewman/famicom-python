@@ -730,22 +730,26 @@ before the board takes a side.
   RAM at power varies by console (`CPU_power_up_state.wiki`); the board keeps
   zeros (`PowerOn.ram_fill`) rather than tune RAM to one game.
 
-- **C73. A misaligned copy's end, and `$2003` during sprite evaluation.** At the
-  end of a sprite's copy into secondary OAM, PPUSim's OAM counter always clears the
-  low two bits; the console clears them only when the X byte just copied is out of
-  range of the line (AccuracyCoin "Misaligned OAM behavior" test 6,
-  hardware-captured). *Board*: the console's rule; with PPUSim's, test 6 fails.
-  The same counter decides what a `$2003` write does during evaluation (open item
-  23): it steps on alternate dots, a load and a step meet, and the step wins with
-  the next value its latch held. The board's model of that matches PPUSim in all 33
-  cases of the `oamaddr` scene but the four whose copy ends on an in-range X byte,
-  where it follows the console instead. Rendering turned off during evaluation
-  (open item 18) is the same counter: secondary OAM stops filling at once, but the
-  counter steps once more, as BLNK rises before the visible-line gate closes and
-  turns off the Y check's realignment (+1, or a Y check's uncarried n+1 and m+1
-  after an odd-dot write); the copy's Johnson counter runs on the dot clock, so a
-  copy in progress is over by the time rendering is back, its bytes skipped in
-  secondary OAM, unwritten. The `mux` scene's two cases now match.
+- **C73. The OAM counter during sprite evaluation: PPUSim against Visual 2C02.** Two
+  die models disagree on OAMADDR's counter, and where the console can tell, it sides
+  with Visual 2C02 (Quietust's transistor netlist), so the board follows Visual 2C02.
+  At the end of a sprite's copy PPUSim always clears m; Visual 2C02 and the console
+  only when the X byte just copied is out of range of the line (AccuracyCoin
+  "Misaligned OAM behavior" test 6, hardware-captured; the board fails it with
+  PPUSim's rule). A `$2003` write: PPUSim lets the counter's step win and takes the
+  latch's stale value; on Visual 2C02 the load holds while the write strobe is low,
+  from early in the cycle, so it takes effect two dots before the board's access
+  point (`OAMADDR_LEAD_TICKS`), the next OAM read uses it, and a step inside the
+  strobe (a cycle beginning on an odd dot) leaves the counter at the written value.
+  Rendering turned off: on Visual 2C02 secondary OAM stops filling, and after a cycle
+  beginning on an even dot the counter's next step counts +1, whatever it was; after
+  an odd one nothing more steps (PPUSim takes a +1 or an uncarried +5). Both agree
+  that a copy in progress is over when rendering is back, its bytes skipped in
+  secondary OAM. *Board*: Visual 2C02's, held to its recorded answers in
+  `tests/test_visual2c02_goldens.py` (14 cases, `scripts/visual2c02/goldens.py`):
+  all match but one, a copy interrupted on an even dot, where Visual 2C02's OAM data
+  reads $E0 while rendering is off and the check as it returns finds nothing.
+  PPUSim's `mux` answers for two cases are kept as known for the same reason.
 
 ## Open items
 
@@ -835,7 +839,8 @@ before the board takes a side.
     restarts before the line ends, PPUSim's secondary OAM takes one more,
     misaligned, entry (`53 02 65 68`) and ours none (the goldens' two
     `mux` cases): the same corner as "Misaligned OAM2 Address". *Modelled
-    2026-11-05* (C73, `PPU._last_eval_step`): both cases match PPUSim.
+    2026-11-05* on Visual 2C02's answers (C73, `PPU._last_eval_step`); PPUSim's
+    two cases stay known, as its counter differs there.
 19. **Milestone 7's open three**: the render-start OAM copy (C32), the M2
     edge of cycle-counting IRQs (C33), the MMC5's in-frame onset (C34). Each
     needs a hardware-corrected test; none was found.
@@ -868,21 +873,14 @@ before the board takes a side.
     $FF, as Visual 2C02 and PPUSim both drive I/OAM2 there
     (`scripts/visual2c02/compare.py prerender2004`); the board now returns
     it, writing nothing to secondary OAM.
-23. **A `$2003` write during sprite evaluation**: *done 2026-11-05* (below, and C73:
-    the counter's load and step, from PPUSim's gates; 29 of the `oamaddr` scene's 33
-    cases match it, the other four are C73's conflict). As first found
-    (`ppusim_compare.py oamaddr_render`): The board took any OAMADDR below 4 after a
-    copy for n having wrapped, so `$2003 = 0` mid-evaluation stopped it after
-    one more sprite; it now tracks the carry out of n, and a write landing
-    on an even dot (the counter's step) matches PPUSim from dot 66 to 130.
-    On odd dots PPUSim keeps part of the old address: at dot 85 $0A became
-    $08 (sprite 2 copied twice), at 109 $1A became $10. The main counter's
-    bits load and step through separate latches (PPUSim's `OAMCounterBit`),
-    a half-cycle matter the board's per-dot counter does not model; dot 86
-    differs too. A write in the first sprite's Y check makes PPUSim skip
-    sprite 0 altogether. *Melanchony of Existance* writes on odd dots: its
-    five pixels on line 19 are this. The model now in `PPU._write_oam_addr`: a
-    write on an odd dot meets the counter's step, shows for the next OAM read
-    only, and the next step takes the latch's stale value (+1 from the address the
-    step before started at while copying, else n+1 and m+1 uncarried, m cleared
-    by a Y check); on an even dot it follows the step and sticks.
+23. **A `$2003` write during sprite evaluation**: *done 2026-11-05* (C73). The board
+    took any OAMADDR below 4 after a copy for n having wrapped, so `$2003 = 0`
+    mid-evaluation stopped it after one more sprite; it now tracks the carry out of
+    n. The write's own timing, first fitted to PPUSim's gates, is Visual 2C02's:
+    its answers and PPUSim's differ, and the console sides with Visual 2C02 where it
+    can tell. *Melanchony of Existance*'s five pixels against Mesen2 are this corner.
+24. **OAM row 0 copied over row $20 on Visual 2C02** (2026-11-05). In the
+    `compare.py` schedules, which turn rendering on at line 5, dot 30, Visual 2C02's
+    evaluation later reads OAM's $20-$27 as a copy of $00-$07; OAM read back with
+    rendering off holds what was written (`oamread`). The board copies nothing. Which
+    edge of rendering's start does it, and whether the console does, is open.

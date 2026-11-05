@@ -134,11 +134,12 @@ class Pair:
         self.t += self.cycle
         results = []
         for ppu in (self.ours, self.sim):
-            ppu.run_to(self.t + self.access_ticks - self.cycle)
+            lead = 0 if value is None or ppu is self.sim else ppu.write_lead(register)
+            ppu.run_to(self.t + self.access_ticks - self.cycle - lead)
             if value is None:
                 results.append(ppu.read_register(register))
             elif ppu is self.ours:
-                access = self.t + self.access_ticks - self.cycle
+                access = self.t + self.access_ticks - self.cycle - lead
                 ppu.write_register(register, value, self.sim.early_value, ppu.time - access)
                 results.append(value)
             else:

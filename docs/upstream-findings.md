@@ -92,5 +92,9 @@ Most rest on what a game does, not on hardware; an edit should say so.
 - **Breaknes PPUSim**: at the end of a sprite's copy into secondary OAM its OAM counter
   always clears m (the step's BlockCount), so a misaligned copy realigns even when its X
   byte is in range; the console does not (AccuracyCoin "Misaligned OAM behavior" test 6,
-  hardware-captured: the board fails it with PPUSim's rule). Traced with the shim's
-  counter fields (`ppusim_shim.cpp`, `oam_main`), C73. Not reported.
+  hardware-captured: the board fails it with PPUSim's rule). Visual 2C02 agrees with
+  the console, and also differs from PPUSim on a `$2003` write during evaluation (the
+  step wins over the load in PPUSim, the load in Visual 2C02) and on rendering
+  turned off (PPUSim's last step). Traced with the shim's counter fields
+  (`ppusim_shim.cpp`, `oam_main`) and `scripts/visual2c02/compare.py evalwrite`, C73.
+  Not reported.
