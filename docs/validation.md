@@ -2148,3 +2148,13 @@ Famicom clocks the pad on each cycle of it. Their one pixel is the frame's first
 PPUSim's backdrop (open item 1). *Melanchony of Existance* writes OAMADDR four times
 during line 18; five sprite pixels on line 19 differ. *Mouser* writes `$2007` 924 times
 with rendering on in its first second, the register-while-rendering kind (milestone 7).
+
+The 51 blank dumps run again at frames 120, 900 and 1800: 12 draw and are identical
+(*Tecmo Super Bowl* and *Ghostbusters II* among them), so with them **8,179 of 8,808**. 40
+stay blank on both for 30 seconds: the BASICs and menu carts that wait for a keyboard or a
+cart, the window-dependent five of C72, and collection extracts that run on neither
+emulator (*Strider* and *Mighty Final Fight* from the Capcom Classics Mini Mix, *Kid Dracula*
+from the Castlevania Anniversary Collection, *Ganbare Goemon Gaiden*'s Virtual Console
+release). *Strider*'s NMI handler returns with the stack pointer wrapped, its RTI lands in
+RAM at `$038A` and the CPU jams; these appear to rely on their host emulator. They stay on
+the failures list as blank.
