@@ -124,7 +124,10 @@ class AddressLatch242(Banked):
     A4-A0 (227: A3-A0) read the solder pads (0 here; 227 only on 227.1).
     CHR-RAM is write-protected in the NROM modes on the multicarts (no
     battery; 227.1/227.2), not on the Chinese RPG boards, which also have no
-    UNROM modes (O taken as set). 242's C bit: on the 640 KiB ET-113 board,
+    UNROM modes (O taken as set). 242's multicart board is the wiki's 512 KiB
+    one (640 with the ET-113's chip): *Gaau Hok Gwong Cheung* (UNL-43272, MAME's
+    software list), 256 KiB with no battery, writes its tiles in the NROM modes
+    only and could not draw were they protected. 242's C bit: on the ET-113,
     clear selects the 128 KiB replacement chip (second in the file), as it
     is at power-on. Power-on and reset (:meth:`m2_gap`) clear the latch.
     """
@@ -137,6 +140,7 @@ class AddressLatch242(Banked):
         self.rpg = self.battery and not (self.wide and self.submapper in (1, 2))
         self.two_chips = len(self.prg) == 0xA0000
         self.chr_ram = not image.chr
+        self.protects = not self.rpg and (self.wide or len(self.prg) >= 0x80000)
         self.latch = 0
         self.pads_shown = False
         self.map_chr(0, 8, 0)
@@ -169,8 +173,7 @@ class AddressLatch242(Banked):
         self.map_prg(0, 16, low)
         self.map_prg(2, 16, high)
         self.set_mirroring(HORIZONTAL if address & 2 else VERTICAL)
-        multicart = not self.rpg
-        self.chr_writable = self.chr_ram and not (multicart and nrom)
+        self.chr_writable = self.chr_ram and not (self.protects and nrom)
 
     def m2_gap(self, t: int) -> None:
         self._latch(0)
