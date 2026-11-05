@@ -81,6 +81,7 @@ WIDTH, HEIGHT = 256, 240
 BORDER = 0x0F  # PAL's border in the picture: colour $0F, no emphasis
 _BORDER_LINE = array("H", [BORDER] * WIDTH)
 REVERSE = bytes(int(f"{i:08b}"[::-1], 2) for i in range(256))  # a byte's bits mirrored
+COPY_WRAPPED = 4  # PPU._copying: n carried out during this sprite's copy
 VBL, SPRITE0, OVERFLOW = 0x80, 0x40, 0x20
 # Sprite line-buffer entries: palette index (0x10-0x1F), then these flags.
 BEHIND, IS_SPRITE0 = 0x20, 0x40
@@ -622,18 +623,27 @@ class PPU:
         if index < 32:
             self.oam2[index] = value
             if self._copying:
+                # The low two bits count the bytes left; COPY_WRAPPED marks a
+                # carry out of n during this copy, acted on when it ends. An
+                # address below 4 is not enough: a $2003 write can put it there
+                # (PPUSim, ppusim_compare.py oamaddr_render; Melanchony of
+                # Existance).
                 self._copying -= 1
                 self._oam2_index = index + 1
                 if index == 31:
                     self._oam2_frozen = True  # full: the address overflowed
+                if address == 0xFF:
+                    self._copying |= COPY_WRAPPED
                 address = (address + 1) & 0xFF
-                if not self._copying and not 0 <= line - value < height:
-                    # The X byte gets Y's range check too: out of range, the
-                    # address is masked back into alignment (AccuracyCoin
-                    # "Misaligned OAM behavior" 4-7; aligned OAM cannot tell).
-                    address &= 0xFC
-                if address < 4 and not self._copying:
-                    self._eval_done = True  # n wrapped: all 64 seen
+                if not self._copying & 3:
+                    if not 0 <= line - value < height:
+                        # The X byte gets Y's range check too: out of range, the
+                        # address is masked back into alignment (AccuracyCoin
+                        # "Misaligned OAM behavior" 4-7; aligned OAM cannot tell).
+                        address &= 0xFC
+                    if self._copying & COPY_WRAPPED:
+                        self._eval_done = True  # n wrapped: all 64 seen
+                    self._copying = 0
             elif 0 <= line - value < height:
                 if dot == 66:
                     self._sprite0_next = True
@@ -1313,7 +1323,7 @@ class PPU:
                     picture[index] = (self._last_value & first) | (picture[index] & 0x1C0)
         elif register == 3:
             if not self.timing.delayed_oamaddr:
-                self.oam_addr = value
+                self._set_oam_addr(value)
             elif (
                 not (refresh := self.timing.oam_refresh)
                 or not refresh[0] <= self.line <= refresh[1]
