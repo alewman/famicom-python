@@ -57,7 +57,7 @@ class FK23C(MMC3):
         self.extended = False
         self.prg_high = 0  # 176.3 $5xx5 / 176.5 $4800
         self.chr_high = 0  # 176.3 $5xx6
-        self.latch = 0  # UNROM / CNROM latch
+        self.discrete_latch = 0  # UNROM / CNROM latch
         self.ram_config = 0  # 176.2 $A001 while D5 is set
         super().__init__(image, cpu_cycle_ticks)
         self.rom = image.chr
@@ -103,7 +103,7 @@ class FK23C(MMC3):
                 self.prg_high = value & 0x3F
                 self._update()
             return
-        self.latch = value
+        self.discrete_latch = value
         register = address & 0xE003
         if register == 0x8000:
             self.bank_select = value
@@ -139,7 +139,7 @@ class FK23C(MMC3):
             self.prg_base = value & 0x7F
         elif register == 2:
             self.chr_base = value
-            self.latch = 0
+            self.discrete_latch = 0
         elif register == 3:
             self.extended = bool(value & 0x02) and self.submapper in (1, 2)
         elif register == 5:
@@ -179,7 +179,7 @@ class FK23C(MMC3):
             elif mode == 4:  # NROM-256
                 self.map_prg(0, 32, (high16 | base16) >> 1)
             else:  # UNROM: inner bank from the latch, 7 fixed
-                self.map_prg(0, 16, high16 | base16 & ~7 | self.latch & 7)
+                self.map_prg(0, 16, high16 | base16 & ~7 | self.discrete_latch & 7)
                 self.map_prg(2, 16, high16 | base16 & ~7 | 7)
         else:
             inner = 0xFF if self.extended or self.wide_mmc3 else 0x3F >> min(mode, 2)
@@ -199,7 +199,7 @@ class FK23C(MMC3):
         if mode & 0x40:  # CHR A12-A10 from the PPU: 8 KiB banks
             if self.submapper == 1 and not mode & 0x20:  # CNROM latch
                 mask = 1 if mode & 0x10 else 3
-                bank8 = base8 & ~mask | self.latch & mask
+                bank8 = base8 & ~mask | self.discrete_latch & mask
             else:
                 bank8 = base8
             for i in range(8):

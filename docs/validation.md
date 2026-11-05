@@ -2116,7 +2116,35 @@ boot on the board where mame_nes is blank (*Sansuu 2 Nen*, *Tetris* (China), *Ko
 Jingling*), *Lex and Grim* by a pixel, *Tokoro-san no Mamoru mo Semeru mo* starting
 later than mame_nes (blank at 60, its title by 120; the Famicom's PPU starting before the
 CPU is not modelled, C72), *Minna no Taabou*, and *Dr. Franken*, which mame_nes draws
-with no window while the board and Mesen2 stay blank: open, in C72.
+while the board and Mesen2 stay blank: their writes at cycles 20 and 104 fall in what a
+head start under a frame would leave of the window, which is how mame_nes behaves (C72).
+
+Triage after the sweep (2026-11-05): *Wenzi Guangchang + Pailei* is mapper 242 on a
+256 KiB board, which the board write-protected as the wiki's 512 KiB multicart; it
+writes its tiles in the NROM modes only, so its board cannot protect. Fixed, identical.
+*Videopoker Bonza* (216) reads its SIM-card port at `$5000`: the board answers "no card"
+(D7 set, krzysiobal's map, forum t=24632) and settles on a screen of the game's own
+tiles; Mesen2 answers `$00` and mame_nes open bus, both "card present", and the game
+reports a malfunction. With `$00` the board is identical to Mesen2 for 300 frames. Which
+the game shows with no card is not known; left as it is.
 
 Slow suite 198 of 198 (the FDS three with `NO_INTRO_DIR` for the BIOS), quick 218, mappers 202,
 AccuracyCoin 147 of 147 at `b037b41`, on PyPy.
+
+Three MMC3 clones kept a register of their own under the MMC3's name for the IRQ reload
+value, `latch`, so their other writes overwrote it: 292's data latch (every CPU write),
+260's CNROM latch and 176's UNROM/CNROM latch (every write to `$8000`-`$FFFF`). Found in
+*Dragon Fighter*, whose counter reloaded to the last byte written rather than `$C000`'s
+and fired 52 lines late. Renamed; 106 dumps of 176, 260, 292 and 523 swept again: **15
+went from differing to identical** (*Dragon Fighter*, *Spider-Man - Return of the
+Sinister Six*, *Sangokushi II*, *Juedai Yingxiong* and 11 more of 176), none got worse.
+Mesen2 over every dump with these and 242: **8,168 of 8,808 identical**.
+
+The small differences left from the Famicom sweep are known kinds. With the board's pads
+made NES-like for the comparison (`joypad_oe_per_cycle` off, no `$4016` D3-D4 open bus),
+the CPU matches Mesen2 for 610 frames on *NTF2 Test Cartridge*, *Super Donkey Kong -
+Xiang Jiao Chuan* and *Balda*: NTF2's controller read is hit by a DMC fetch, and the RF
+Famicom clocks the pad on each cycle of it. Their one pixel is the frame's first, (0, 0),
+PPUSim's backdrop (open item 1). *Melanchony of Existance* writes OAMADDR four times
+during line 18; five sprite pixels on line 19 differ. *Mouser* writes `$2007` 924 times
+with rendering on in its first second, the register-while-rendering kind (milestone 7).

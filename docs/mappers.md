@@ -292,7 +292,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 170 | Fujiya170 | discrete | 1 | 0 | 0 | 1 / 0 / 0 | wiki, the game (C69) | matches Mesen2 |
 | 172 | ProtectedLatch | txc | 3 | 0 | 0 | 3 / 0 / 0 | wiki | matches Mesen2 |
 | 173 | ProtectedLatch | txc | 7 | 0 | 0 | 7 / 0 / 0 | wiki | matches Mesen2 |
-| 176 | FK23C | waixing | 52 | 44 | 0 | 83 / 21 / 0 | wiki | matches Mesen2 |
+| 176 | FK23C | waixing | 52 | 44 | 0 | 97 / 7 / 0 | wiki | matches Mesen2 |
 | 177 | Hengge | chinese | 8 | 6 | 0 | 14 / 0 / 0 | wiki | matches Mesen2 |
 | 178 | Education178 | chinese | 13 | 26 | 0 | 41 / 0 / 0 | wiki | matches Mesen2 |
 | 180 | UNROM180 | discrete | 1 | 0 | 1 | 2 / 0 / 0 | wiki | matches Mesen2 |
@@ -332,7 +332,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 224 | mindkids_224 | mmc3 | 4 | 37 | 0 | 40 / 1 / 0 | wiki | matches Mesen2 |
 | 225 | AddressLatch225 | multicart | 5 | 0 | 0 | 7 / 0 / 0 | wiki | matches Mesen2 |
 | 226 | Latch226 | multicart | 6 | 0 | 0 | 6 / 0 / 0 | wiki | matches Mesen2 |
-| 227 | AddressLatch242 | multicart | 7 | 3 | 0 | 11 / 0 / 0 | wiki | matches Mesen2 |
+| 227 | AddressLatch242 | multicart | 7 | 3 | 0 | 11 / 0 / 0 | wiki, MAME | matches Mesen2 |
 | 228 | Action52 | unlicensed | 4 | 0 | 0 | 4 / 0 / 0 | wiki | matches Mesen2 |
 | 229 | Latch229 | multicart | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 232 | Camerica | unlicensed | 13 | 0 | 0 | 12 / 1 / 0 | wiki | matches Mesen2 |
@@ -341,7 +341,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 238 | ContraFighter238 | mmc3_clones | 1 | 0 | 0 | 1 / 0 / 0 | wiki, the game (C68) | matches Mesen2 |
 | 240 | Latch240 | chinese | 3 | 2 | 0 | 5 / 0 / 0 | wiki | matches Mesen2 |
 | 241 | Hengge | chinese | 10 | 10 | 2 | 18 / 5 / 0 | wiki | matches Mesen2 |
-| 242 | AddressLatch242 | multicart | 12 | 0 | 0 | 7 / 8 / 0 | wiki | matches Mesen2 |
+| 242 | AddressLatch242 | multicart | 12 | 0 | 0 | 8 / 7 / 0 | wiki, MAME | matches Mesen2 |
 | 243 | SachenLS374N | sachen | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 244 | Decathlon244 | chinese | 1 | 0 | 0 | 1 / 0 / 0 | wiki, MAME, the game (C69) | matches Mesen2 |
 | 245 | F003 | mmc3_clones | 2 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
@@ -365,10 +365,10 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 286 | BS5 | multicart | 0 | 10 | 0 | 20 / 0 / 0 | wiki | matches Mesen2 |
 | 289 | Champion289 | multicart | 1 | 2 | 0 | 4 / 0 / 0 | wiki | matches Mesen2 |
 | 290 | Asder290 | multicart | 1 | 0 | 0 | 2 / 0 / 0 | wiki | matches Mesen2 |
-| 292 | BMW8544 | mmc3_clones | 1 | 0 | 0 | 0 / 1 / 0 | wiki | differs, by eye |
+| 292 | BMW8544 | mmc3_clones | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 298 | TF1201 | konami | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 299 | Latch299 | multicart | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
-| 301 | AddressLatch242 | multicart | 1 | 0 | 0 | 0 / 0 / 0 | wiki | unit tests only |
+| 301 | AddressLatch242 | multicart | 1 | 0 | 0 | 0 / 0 / 0 | wiki, MAME | unit tests only |
 | 302 | KS7057 | kaiser | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 303 | Kaiser303 | kaiser | 3 | 0 | 0 | 3 / 0 / 0 | wiki | matches Mesen2 |
 | 304 | Board09034A | kaiser | 3 | 0 | 0 | 1 / 2 / 0 | wiki | matches Mesen2 |

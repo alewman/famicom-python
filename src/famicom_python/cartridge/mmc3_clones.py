@@ -827,7 +827,7 @@ class BMW8544(MMC3):
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
         self.extra = [0, 0]
-        self.latch = 0
+        self.data_latch = 0
         self.index = 0
         self.ram_control = 0x80
         super().__init__(image, cpu_cycle_ticks)
@@ -850,13 +850,13 @@ class BMW8544(MMC3):
 
     def cpu_read(self, address: int, t: int) -> int | None:
         if 0x6000 <= address < 0x8000 and self.ram_control & 0x80:
-            self.extra[(self.index >> 5) & 1] = self.latch
+            self.extra[(self.index >> 5) & 1] = self.data_latch
             self._update()
             return None
         return super().cpu_read(address, t)
 
     def cpu_write(self, address: int, value: int, t: int) -> None:
-        self.latch = value
+        self.data_latch = value
         if 0x6000 <= address < 0x8000:
             if self.ram_control & 0x80:
                 self.index = value
@@ -1045,7 +1045,7 @@ class HPxx260(MMC3):
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
         self.outer = [0, 0, 0]
-        self.latch = 0
+        self.cnrom_latch = 0
         super().__init__(image, cpu_cycle_ticks)
 
     def map_prg(self, window: int, size_kib: int, bank: int) -> None:
@@ -1070,7 +1070,7 @@ class HPxx260(MMC3):
                 one = base * 8 + w
             else:
                 mask = 1 if mode == 6 else 3
-                one = ((base & ~mask) | self.latch & mask) * 8 + w
+                one = ((base & ~mask) | self.cnrom_latch & mask) * 8 + w
             super().map_chr(w, 1, one)
 
     def cpu_read(self, address: int, t: int) -> int | None:
@@ -1085,7 +1085,7 @@ class HPxx260(MMC3):
                 self._update()
             return
         if address >= 0x8000:
-            self.latch = value
+            self.cnrom_latch = value
             if self.outer[0] & 4:
                 self.set_mirroring(HORIZONTAL if value & 4 else VERTICAL)
                 self._update()

@@ -699,23 +699,36 @@ before the board takes a side.
   *Air Fortress*, *Elysion* and more write $2000 inside the window and hung on
   the NES-001 row. Mesen2 does not have the window by default; the harness had
   forced it on to match the board, so both hung alike and the sweep scored two
-  blank screens as identical. mame_nes, which has no window, exposed it. Open:
-  how long before the CPU the Famicom's PPU starts (11.4 ms or more by
-  Fiskbit's count, "not measured, may vary"); the board starts both together.
-  The other side: a few carts need the window, and run with `--machine nes`.
-  *The Adventures of Dr. Franken* (USA prototype) writes $2000 = $80 at $E079
-  inside it and goes blank without it; so do the educational pirates *CNEDC
-  Family Computer System v2.1*, *Jiating Diannao Jiaoxue Jianpan* and *Tangguo
-  Mao 2*, on Mesen2 as on the board. mame_nes, with no window either, draws
-  *Dr. Franken*: something else at power, perhaps the PPU's head start, may
-  carry it through, and that is open. Whether the clones the pirates were
-  sold for hold the PPU's reset is not known (the Dendy row is unverified). *Minna no
-  Taabou no Nakayoshi Daisakusen* enables NMI at its first instruction, and its
-  handler walks a list in uninitialised zero page until it finds $FF: with RAM
-  powered on as zeros it loops for ever, with $FF it boots. RAM at power is
-  unreliable and varies by console (`CPU_power_up_state.wiki`), so on a
-  Famicom it is a coin toss; the board keeps zeros (`PowerOn.ram_fill`) rather
-  than tune RAM to one game.
+  blank screens as identical. mame_nes exposed it.
+  How long the Famicom's PPU runs before the CPU is not measured ("very
+  roughly 1/60th of a second", lidnariq; "at least 11.4 ms, but it could be
+  longer", Fiskbit, forum p=247896). The PPU's own window still runs from its
+  power-on, so the CPU sees what is left of it: none for a head start of a
+  frame or more, which the board models. The games bound it: *Magic John*
+  writes $2000 at cycle 9,217 and boots every time on an AV Famicom, so the
+  head start is over 20,441 cycles; *Metal Gear* writes at 18,629. A head start
+  under 29,658 cycles leaves a short window, which drops the early writes
+  below; mame_nes behaves that way, and boots both. Not settled, and not tuned
+  to mame_nes, a detector.
+  The NES-001 keeps the window at power: blargg measured writes ignored until
+  29,658 cycles "after power and reset" (forum t=3958, hardware-captured). One
+  modified front-loader booted *Magic John* from cold (p=247896); the NES-101
+  failed only on quick power cycles, as the wiki's 20-second note says. No
+  judge ROM depends on the window at power: run without it, the slow suite
+  (198) and AccuracyCoin (147) all pass (2026-11-05).
+  Carts that need the window run with `--machine nes`. *The Adventures of Dr.
+  Franken* (USA prototype) skips the vblank wait, writes $2000 = $80 at cycle
+  104, and its first NMI lands during init and ends in a BRK, from any PPU
+  start line; the educational pirates *CNEDC Family Computer System v2.1*,
+  *Jiating Diannao Jiaoxue Jianpan* and *Tangguo Mao 2* write $2000, $2001,
+  $2005 and $2006 early too, and are blank on Mesen2 as on the board. Whether
+  the clones they were sold for hold the PPU's reset is not known (the Dendy
+  row is unverified). *Minna no Taabou no Nakayoshi Daisakusen*, a Famicom
+  release, enables NMI at cycle 20, and its handler walks a list in
+  uninitialised zero page until it finds $FF: with RAM powered on as zeros it
+  loops for ever, with $FF it boots, and a short window would drop the write.
+  RAM at power varies by console (`CPU_power_up_state.wiki`); the board keeps
+  zeros (`PowerOn.ram_fill`) rather than tune RAM to one game.
 
 ## Open items
 
