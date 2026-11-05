@@ -2197,3 +2197,13 @@ match, one is known (C73). The PPUSim `oamaddr` scene is dropped from its golden
 two `mux` cases are known there. Visual 2C02 also turned up OAM row 0 copied over row
 $20 in its schedules (open item 24). AccuracyCoin 147 of 147, PPU test ROMs 42 of 42,
 quick tests 234.
+
+**Visual 2C02's row copies: the hardware judges keep the board's** (2026-11-05, C26,
+open item 24). Item 24's copy is C26's: Visual 2C02's saved state has the secondary OAM
+address frozen at row 4, so its first rendering start copies the OAMADDR row over
+$20-$27. `compare.py rowcopy` (17 runs) shows it copying at both mid-frame edges, the
+on edge on half the phases of the write's dot. Tried on the board: the on copy alone
+fails `sprite_overflow_tests/5.Emulator` (3); with the off copy too, 5.Emulator passes
+but AccuracyCoin "OAM Corruption" fails (2), at every clear-phase row shift tried. Both
+pass on hardware, so the board keeps its pre-render copy and nothing changed in
+`ppu.py`.

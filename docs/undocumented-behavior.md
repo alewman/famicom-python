@@ -349,6 +349,19 @@ before the board takes a side.
   mid-line, a visible-line re-enable lets it count again (back to 0 by the
   line's end), and if it is still frozen when rendering begins at the
   pre-render line, the OAMADDR row is copied over it. Both tests pass.
+  *Visual 2C02 (2026-11-05, `compare.py rowcopy`)* copies at both mid-frame
+  edges, as Errata's alignment-dependent cases: turning rendering off copies the
+  frozen row over the OAMADDR row (from dot 40: row 18 over row 0; from dot 200,
+  in evaluation: row 16 over $E0, and over $A0 too, unexplained), and turning it
+  on copies the OAMADDR row over the frozen row on half-cycle phases 0 and 5-7 of
+  the write's dot, not 1-4. The hardware judges rule both out for the board:
+  the off copy makes AccuracyCoin "OAM Corruption" 2 fail (row 0 takes row n's
+  bytes before row n takes row 0's, so no marker moves; its author's console
+  passes at all four alignments), and without it a mid-frame on copy fails
+  `5.Emulator` 3 (rendering off at line 126 dot 14, row 6: two of the nine
+  sprites at 230 become row 0's). Visual 2C02 at compare.py's phase 0 is not a
+  hardware alignment here, or its off copy is a simulation artefact; either way
+  the board keeps the pre-render copy alone.
 - **C23. PPUSim's `$2002` bit 7.** Breaknes PPUSim `fb7de61` drives it as the
   complement of the VBL flag (`fsm.cpp`, `db_latch.nget()`); its own wiki
   drawing, its author's Verilog and the Visual2C02 netlist all show the true
@@ -879,8 +892,10 @@ before the board takes a side.
     n. The write's own timing, first fitted to PPUSim's gates, is Visual 2C02's:
     its answers and PPUSim's differ, and the console sides with Visual 2C02 where it
     can tell. *Melanchony of Existance*'s five pixels against Mesen2 are this corner.
-24. **OAM row 0 copied over row $20 on Visual 2C02** (2026-11-05). In the
-    `compare.py` schedules, which turn rendering on at line 5, dot 30, Visual 2C02's
-    evaluation later reads OAM's $20-$27 as a copy of $00-$07; OAM read back with
-    rendering off holds what was written (`oamread`). The board copies nothing. Which
-    edge of rendering's start does it, and whether the console does, is open.
+24. **OAM row 0 copied over row $20 on Visual 2C02**: *done 2026-11-05* (C26). It
+    is C26's row copy: Visual 2C02's saved power state has the secondary OAM address
+    frozen at row 4, so its first rendering start, wherever it falls, copies the
+    OAMADDR row over $20-$27 (`compare.py rowcopy`, `ROW_ADDR=$48` moves the source
+    with OAMADDR). The board starts with nothing frozen and copies only at the
+    pre-render line; hardware judges keep it so (C26), and the C73 goldens stop
+    before dot 89.
