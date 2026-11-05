@@ -56,7 +56,8 @@ class Board:
     def access(self, register: int, value: int | None = None) -> int:
         self.t += CYCLE
         ppu = self.ours
-        ppu.run_to(self.t + ACCESS_TICKS - CYCLE)
+        lead = 0 if value is None else ppu.write_lead(register)
+        ppu.run_to(self.t + ACCESS_TICKS - CYCLE - lead)
         if value is None:
             result = ppu.read_register(register)
         else:
@@ -308,34 +309,6 @@ def flags(d) -> None:
         d.observe(f"flags {start}", [], None, d.status())
 
 
-def oamaddr(d) -> None:
-    """$2003 = 0 written during line 18's sprite evaluation (ppusim_compare.py
-    oamaddr_render): sixteen sprites cover line 19, so where evaluation goes on
-    from decides which eight show. Line 18's ALE addresses include its sprite
-    fetches, secondary OAM's eight slots."""
-    setup_picture(d)
-    oam = [0xF8] * 256
-    for i in range(16):
-        oam[i * 4 : i * 4 + 4] = [16 + i % 4, 0x41 + i, i & 3, i * 15]
-    for dots in [[dot] for dot in range(66, 98)] + [[73, 91, 163, 181]]:
-        d.to_line(241, 10)
-        d.write(1, 0x00)
-        d.write(3, 0)
-        for value in oam:
-            d.write(4, value)
-        d.to_line(261, 100)
-        scroll_zero(d, 0x00)  # 8x8 sprites from $0000
-        d.write(1, 0x14)
-        d.to_line(18, 0)
-        d.trace(True)
-        for dot in dots:
-            d.to_line(18, dot - 12)  # STA's access is 4 cycles, ~12 dots, on
-            d.write(3, 0x00)
-        d.to_line(20, 0)
-        d.trace(False)
-        d.observe(f"oamaddr {'+'.join(str(x) for x in dots)}", [19], 18)
-
-
 SCENES: dict[str, Callable] = {
     "phases": phases,
     "mux": mux,
@@ -343,5 +316,4 @@ SCENES: dict[str, Callable] = {
     "window 1E": windows(0x1E),
     "lanes": lanes,
     "flags": flags,
-    "oamaddr": oamaddr,
 }

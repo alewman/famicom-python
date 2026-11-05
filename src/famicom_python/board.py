@@ -208,7 +208,7 @@ class Board:
         self.data_bus = self.internal_bus = value
         ppu = self.ppu
         if 0x2000 <= address < 0x4000:
-            access = t + self._ppu_access
+            access = t + self._ppu_access - ppu.write_lead(address & 7)
             ppu.run_to(access)
             ppu.write_register(address & 7, value, early, ppu.time - access)
         ppu.run_to(t)

@@ -2184,3 +2184,16 @@ PPUSim's counter steps once more after the `$2001` write, unrealigned, and a cop
 progress runs out with its secondary-OAM bytes skipped. Modelled in `PPU._last_eval_step`:
 the goldens' two `mux` cases, kept as known since 2026-10-24, now match, so every scene
 matches PPUSim but C73's four. AccuracyCoin 147 of 147, PPU test ROMs 42 of 42.
+
+**Visual 2C02 overrules PPUSim on the OAM counter** (2026-11-05, C73). The two models
+above were fitted to PPUSim. Asked the same questions (`compare.py c73`, `evalwrite`),
+Visual 2C02 sides with the console on the copy's end, where PPUSim does not, and
+differs from PPUSim on `$2003` during evaluation and on rendering turned off. The board
+now follows Visual 2C02: `$2003` takes effect two dots before the access point and holds
+the counter through a step inside its strobe; rendering off after a cycle beginning on an
+even dot takes one more +1 step, after an odd one none; a copy in progress is skipped.
+`tests/test_visual2c02_goldens.py` holds the board to 14 recorded Visual 2C02 cases: 13
+match, one is known (C73). The PPUSim `oamaddr` scene is dropped from its goldens, and
+two `mux` cases are known there. Visual 2C02 also turned up OAM row 0 copied over row
+$20 in its schedules (open item 24). AccuracyCoin 147 of 147, PPU test ROMs 42 of 42,
+quick tests 234.

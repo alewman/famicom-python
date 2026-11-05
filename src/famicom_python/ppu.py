@@ -82,6 +82,10 @@ BORDER = 0x0F  # PAL's border in the picture: colour $0F, no emphasis
 _BORDER_LINE = array("H", [BORDER] * WIDTH)
 REVERSE = bytes(int(f"{i:08b}"[::-1], 2) for i in range(256))  # a byte's bits mirrored
 COPY_WRAPPED = 4  # PPU._copying: n carried out during this sprite's copy
+# $2003 is a load held while the CPU's write strobe is low, from early in the
+# cycle: on NTSC it takes effect this many master ticks before the board's
+# access point (Visual 2C02; scripts/visual2c02/compare.py evalwrite).
+OAMADDR_LEAD_TICKS = 8
 VBL, SPRITE0, OVERFLOW = 0x80, 0x40, 0x20
 # Sprite line-buffer entries: palette index (0x10-0x1F), then these flags.
 BEHIND, IS_SPRITE0 = 0x20, 0x40
@@ -164,9 +168,7 @@ class PPU:
         self._oam2_fetch = 0
         self._fetch_y = 0
         self._copying = 0  # bytes of an in-range sprite still to copy
-        # A $2003 write that met the OAM counter's step: the address to go back
-        # to at the next step, or -1 (:meth:`_write_oam_addr`).
-        self._eval_stall = -1
+        self._eval_hold = -1  # OAMADDR a $2003 write holds through a step, or -1
         self._step_from = 0  # OAMADDR before the last evaluation step
         self._eval_done = False
         self._sprite_count = 0
@@ -605,15 +607,12 @@ class PPU:
                 self._copying = 0
                 self._eval_done = False
                 self._sprite0_next = False
-                self._eval_stall = -1
-                self._step_from = self.oam_addr  # no steps on dots 1-64
-            if self._eval_stall >= 0:
-                # The step after a $2003 write that met one (_write_oam_addr):
-                # the counter takes its stale next value, the address before
-                # the write, with m cleared if the step was a Y check.
-                stall = self._eval_stall
-                self._eval_stall = -1
-                self.oam_addr = stall if self._copying & 3 else stall & 0xFC
+                self._eval_hold = -1
+            if self._eval_hold >= 0:
+                # A $2003 write's strobe spanned the step just made: the load
+                # held the counter (_write_oam_addr).
+                self.oam_addr = self._eval_hold
+                self._eval_hold = -1
             self.oam_bus = self.oam[self.oam_addr]
             return
         # Even: write secondary OAM, or read it once it is full.
@@ -699,24 +698,18 @@ class PPU:
         self.oam_addr = address
 
     def _last_eval_step(self) -> None:
-        """Rendering turned off during sprite evaluation: secondary OAM stops
-        filling at once, but the OAM counter steps once more, at its next step
-        after a write on an odd dot, two dots on after one on an even dot, as
-        BLNK rises before the visible-line gate closes. BLNK also turns off the
-        Y check's mode, so that step is not realigned: after an even-dot write,
-        or in a copy, the latch counts +1; after an odd-dot write a Y check's
-        latch holds n+1 and m+1, uncarried, and the step takes it whole.
-        The copy's own counter (a Johnson counter on the dot clock) runs on
-        with rendering off, and secondary OAM's address with it, unwritten: a
-        copy in progress has ended by the time it is back, its bytes skipped
-        (PPUSim; open item 18)."""
-        address = self.oam_addr
-        left = self._copying & 3
-        if self.dot & 1 and not left:
-            self.oam_addr = ((address & 0xFC) + 4 | (address + 1) & 3) & 0xFF
-        else:
-            self.oam_addr = (address + 1) & 0xFF
-        self._oam2_index = min(self._oam2_index + left, 32)
+        """Rendering turned off during sprite evaluation (the $2001 write lands
+        two dots after its cycle begins). Secondary OAM stops filling at once.
+        After a cycle that began on an even dot the OAM counter's step two dots
+        on, already made here, counts +1 whatever it was, BLNK having turned the
+        Y check's mode off; after an odd one nothing more steps. The copy's own
+        counter runs on the dot clock, and secondary OAM's address with it,
+        unwritten: a copy in progress is over by the time rendering is back,
+        its bytes skipped (Visual 2C02, compare.py evalwrite; PPUSim agrees on
+        the copy, not the step, C73; open item 18)."""
+        if not self.dot & 1:
+            self.oam_addr = (self._step_from + 1) & 0xFF
+        self._oam2_index = min(self._oam2_index + (self._copying & 3), 32)
         self._copying = 0
 
     def _set_overflow(self) -> None:
@@ -968,27 +961,21 @@ class PPU:
     def _set_oam_addr(self, value: int) -> None:
         self.oam_addr = value
 
+    def write_lead(self, register: int) -> int:
+        """Master ticks before the access point at which a write to ``register``
+        takes effect: $2003's load, on NTSC (OAMADDR_LEAD_TICKS)."""
+        return OAMADDR_LEAD_TICKS if register == 3 and not self.timing.delayed_oamaddr else 0
+
     def _write_oam_addr(self, value: int) -> None:
-        """$2003 on NTSC. During sprite evaluation the OAM counter steps on
-        each even dot, and the write is a load that a step overrides; between
-        steps a latch takes the counter's next value (PPUSim's OAMCounterBit).
-        A write on an odd dot meets a step: the load shows for the next read
-        only, and the next step takes what the latch held from before the
-        write, not clocked since. On an even dot the load follows the step and
-        sticks (ppusim_compare.py oamaddr_render; the oamaddr scene, C73)."""
+        """$2003 on NTSC, written OAMADDR_LEAD_TICKS early. During sprite
+        evaluation the OAM counter steps on even dots; the load wins over a step
+        while the strobe lasts, so a write on an odd dot also holds the counter
+        through the next step (Visual 2C02, compare.py evalwrite; PPUSim lets
+        the step win instead, C73)."""
+        self.oam_addr = value
         dot = self.dot
         if dot & 1 and 65 <= dot < WIDTH and self.line < HEIGHT and self.mask & 0x18:
-            # The stale latch: the step before computed from, +1 while copying,
-            # else n+1 with m+1 uncarried (cleared only as a step takes it).
-            start = self._step_from
-            if self._copying & 3:
-                self._eval_stall = (start + 1) & 0xFF
-            else:
-                self._eval_stall = ((start & 0xFC) + 4 | (start + 1) & 3) & 0xFF
-            self.oam_addr = value
-            self.oam_bus = self.oam[value]  # dot's read, made after the load
-        else:
-            self.oam_addr = value
+            self._eval_hold = value
 
     def _write_oam_refreshing(self, value: int) -> None:
         """A $2004 write landing inside the 2C07's refresh: the write and the
