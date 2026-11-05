@@ -24,6 +24,15 @@ GOLDENS = json.loads(
 # line before; PPUSim's sprite evaluation, so interrupted, copies a misaligned
 # entry (53 02 65 68) into secondary OAM and ours copies none (open item 18).
 KNOWN = {"mux 1E>0E +6", "mux 0E>1E +5"}
+# A $2003 write during sprite evaluation that falls between the main counter's
+# steps: PPUSim's counter bits keep part of the old address, the board's
+# per-dot counter takes the whole write (open item 23). The names are the dots
+# asked for; each write lands about two dots earlier.
+KNOWN |= {
+    f"oamaddr {dot}"
+    for dot in (67, 68, 70, 72, 73, 74, 76, 79, 80, 82, 85, 86, 87, 88, 89, 91, 92, 94, 97)
+}
+KNOWN.add("oamaddr 73+91+163+181")  # Melanchony of Existance's writes
 
 
 @pytest.mark.parametrize("scene", SCENES)

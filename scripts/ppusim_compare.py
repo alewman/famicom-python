@@ -25,6 +25,7 @@ scripts/build_ppusim.py first).
 from __future__ import annotations
 
 import ctypes
+import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -686,6 +687,63 @@ def write2007(_pair: Pair) -> None:
 
 EXPERIMENTS["write2007"] = write2007
 EXPERIMENTS["pal_oam"] = pal_oam
+
+
+def oamaddr_render(pair: Pair) -> None:
+    """$2003 written during line 18's sprite evaluation, rendering on: line 19's pixels.
+
+    Sixteen sprites cover line 19, twice what one line shows, so where the
+    evaluation restarts decides which eight are drawn. *Melanchony of
+    Existance* writes $2003 = 0 at dots 73, 91, 163 and 181 of a line
+    (docs/validation.md, 2026-11-05); the cases put one write at each of a
+    spread of dots, then those four. With OAMADDR_DOTS="66-130" in the
+    environment, one case a dot; the tiles of line 18's sprite fetches
+    (dots 257-320, secondary OAM's eight slots) are printed for both.
+    """
+    setup_picture(pair)
+    oam = [0xF8] * 256
+    for i in range(16):
+        oam[i * 4 : i * 4 + 4] = [16 + i % 4, 0x41 + i, i & 3, i * 15]
+    if span := os.environ.get("OAMADDR_DOTS"):
+        first, last = (int(d) for d in span.split("-"))
+        cases = [[dot] for dot in range(first, last + 1)]
+    else:
+        cases = [[dot] for dot in range(64, 260, 12)] + [[73, 91, 163, 181]]
+    for dots in cases:
+        pair.to_line(241, 10)
+        pair.write(1, 0x00)
+        pair.write(3, 0)
+        for value in oam:
+            pair.write(4, value)
+        pair.to_line(261, 100)
+        scroll_zero(pair)
+        pair.write(0, 0x00)  # 8x8 sprites from $0000, where the font is
+        pair.write(1, 0x14)  # sprites only, so the slots' pixels stand out
+        landed = []
+        for dot in dots:
+            pair.to_line(18, dot - 12)  # STA's access is 4 cycles, ~12 dots, on
+            pair.write(3, 0x00)
+            landed.append(pair.ours.dot - 1)
+        pair.to_line(18, 250)
+        pair.trace(True)
+        pair.to_line(18, 330)
+        pair.trace(False)
+        sim_ales = [(t + 4, a) for t, a in pair.sim_ales()]
+        slots = {
+            name: [hex(a >> 4) for _, a in ales if a < 0x2000 and not a & 8]
+            for name, ales in (("ours", pair.ales), ("PPUSim", sim_ales))
+        }
+        pair.to_line(19, 0)
+        pair.line_start = pair.t
+        pair.trace(True)
+        pair.to_line(20, 0)
+        pair.trace(False)
+        print(f"$2003 at line 18 dots {landed}: line 19 {compare_line(pair, 19)}")
+        if slots["ours"] != slots["PPUSim"]:
+            print(f"    sprite tiles fetched: ours {slots['ours']}, PPUSim {slots['PPUSim']}")
+
+
+EXPERIMENTS["oamaddr_render"] = oamaddr_render
 
 
 def finished_picture(system: System) -> list[int]:

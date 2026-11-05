@@ -851,3 +851,17 @@ before the board takes a side.
     $FF, as Visual 2C02 and PPUSim both drive I/OAM2 there
     (`scripts/visual2c02/compare.py prerender2004`); the board now returns
     it, writing nothing to secondary OAM.
+23. **A `$2003` write during sprite evaluation** (`ppusim_compare.py
+    oamaddr_render`, 2026-11-05). The board took any OAMADDR below 4 after a
+    copy for n having wrapped, so `$2003 = 0` mid-evaluation stopped it after
+    one more sprite; it now tracks the carry out of n, and a write landing
+    on an even dot (the counter's step) matches PPUSim from dot 66 to 130.
+    On odd dots PPUSim keeps part of the old address: at dot 85 $0A became
+    $08 (sprite 2 copied twice), at 109 $1A became $10. The main counter's
+    bits load and step through separate latches (PPUSim's `OAMCounterBit`),
+    a half-cycle matter the board's per-dot counter does not model; dot 86
+    differs too. A write in the first sprite's Y check makes PPUSim skip
+    sprite 0 altogether. *Melanchony of Existance* writes on odd dots: its
+    five pixels on line 19 are this. The scene `oamaddr` (tests/ppusim_scenes.py)
+    keeps PPUSim's answers in the goldens: 13 of 33 cases match, and the 20
+    that do not are listed in `tests/test_ppusim_goldens.py` as known.
