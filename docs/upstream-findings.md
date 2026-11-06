@@ -97,4 +97,5 @@ Most rest on what a game does, not on hardware; an edit should say so.
   step wins over the load in PPUSim, the load in Visual 2C02) and on rendering
   turned off (PPUSim's last step). Traced with the shim's counter fields
   (`ppusim_shim.cpp`, `oam_main`) and `scripts/visual2c02/compare.py evalwrite`, C73.
-  Not reported.
+  Not reported: held until Breaknes responds to #535-#538, then
+  reconsidered if it welcomes our reports.
