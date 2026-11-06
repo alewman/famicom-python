@@ -2207,3 +2207,14 @@ fails `sprite_overflow_tests/5.Emulator` (3); with the off copy too, 5.Emulator 
 but AccuracyCoin "OAM Corruption" fails (2), at every clear-phase row shift tried. Both
 pass on hardware, so the board keeps its pre-render copy and nothing changed in
 `ppu.py`.
+
+**Visual 2C02's last two OAM puzzles are C26's off copy** (2026-11-05, handoff items 2
+and 3). `compare.py evalwrite` and `rowcopy` gained `EVAL_TRACE`/`EVAL_READBACK` and
+`ROW_TRACE` (the OAM buffer path per half-cycle; all of OAM read back afterwards). The
+known golden "off copy 96" is not a counter difference: turning rendering off on an
+even dot copies a filler row over OAM $18-$1F, so $1A reads $E0 and evaluation skips
+it as an out-of-range Y when rendering returns (dots 94, 96 and 98 do this; dot 97
+copies the other way and matches). The "$80 over $A0 as well as $E0" copy from dot 200
+is the same off copy hitting a second row, the OAMADDR row with address bit 6 from the
+frozen row (dots 196-202 even; none on 199 and 201). The board models neither, since
+the hardware judges rule the off copy out (C26). Goldens unchanged: 13 match, 1 known.
