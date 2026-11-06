@@ -780,6 +780,29 @@ before the board takes a side.
   Visual 2C02's here; only the copy, which the hardware judges rule out for the
   board, is missing.
   PPUSim's `mux` answers for two cases are kept as known for the same reason.
+- **C74. When the CPU sees a mapper IRQ raised by the PPU's bus, on PAL.** The 6502
+  takes /IRQ through a stage that is transparent while φ2 is high and latches at the
+  next φ1 (Visual6502 wiki, "6502 Interrupt Recognition Stages and Tolerances";
+  CPU_interrupts.wiki), so a level that is low before φ2 ends, at M2's fall, counts
+  for that cycle. PPUSim puts PA12 out a fixed time before the board's bus timestamp
+  (the dot's start plus one dot): 4 master ticks on NTSC and 3 on PAL
+  (`ppusim_compare.py pal_fetches`). On NTSC the two give "an A12 rise stamped before
+  the cycle's end plus 4 ticks is seen", which is the board's rule, and blargg's
+  `4-scanline_timing` pins that to the tick: run the PPU 1 tick ahead and it fails
+  with "should occur later when $2000=$08", 1 tick behind and it fails with "sooner"
+  (2026-11-06). On PAL the same reasoning gives "before the end plus 3", where the
+  board, which runs the PPU to the cycle's end (C45's alignment), sees rises stamped
+  before the end plus 5: 2 ticks early, within the ±1 tick of C45's fit and the
+  mapper's own delay. Mesen2 is earlier again: *Banana Prince* (Germany) and *Sam's
+  Journey* match it in lockstep for 620 frames only when the board runs the PPU 2 or
+  more ticks further ahead. APUSim's 2A03 seems to cut off at φ2's rise, 6 ticks
+  sooner, but its core binding steps the 6502 only on PHI0 edges, so that is the
+  binding, not the die; it has no 2A07 divider. *Board*: unchanged. Seeing only rises
+  stamped before the end plus 3 on PAL (a `sitecustomize` patch on the MMC3) changes
+  nothing against Mesen2 across the 160 PAL dumps with IRQs clocked by A12
+  (148 identical, as before; *Krusty's Fun House* at frame 600 goes from 8 pixels to
+  4), so it does not pay for a second PPU run in every cycle's end for the nine
+  mappers that raise IRQs from the PPU's bus. No hardware answer on PAL.
 
 ## Open items
 
@@ -895,8 +918,9 @@ before the board takes a side.
     PAL: The 2A07's DMA halts only on opcode fetches
     (part 3), at the specification tier: BreakingNESWiki's 2A07 page leaves
     RDY "TBD". Mapper IRQs land one instruction after Mesen2's at some
-    phases (part 3: PPUSim's bus is 3 master ticks ahead of the board's
-    timestamps on PAL). The alignment (C45) has
+    phases; *studied 2026-11-06* (C74): the die models put them 2 ticks later
+    than the board, not earlier, so Mesen2 is the one off; the board is
+    unchanged, as the later rule moves no dump. The alignment (C45) has
     no hardware answer. `full_palette` on PAL keeps 46 single-pixel
     transients against PPUSim, at palette-write instants. A `$2004` read on
     the pre-render line's dots 1-64 with rendering on: *settled 2026-10-29*,
