@@ -1695,7 +1695,9 @@ APU suite 38 of 38, AccuracyCoin 146 of 146.
   constant is one whole dot), and the CPU samples the cartridge's IRQ at
   cycle ends: an A12 rise within 3 ticks of one lands an instruction later
   here. Moving it means moving the PPU against the CPU on PAL, which C45's
-  fit and Mesen2's dot rows pin from two sides; no hardware answer. Open.
+  fit and Mesen2's dot rows pin from two sides; no hardware answer.
+  Studied 2026-11-06 (C74, and the last section here): the lead is no
+  reason to move it, since NTSC has one too.
 - *Elite*: a `$2002` poll lands on the VBL set; Mesen2 suppresses the flag
   and the board does not. The board and PPUSim agree on the race at every
   one of 40 phases (`ppusim_compare.py vbl_race`): Mesen2's PAL race is not
@@ -1729,7 +1731,7 @@ its first divergence with `mesen_lockstep.py --machine pal --frames 620`:
 | The VBL race at (241, 1): a `$2002` poll in the second frame (CPU cycle 58,936 from power-on in all of them) reads the flag set here and clear in Mesen2; later, the NMI entered where the board's was suppressed | *Bayou Billy*, *Blue Shadow*, *Burai Fighter*, *Guerrilla War*, *Krusty's Fun House*; *Bigfoot*, *Airwolf*, *Kickle Cubicle* | the board: it matches PPUSim's 2C07 on the read and on /NMI, cycle by cycle, at all 40 phases (`ppusim_compare.py vbl_race`) |
 | `$2002`'s open-bus bits (the I/O latch, C1): the CPU's control flow agrees, the low bits read differ | *Pizza Pop!*, *IronSword* | neither judged here: Mesen2 decays the latch after 3 frames, the board after blargg's 0.6 s (`ppu_open_bus`, hardware-corrected on NTSC); Mesen2's 3 frames does not reproduce Mesen2's trace either |
 | A `$2007` read during rendering (C31) | *Little Ninja Brothers* | the board follows PPUSim (milestone 6) |
-| The MMC3's IRQ one instruction after Mesen2's (part 3) | *Terminator 2* | open (PPUSim's bus 3 ticks ahead of the board's timestamps) |
+| The MMC3's IRQ one instruction after Mesen2's (part 3) | *Terminator 2* | the board, or later still: the die models put the IRQ 2 ticks after the board's (C74, 2026-11-06) |
 | A few pixels of a mid-frame effect, the CPU in lockstep throughout | *Ice Hockey* (8 pixels of one sprite row, line 54), *North & South* (MMC3, 3 pixels) | open: on *Ice Hockey* PPUSim, at its own alignment, differs from both on the same line, so the line is alignment-sensitive (C45) |
 
 None of the 15 differs on NTSC. `tests/mame_traces/sweep-pal/failures.txt` is
@@ -2236,10 +2238,41 @@ first divergence:
 | --- | --- | --- |
 | The VBL race at (241, 1), as in milestone 10's PAL sweep | *Airwolf*, *Bigfoot*, *Burai Fighter*, *Guerrilla War*, *Kickle Cubicle*, *Elite*, *Ghostbusters II* (blank at 600), *Xiao Zhuangyuan* (cycle 58,936), *Xiao Zhuangyuan Shuxue 7-in-1* (blank) | the board: PPUSim's 2C07 |
 | `$2002` open-bus bits (C1) | *IronSword* | neither judged (milestone 10) |
-| The MMC3 IRQ taken one instruction later than Mesen2's on PAL | *Banana Prince* (Germany), *Sam's Journey* (demo and full) | open, as *Terminator 2* (PPUSim's bus leads the board's timestamps by 3 ticks) |
+| The MMC3 IRQ taken one instruction later than Mesen2's on PAL | *Banana Prince* (Germany), *Sam's Journey* (demo and full) | the board, or later still (C74, below) |
 | Mapper 163 on the Dendy: Mesen2 switches CHR on fixed scanline numbers (127 and 239, and a `scanline < 128` check on `$5000` writes); the board latches PPU A9 when A13 rises, the same on any console | *Jiqiren Dazhan*, *Chaoji Jiqiren Dazhan A*, *Xianjian Qi Xia Zhuan* (every frame), *Anhei Pohuai Shen*, *Diablo II*, *Huanxiang Chuanshuo*, *Mohuan Shijie* (frame 60 only) | the board, on the pictures: clean title screens, while Mesen2 garbles *Jiqiren Dazhan* and puts black blocks on *Xianjian*'s clouds. Lockstep cannot judge them: Mesen2 boots a different bank from the first instruction (C54), on NTSC as well |
 | Blank on both, identical in lockstep for 620 frames | *Da Hanghai VII* (Dendy), *Fighter F-8000* (PAL) | the same: neither draws in 600 frames |
 
 Nothing points at the board. The 210 that differ are the next PAL/Dendy quick-sweep list
 (`sweep-paldendy/*/failures.txt`); most of them already differed on NTSC and keep their
 NTSC causes.
+
+### The PAL MMC3 IRQ against the die models (2026-11-06)
+
+Part 3 and the re-run above left *Terminator 2*, *Banana Prince* (Germany) and both
+*Sam's Journey* dumps taking the MMC3's IRQ one instruction after Mesen2's on PAL, with
+PPUSim's PA12 3 ticks ahead of the board's timestamps as the suspect. NTSC has the same
+kind of lead, 4 ticks, and there the board is exact: blargg's `4-scanline_timing` fails
+with the PPU run 1 tick ahead of the board ("should occur later when $2000=$08") and 1
+tick behind ("sooner"). The 6502 counts /IRQ low until φ2 ends, at M2's fall (C74), and
+that with PPUSim's lead gives the board's NTSC rule exactly. The same rule on PAL sees
+an A12 rise when it is stamped before the cycle's end plus 3 ticks; the board sees one
+before the end plus 5, so the board is up to 2 ticks early, and Mesen2 earlier still.
+In lockstep, *Banana Prince* matches Mesen2 for 620 frames with the PPU run 1-7 ticks
+ahead of the board, *Sam's Journey* 2-7; at the board's own timing both diverge.
+
+The die-model rule (a patch seeing an MMC3 IRQ only when its rise is stamped before the
+end plus 3), swept over the 160 PAL dumps whose mappers clock IRQs by A12 (`--machine
+auto`, Main, Aftermarket, Private):
+
+| Set | Dumps | Identical to Mesen2, board | With the patch |
+| --- | --- | --- | --- |
+| Main | 156 | 148 | 148 (*Krusty's Fun House*, frame 600: 8 pixels to 4) |
+| Aftermarket | 2 | 0 | 0 |
+| Private | 2 | 1 | 1 |
+
+It moves nothing, and the 2 ticks are near the uncertainty of C45's fit, so the board
+keeps its rule. The pictures do not judge it either: *Sam's Journey*'s frame 600
+differs at lines 126-132 (Mesen2 draws a mark in colour $00 above the "i" of "Knights
+of Bytes", the board colour $1D), *Banana Prince*'s frame 60 at 8 pixels of line 191,
+*Terminator 2*'s frame 600 on lines 79, 101 and 102. The Dendy is not measured:
+`ppusim_compare.py`'s pair runs NTSC and PAL only.
