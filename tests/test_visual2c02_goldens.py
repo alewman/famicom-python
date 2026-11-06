@@ -28,8 +28,9 @@ GOLDENS = json.loads(
 )
 
 # Rendering turned off in a copy, on a cycle beginning on an even dot: Visual
-# 2C02's OAM data reads $E0 while it is off, not the byte at the address, so the
-# check as rendering returns finds nothing (C73, not modelled).
+# 2C02 copies a filler row over OAM $18-$1F there (C26's off copy), so $1A reads
+# $E0 and the check as rendering returns finds nothing. The board keeps no off
+# copy, since hardware judges rule it out (C26, C73).
 KNOWN = {"off copy 96"}
 # Visual 2C02's saved state has the secondary OAM address frozen at row 4, so
 # rendering's start at line 5, dot 30 copies OAM's row 0 over row $20 (C26, open

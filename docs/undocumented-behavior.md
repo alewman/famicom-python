@@ -352,7 +352,7 @@ before the board takes a side.
   *Visual 2C02 (2026-11-05, `compare.py rowcopy`)* copies at both mid-frame
   edges, as Errata's alignment-dependent cases: turning rendering off copies the
   frozen row over the OAMADDR row (from dot 40: row 18 over row 0; from dot 200,
-  in evaluation: row 16 over $E0, and over $A0 too, unexplained), and turning it
+  in evaluation: row 16 over $E0), and turning it
   on copies the OAMADDR row over the frozen row on half-cycle phases 0 and 5-7 of
   the write's dot, not 1-4. The hardware judges rule both out for the board:
   the off copy makes AccuracyCoin "OAM Corruption" 2 fail (row 0 takes row n's
@@ -361,7 +361,17 @@ before the board takes a side.
   `5.Emulator` 3 (rendering off at line 126 dot 14, row 6: two of the nine
   sprites at 230 become row 0's). Visual 2C02 at compare.py's phase 0 is not a
   hardware alignment here, or its off copy is a simulation artefact; either way
-  the board keeps the pre-render copy alone.
+  the board keeps the pre-render copy alone. *The off copy's direction and its
+  second row (2026-11-05, `rowcopy` with `ROW_PRE` off at line 4, dots 196-202,
+  and `evalwrite EVAL_READBACK=1`)*: a write in a CPU cycle beginning on an even
+  dot copies the frozen row over the OAMADDR row, and over a second row, the
+  OAMADDR row with address bit 6 taken from the frozen row (frozen $80: OAMADDR
+  $E0 also hits $A0, $D0 and $D8 also hit $90 and $98). A cycle beginning on an
+  odd dot copies the other way, the OAMADDR row over the frozen row, with no
+  second row (dots 199, 201; `evalwrite` dot 97: row $18 over $80). Bit 6 alone
+  lagging looks like a race in the switch-level simulation, but nothing here
+  can tell. Either way it belongs to the off copy, which the board does not
+  model.
 - **C23. PPUSim's `$2002` bit 7.** Breaknes PPUSim `fb7de61` drives it as the
   complement of the VBL flag (`fsm.cpp`, `db_latch.nget()`); its own wiki
   drawing, its author's Verilog and the Visual2C02 netlist all show the true
@@ -761,7 +771,14 @@ before the board takes a side.
   secondary OAM. *Board*: Visual 2C02's, held to its recorded answers in
   `tests/test_visual2c02_goldens.py` (14 cases, `scripts/visual2c02/goldens.py`):
   all match but one, a copy interrupted on an even dot, where Visual 2C02's OAM data
-  reads $E0 while rendering is off and the check as it returns finds nothing.
+  reads $E0 while rendering is off and the check as it returns finds nothing. That
+  $E0 is C26's off copy, not the counter: turning rendering off there copies a filler
+  row ($F8 F8 E0 F8) over the OAMADDR row $18-$1F (read back with `EVAL_READBACK=1`
+  at dots 94, 96 and 98; at dot 97 the copy goes the other way and leaves $18-$1F
+  alone, which is why that case matches). When rendering returns, $1A's $E0 is out of
+  range as a Y, so evaluation moves on to $1C. The board's counter does the same as
+  Visual 2C02's here; only the copy, which the hardware judges rule out for the
+  board, is missing.
   PPUSim's `mux` answers for two cases are kept as known for the same reason.
 
 ## Open items

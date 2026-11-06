@@ -433,7 +433,16 @@ def evalwrite() -> Schedule:
         s.write(1, 0x00, at(7, dot))
         s.write(1, 0x1E, at(7, 246))
     s.probe = [7]
+    if trace := os.environ.get("EVAL_TRACE"):  # "from,to;...": line 7's OAM buffer path
+        s.signals = [(7, *(int(n) for n in w.split(","))) for w in trace.split(";")]
+        s.signal_set = "ob"
     s.end = at(8, 0)
+    if os.environ.get("EVAL_READBACK"):  # then all of OAM read back with rendering off
+        s.write(1, 0x00, s.end)
+        for address in range(256):
+            s.write(3, address)
+            s.read(4)
+        s.end = s.t + 16 * DOT
     return s
 
 
@@ -467,6 +476,9 @@ def rowcopy() -> Schedule:
         s.write(3, address)
         s.read(4)
     s.probe = place(os.environ.get("ROW_PROBE", "")) if os.environ.get("ROW_PROBE") else []
+    if trace := os.environ.get("ROW_TRACE"):  # "line,from,to;...": the OAM buffer path
+        s.signals = [tuple(place(w)) for w in trace.split(";")]
+        s.signal_set = "ob"
     s.end = s.t + 16 * DOT
     return s
 
