@@ -2218,3 +2218,28 @@ copies the other way and matches). The "$80 over $A0 as well as $E0" copy from d
 is the same off copy hitting a second row, the OAMADDR row with address bit 6 from the
 frozen row (dots 196-202 even; none on 199 and 201). The board models neither, since
 the hardware judges rule the off copy out (C26). Goldens unchanged: 13 match, 1 known.
+
+### PAL and Dendy dumps on their own consoles (2026-11-06)
+
+Every earlier full sweep ran each dump on one console, so the dumps whose header or
+nes20db says PAL or Dendy ran as NTSC. `compat_sweep.py --machine auto` re-ran all of
+them (`tests/mame_traces/sweep-paldendy`, gitignored): 1,390 dumps, of which 1,059 are in
+the Main and 2024 sets (472 PAL, 587 Dendy), 325 in Aftermarket and 6 in Private. Against
+Mesen2 on the same console: **1,150 identical**, 210 differ, 8 blank, 22 errors (every
+error also failed on NTSC). Against the NTSC run of the same dumps, 52 now match (among
+them *International Cricket*, the last undiagnosed licensed difference, and its beta),
+and 28 rows got worse (21 dumps; 7 mapper-163 dumps appear in both the 2024 and
+Aftermarket stages). Each one was run in lockstep with `mesen_lockstep.py` up to its
+first divergence:
+
+| Cause | Dumps | Who is right |
+| --- | --- | --- |
+| The VBL race at (241, 1), as in milestone 10's PAL sweep | *Airwolf*, *Bigfoot*, *Burai Fighter*, *Guerrilla War*, *Kickle Cubicle*, *Elite*, *Ghostbusters II* (blank at 600), *Xiao Zhuangyuan* (cycle 58,936), *Xiao Zhuangyuan Shuxue 7-in-1* (blank) | the board: PPUSim's 2C07 |
+| `$2002` open-bus bits (C1) | *IronSword* | neither judged (milestone 10) |
+| The MMC3 IRQ taken one instruction later than Mesen2's on PAL | *Banana Prince* (Germany), *Sam's Journey* (demo and full) | open, as *Terminator 2* (PPUSim's bus leads the board's timestamps by 3 ticks) |
+| Mapper 163 on the Dendy: Mesen2 switches CHR on fixed scanline numbers (127 and 239, and a `scanline < 128` check on `$5000` writes); the board latches PPU A9 when A13 rises, the same on any console | *Jiqiren Dazhan*, *Chaoji Jiqiren Dazhan A*, *Xianjian Qi Xia Zhuan* (every frame), *Anhei Pohuai Shen*, *Diablo II*, *Huanxiang Chuanshuo*, *Mohuan Shijie* (frame 60 only) | the board, on the pictures: clean title screens, while Mesen2 garbles *Jiqiren Dazhan* and puts black blocks on *Xianjian*'s clouds. Lockstep cannot judge them: Mesen2 boots a different bank from the first instruction (C54), on NTSC as well |
+| Blank on both, identical in lockstep for 620 frames | *Da Hanghai VII* (Dendy), *Fighter F-8000* (PAL) | the same: neither draws in 600 frames |
+
+Nothing points at the board. The 210 that differ are the next PAL/Dendy quick-sweep list
+(`sweep-paldendy/*/failures.txt`); most of them already differed on NTSC and keep their
+NTSC causes.
