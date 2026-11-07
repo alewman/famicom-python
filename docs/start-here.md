@@ -142,9 +142,16 @@ AccuracyCoin "Open Bus", README l.93–102).
   (without its data recorder) and Konami's Hyper Shot. `System.plug` puts in a
   cartridge's device from NES 2.0 byte 15 or nes20db's `<expansion>`;
   `System.machine_for` picks the NES for one only its ports take (Four Score,
-  Power Pad, NES Vaus, two Zappers). Not built: the Vs. Zapper, the Bandai
-  Hyper Shot, mice, the Subor and other keyboards, the second *Arkanoid II*
-  Vaus, the data recorder, the Turbo File, R.O.B.
+  Power Pad, NES Vaus, two Zappers). Since added: the Super NES Mouse and
+  controller (through adapters), the Subor Keyboard (MAME's `suborkey.cpp`,
+  BSD-3: no wiki page) with the Subor, Macro Winners/Mega Book and Yuxing mice,
+  the Hori Track (its port and trailing bits UNVERIFIED), the ASCII Turbo File,
+  the Family BASIC Data Recorder (the bit stream as emitted, as the wiki
+  advises) and *Arkanoid II*'s second Vaus. Not built: the Vs. System's devices
+  (the board has no Vs. System), the IGS Battle Box (its EEPROM's commands are
+  not on its page), the other Chinese keyboards (no description anywhere), and
+  the rest of the tail (Bandai Hyper Shot, Partytap, mahjong and pachinko
+  controllers, R.O.B., the pianos, Barcode Battler, Oeka Kids).
 
 ### Power-up and reset (CPU)
 
