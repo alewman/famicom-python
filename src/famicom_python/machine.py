@@ -218,6 +218,12 @@ class Machine:
     # understood"; Mesen2 does the same). Specification tier: BreakingNESWiki
     # leaves the 2A07's RDY "TBD".
     dma_halts_on_opcode: bool = False
+    # A sample ends 1 APU cycle late: $4015's DMC bit clears 1 APU cycle later
+    # than on RP2A03 CPUs, which moves the implicit-stop glitches 1 APU cycle
+    # earlier (the UA6527P: CPU_variants.wiki, DMA.wiki "Bugs"; specification
+    # tier, no test ROM answer). The DMC IRQ, which the wiki "suspects" is late
+    # too, is not moved.
+    dmc_late_stop: bool = False
     certified: bool = True
 
 
@@ -300,7 +306,8 @@ DENDY_CLONE = Machine(
     ppu_reset_at_power=False,  # UNVERIFIED: as the reset button
     joypad_oe_per_cycle=True,
     famicom_audio_through_cart=False,
-    dmc_unexpected_reload_bug=False,
+    dmc_unexpected_reload_bug=True,  # "both the aborted DMA and unexpected DMA bugs" (DMA.wiki)
+    dmc_late_stop=True,
     certified=False,
 )
 

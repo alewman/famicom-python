@@ -8,11 +8,15 @@ cannot hear, and the DMA cycle counts directly.
 
 from __future__ import annotations
 
+import dataclasses
 from itertools import pairwise
+from pathlib import Path
 
+import pytest
 from conftest import nrom_system
 
 from famicom_python.apu import APU, NOISE_PERIODS
+from famicom_python.machine import DENDY_CLONE, NES_001
 
 
 def _apu() -> APU:
@@ -231,6 +235,42 @@ def test_dmc_irq_is_set_when_the_last_byte_is_fetched() -> None:
     assert board.apu.dmc.irq and board.apu.irq
     assert board.read_byte(0x4015) & 0x80  # $4015 shows it ...
     assert board.apu.dmc.irq  # ... and reading does not clear it (7-dmc_basics #10)
+
+
+def test_dendy_clears_the_dmc_bit_one_apu_cycle_late() -> None:
+    # CPU_variants.wiki, UA6527P: "DMC status bit is cleared 1 APU cycle later
+    # than on RP2A03 CPUs". The last byte's fetch ends the sample; $4015 D4.
+    def bits_after_last_fetch(machine) -> list[int]:
+        board = nrom_system(b"", machine).board
+        board.write_byte(0x4010, 0x0F)
+        board.write_byte(0x4013, 0x00)  # 1 byte
+        board.write_byte(0x4015, 0x10)
+        while board.apu.dmc.remaining:
+            board.read_byte(0x0000)
+        return [board.read_byte(0x4015) >> 4 & 1 for _ in range(4)]
+
+    assert bits_after_last_fetch(NES_001) == [0, 0, 0, 0]
+    assert bits_after_last_fetch(DENDY_CLONE) == [1, 0, 0, 0]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("late", [False, True])
+def test_implicit_dma_abort_matches_both_hardware_answer_keys(late: bool) -> None:
+    # AccuracyCoin "Implicit DMA Abort" keeps two answer keys, both taken on
+    # consoles: pre-mid-1990 CPUs (result 9) and later ones, whose unexpected
+    # reload DMA (DMA.wiki "Bugs") takes 4 cycles at X = 8 and 9 (result 5).
+    from famicom_python.system import System
+    from famicom_python.testrom import accuracycoin_tests, run_accuracycoin_test
+
+    home = Path(__file__).parent / "test_roms" / "AccuracyCoin"
+    test = next(
+        t
+        for t in accuracycoin_tests((home / "AccuracyCoin.asm").read_text())
+        if t.name == "Implicit DMA Abort"
+    )
+    machine = dataclasses.replace(NES_001, dmc_unexpected_reload_bug=late)
+    system = System.from_rom(home / "AccuracyCoin.nes", machine)
+    assert run_accuracycoin_test(system, test) == (5 if late else 9)
 
 
 def test_dmc_dma_during_oam_dma_costs_2_cycles() -> None:

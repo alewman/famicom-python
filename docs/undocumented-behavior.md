@@ -220,7 +220,11 @@ before the board takes a side.
   a difference of framing, document the wiki's model. *Board (milestone 3)*:
   the wiki's model, cycle by cycle (`board.py` "DMA"); `sprdma_and_dmc_dma`
   (both) and `dmc_dma_during_read4` pass with it. The two DMC bugs (aborted
-  DMA, unexpected reload) are not modelled yet: AccuracyCoin (milestone 4).
+  DMA, unexpected reload): AccuracyCoin "Implicit DMA Abort" holds both
+  answer keys; the board matches the first (pre-mid-1990 CPUs) on the NTSC
+  rows and the second with `dmc_unexpected_reload_bug` (2026-11-07,
+  timing.md "DMA"). The Dendy's UA6527P has both, its sample ending 1 APU
+  cycle late (`dmc_late_stop`; open item 22).
 - **C12. Rendering-enable latency.** Wiki: 3–4 dots. Mesen2: 1 dot.
   AccuracyCoin: 2–5 dots depending on the PPU revision and the CPU/PPU
   alignment. *Settled on PPUSim (C12 work, after milestone 7)*, with
@@ -912,9 +916,13 @@ before the board takes a side.
     claims (C42, C43); FDS-4023-Test (its answer is a video too); the drive's
     timing (C39); a sweep of the FDS sets (smoke first).
 22. **PAL and the Dendy, after milestone 10.** The Dendy: its UA6527P's DMC
-    timing (samples ending one APU cycle later, both DMA bugs; DMA.wiki) is
-    not modelled, and whether its pads clock on every read cycle (the row's
-    Famicom-style assumption) or once (Mesen2's NES behaviour) is not known.
+    timing (samples ending one APU cycle later, both DMA bugs; DMA.wiki):
+    *modelled 2026-11-07* at the specification tier (timing.md "DMA"); on
+    AccuracyCoin's "Implicit DMA Abort" its windows land 1 APU cycle from the
+    NTSC keys', as the wiki says, but no Dendy answer key exists, and whether
+    its DMC IRQ is late too is not known. Whether its pads clock on every read
+    cycle (the row's Famicom-style assumption) or once (Mesen2's NES
+    behaviour) is not known.
     PAL: The 2A07's DMA halts only on opcode fetches
     (part 3), at the specification tier: BreakingNESWiki's 2A07 page leaves
     RDY "TBD". Mapper IRQs land one instruction after Mesen2's at some

@@ -224,8 +224,19 @@ answer key from hardware:
   DMA, its halt cycle only, which a write cycle cancels outright; a DMA
   already scheduled survives a disable ("Explicit/Implicit DMA Abort", whose
   answer key the board matches byte for byte). The RP2A03H/late-G
-  "unexpected reload" is `Machine.dmc_unexpected_reload_bug`, off for the
-  RP2A03G and not modelled;
+  "unexpected reload" is `Machine.dmc_unexpected_reload_bug`: a load DMA's
+  byte arriving in the APU cycle an output cycle ended with the buffer empty
+  goes straight to the shifter, and a reload DMA follows even when that byte
+  ended the sample (AccuracyCoin's second answer key, "behaviour 1", byte for
+  byte: `test_implicit_dma_abort_matches_both_hardware_answer_keys`). Off on
+  the NTSC rows (an RP2A03G from before mid-1990, the first key's), on on the
+  Dendy;
+- the Dendy's UA6527P ends a sample 1 APU cycle late (`Machine.dmc_late_stop`,
+  CPU_variants.wiki): `$4015` D4 reads 1 for 2 more CPU cycles after the last
+  fetch, and the stop counts in the next APU cycle, so the abort and the
+  unexpected reload need the last byte fetched 1 APU cycle earlier, as DMA.wiki
+  says; there the reload comes from the stop, not the shifter. The DMC IRQ, which
+  the wiki "suspects" is late too, is not moved. Specification tier;
 - the register-decode composition (undocumented-behavior.md C25): DMA reads
   with the core halted on `$4000-$401F` reach the APU and pad registers;
 - a DMA that stretches a read sets 6502-python's `dma_stalled`, so SHA, SHX,

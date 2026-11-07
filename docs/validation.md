@@ -2276,3 +2276,21 @@ differs at lines 126-132 (Mesen2 draws a mark in colour $00 above the "i" of "Kn
 of Bytes", the board colour $1D), *Banana Prince*'s frame 60 at 8 pixels of line 191,
 *Terminator 2*'s frame 600 on lines 79, 101 and 102. The Dendy is not measured:
 `ppusim_compare.py`'s pair runs NTSC and PAL only.
+
+### The DMC's two late-CPU behaviours, and AccuracyCoin `66e8711` (2026-11-07)
+
+`Machine.dmc_unexpected_reload_bug`, a field no code read, is now modelled (timing.md
+"DMA"): with it on, the board's "Implicit DMA Abort" gives AccuracyCoin's second
+answer key byte for byte (result 5, the mid-1990-and-later CPUs: 4-cycle DMAs at X = 8
+and 9); off, as on the NTSC rows, the first (result 9), as before. Both are held by
+`test_implicit_dma_abort_matches_both_hardware_answer_keys`. The Dendy row now has the
+bug and the UA6527P's late sample end (`dmc_late_stop`): on the same test its reload
+lands at X = $A-$B and its abort at $C-$D, 1 APU cycle from the NTSC keys, as DMA.wiki
+says; no Dendy key exists. A 42-dump Dendy smoke sweep (20 identical to Mesen2 and 20
+differing, from the re-run above; two have Aftermarket copies) is unchanged, dump for
+dump and pixel for pixel.
+
+Repinned to `66e8711` (2026-11-04): no new tests (147). It makes the DMA-timing
+pretest check the DMC rate before its stopwatch loop. The board passes **147 of 147**
+on it, with the DMC change.
+
