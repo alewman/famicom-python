@@ -2294,3 +2294,31 @@ Repinned to `66e8711` (2026-11-04): no new tests (147). It makes the DMA-timing
 pretest check the DMC rate before its stopwatch loop. The board passes **147 of 147**
 on it, with the DMC change.
 
+### Controllers besides the pad (2026-11-07)
+
+`peripherals.py` builds the devices NES 2.0's Default Expansion Device byte names
+that nes20db uses most, each from its wiki page (start-here.md "Controllers"); the
+cartridge's device comes from nes20db's `<expansion>` or header byte 15, and
+`System.machine_for` runs the ones only the NES's ports take on the NES. Each
+protocol is held by `tests/test_peripherals.py` (14 cases: the Four Score's and the
+Hori adapter's signatures, the Power Pad's bit order, the Family Trainer's rows,
+the keyboard's scan and *Lode Runner*'s detection, the Vaus's inverted MSB-first
+bits and its conversion, the Zapper's light window and trigger). No hardware test
+ROM judges any of them here (Zap Ruder's numbers are the Zapper's only measured
+input). In games, headless with scripted input:
+
+| Device | Game | What happened |
+| --- | --- | --- |
+| Zapper (Famicom) | *Duck Hunt* | aimed at the ducks' sprites: hits, 2,500 points in 1,400 frames; aimed at the sky: no hits |
+| Vaus (Famicom) | *Arkanoid II* | the paddle follows the knob both ways, from the left wall at $4D (the wiki's range start) to the right at $E2 |
+| Four Score | *Gauntlet II* | the game reads 16 bits of $4016; player 3's A joins the Wizard beside player 1's Warrior |
+| Power Pad | *Stadium Events* (PAL) | 8 bits of both ports per frame; button 10 moves through the menu into the 100 m dash |
+| Family BASIC Keyboard | *Family BASIC* v2.1 | the wiki's scan ($05, then $04/$06 per row); keys move the opening dialogue on, and a typed name appears |
+| Konami Hyper Shot | *Hyper Olympic* | Run joins a 1UP lane to the attract race (CPU against CPU without it) |
+
+The frontend plugs the cartridge's device (`--device` to choose): the mouse is the
+Zapper and the Vaus knob, keys 1-4/Q-R/A-F the mats, the host keyboard the Family
+BASIC Keyboard. Not built: the Vs. Zapper, the Bandai Hyper Shot, mice, the Subor
+and other keyboards (nes20db's 119 type-38 dumps), the second *Arkanoid II* Vaus,
+the data recorder, the Turbo File, R.O.B.
+

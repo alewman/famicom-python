@@ -58,7 +58,7 @@ def test_the_window_runs_frames_and_keeps_the_save(tmp_path: Path) -> None:
     pygame.display.init()
     try:
         frontend = Frontend(pygame, rom, "famicom", palette, 2, False, False)
-        assert frontend.system.board.expansion_pads[0] is not None
+        assert frontend.system.board.expansion is not None
         frontend.run(max_frames=2)
         frontend.save()
         count = save_path(rom).read_bytes()[0]

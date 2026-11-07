@@ -33,6 +33,9 @@ class BoardInfo:
     chr_nvram: int = 0
     timing: int = 0  # 0 NTSC, 1 PAL, 2 multi-region, 3 Dendy (NES_2.0.wiki byte 12)
     console: int = 0  # 0 NES/Famicom, 1 Vs., 2 PlayChoice-10, 3 extended
+    # The Default Expansion Device (NES_2.0.wiki byte 15; peripherals.py): 0
+    # unspecified, 1 standard pads, 8 the Zapper, ...
+    expansion: int = 0
 
 
 @dataclass(frozen=True)
@@ -84,6 +87,7 @@ def parse(data: bytes) -> RomImage:
             chr_nvram=_shift_size(h[11] >> 4),
             timing=h[12] & 0x03,
             console=h[7] & 0x03,
+            expansion=h[15] & 0x3F,
         )
         prg_size = _nes2_rom_size(h[4], h[9] & 0x0F, 0x4000)
         chr_size = _nes2_rom_size(h[5], h[9] >> 4, 0x2000)

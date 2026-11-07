@@ -32,6 +32,20 @@ from .cartridge.fds import FDS
 from .fds_auto import AutoDisk
 from .joypad import DOWN, LEFT, RIGHT, SELECT, START, UP, A, B, StandardController
 from .machine import MACHINES
+from .peripherals import (
+    DEVICE_NAMES,
+    FAMILY_BASIC_KEYBOARD,
+    VAUS_FAMICOM,
+    VAUS_NES,
+    ExpansionPads,
+    FamilyBasicKeyboard,
+    FamilyTrainer,
+    FourScore,
+    KonamiHyperShot,
+    PowerPad,
+    Vaus,
+    Zapper,
+)
 from .ppu import DOTS, HEIGHT, WIDTH
 from .system import System
 from .video import load_palette, palette_for, to_rgb, write_png
@@ -49,8 +63,49 @@ Tab (hold)  fast forward (no sound)                F11  fullscreen
 F12         screenshot (PNG)                       Esc  quit
 D           FDS: eject the disk, then put the next side in (sides change by
             themselves unless --manual-disk)
+F6          the reset button too (when Backspace is the keyboard's DEL)
 Gamepads: the first two are players 1 and 2; on a Famicom a third and fourth
-are players 3 and 4 through the expansion port (a four-player adapter)."""
+are players 3 and 4 through the expansion port (a four-player adapter), and
+with a Four Score (--device four-score) on the NES as well.
+Devices (--device, default the cartridge's from nes20db or its NES 2.0 header):
+  Zapper      the mouse aims, left button fires, right button points off screen
+  Vaus        the mouse's left-right is the knob, left button fires
+  Power Pad / Family Trainer   keys 1 2 3 4 / Q W E R / A S D F are its rows
+  Family BASIC Keyboard        the host keyboard types on it (pads: gamepads)
+  Hyper Shot  each gamepad's A is Run, B is Jump"""
+
+# --device names: NES 2.0 expansion numbers (peripherals.py); "vaus" is the
+# console's own version.
+DEVICES = {
+    "auto": None,
+    "pads": 0x01,
+    "four-score": 0x02,
+    "famicom-four-players": 0x03,
+    "zapper": 0x08,
+    "two-zappers": 0x09,
+    "power-pad": 0x0C,
+    "family-trainer": 0x0E,
+    "vaus": VAUS_NES,
+    "hyper-shot": 0x12,
+    "keyboard": FAMILY_BASIC_KEYBOARD,
+}
+
+MAT_KEYS = ("K_1", "K_2", "K_3", "K_4", "K_q", "K_w", "K_e", "K_r", "K_a", "K_s", "K_d", "K_f")
+
+# The host keyboard on the Family BASIC Keyboard, by position on a US layout.
+KEYBOARD_KEYS = {
+    **{f"K_{c.lower()}": c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"},
+    **{f"K_{d}": d for d in "0123456789"},
+    **{f"K_F{n}": f"F{n}" for n in range(1, 9)},
+    "K_MINUS": "-", "K_EQUALS": "^", "K_BACKQUOTE": "YEN", "K_END": "STOP",
+    "K_LEFTBRACKET": "@", "K_RIGHTBRACKET": "[", "K_RETURN": "RETURN",
+    "K_SEMICOLON": ";", "K_QUOTE": ":", "K_BACKSLASH": "]", "K_RALT": "KANA",
+    "K_COMMA": ",", "K_PERIOD": ".", "K_SLASH": "/", "K_RCTRL": "_",
+    "K_LSHIFT": "LSHIFT", "K_RSHIFT": "RSHIFT", "K_LCTRL": "CTR", "K_LALT": "GRPH",
+    "K_SPACE": "SPACE", "K_HOME": "CLR", "K_INSERT": "INS", "K_DELETE": "DEL",
+    "K_BACKSPACE": "DEL", "K_PAUSE": "ESC",
+    "K_UP": "UP", "K_DOWN": "DOWN", "K_LEFT": "LEFT", "K_RIGHT": "RIGHT",
+}  # fmt: skip
 
 KEYS = (  # (button, pygame key names)
     (UP, ("K_UP",)),
@@ -130,9 +185,12 @@ class Frontend:
     """One console in one window. ``pygame`` is imported by :func:`main`."""
 
     def __init__(self, pygame, rom: Path, machine: str, palette: Path | None, scale: int,
-                 audio: bool, fullscreen: bool, auto_disk: bool = True) -> None:  # fmt: skip
+                 audio: bool, fullscreen: bool, auto_disk: bool = True,
+                 device: int | None = None, vaus_low: int = 0x62) -> None:  # fmt: skip
         self.pg = pygame
         self.rom, self.machine_name = rom, machine
+        self.device_choice, self.vaus_low = device, vaus_low
+        self.peripheral: object | None = None
         self.auto_disk = auto_disk
         self.last_side = -1  # the FDS side the D key last took out
         self.system = self._power_on()
@@ -175,9 +233,17 @@ class Frontend:
         path = save_path(self.rom)
         if path.exists() and not system.cartridge.restore_battery(path.read_bytes()):
             print(f"{path}: not this cartridge's save; ignored", file=sys.stderr)
-        if MACHINES[self.machine_name].famicom_audio_through_cart:
-            board = system.board
-            board.expansion_pads = [StandardController(), StandardController()]
+        machine = MACHINES[self.machine_name]
+        device = self.device_choice
+        if device is None and system.loaded is not None:
+            device = system.loaded.image.board.expansion
+        if device == VAUS_NES and machine.famicom_expansion_port:
+            device = VAUS_FAMICOM
+        self.peripheral = system.plug(device)
+        if self.peripheral is not None:
+            print(f"device: {DEVICE_NAMES[device]}", file=sys.stderr)
+        if system.board.expansion is None and machine.famicom_expansion_port:
+            system.board.expansion = ExpansionPads()  # players 3 and 4
         if isinstance(system.cartridge, FDS) and self.auto_disk:
             AutoDisk(system, print)
         return system
@@ -263,16 +329,52 @@ class Frontend:
                 buttons |= button
         return buttons
 
-    def _apply_inputs(self) -> None:
+    def _players(self) -> list[StandardController]:
+        """The standard pads plugged in, in player order."""
         board = self.system.board
+        device = self.peripheral
+        if isinstance(device, FourScore):
+            players = list(device.pads)
+        else:
+            players = [pad for pad in board.pads if isinstance(pad, StandardController)]
+        if isinstance(board.expansion, ExpansionPads):
+            players += board.expansion.pads
+        return players
+
+    def _apply_inputs(self) -> None:
+        pg = self.pg
+        board = self.system.board
+        device = self.peripheral
         pads = [self._controller(c) for c in self.controllers.values()]
         pads += [0] * (4 - len(pads))
-        board.pads[0].buttons = self._keyboard() | pads[0]
-        board.pads[1].buttons = pads[1]
-        for pad, buttons in zip(board.expansion_pads, pads[2:], strict=True):
-            if pad is not None:
-                pad.buttons = buttons
-        board.microphone = bool(self.pg.key.get_pressed()[self.pg.K_m])
+        typing = isinstance(device, FamilyBasicKeyboard)
+        pads[0] |= 0 if typing else self._keyboard()
+        for pad, buttons in zip(self._players(), pads, strict=False):
+            pad.buttons = buttons
+        board.microphone = not typing and bool(pg.key.get_pressed()[pg.K_m])
+        if device is None:
+            return
+        keys = pg.key.get_pressed()
+        x, y = pg.mouse.get_pos()
+        left, _, right = pg.mouse.get_pressed()[:3]
+        zappers = device if isinstance(device, list) else [device]
+        if isinstance(zappers[0], Zapper):
+            zapper = zappers[0]
+            zapper.aim = (x, y) if pg.mouse.get_focused() and not right else None
+            zapper.trigger = bool(left)
+        elif isinstance(device, Vaus):
+            device.position = (self.vaus_low + min(max(x, 0), WIDTH - 1) * 0xA0 // WIDTH) & 0xFF
+            device.fire = bool(left)
+        elif isinstance(device, (PowerPad, FamilyTrainer)):
+            device.buttons = sum(
+                1 << n for n, name in enumerate(MAT_KEYS) if keys[getattr(pg, name)]
+            )
+        elif isinstance(device, FamilyBasicKeyboard):
+            device.keys = {name for key, name in KEYBOARD_KEYS.items() if keys[getattr(pg, key)]}
+        elif isinstance(device, KonamiHyperShot):
+            device.buttons = sum(
+                (bool(pads[p] & A) << (2 * p)) | (bool(pads[p] & B) << (2 * p + 1)) for p in (0, 1)
+            )
 
     # -- events ---------------------------------------------------------------------
 
@@ -289,7 +391,9 @@ class Frontend:
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_ESCAPE:
                 return False
-            if event.key == pg.K_BACKSPACE:
+            if event.key == pg.K_F6 or (
+                event.key == pg.K_BACKSPACE and not isinstance(self.peripheral, FamilyBasicKeyboard)
+            ):
                 self.system.reset()
             elif event.key == pg.K_F3:
                 self.paused = not self.paused
@@ -298,7 +402,7 @@ class Frontend:
                 self.save()
                 self.system = self._power_on()
                 self.sound.clear()
-            elif event.key == pg.K_d:
+            elif event.key == pg.K_d and isinstance(self.system.cartridge, FDS):
                 self.change_disk()
             elif event.key == pg.K_F11:
                 pg.display.toggle_fullscreen()
@@ -387,6 +491,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--manual-disk", action="store_true", help="FDS: change sides only with the D key"
     )
+    parser.add_argument(
+        "--device",
+        choices=sorted(DEVICES),
+        default="auto",
+        help="what is plugged in besides the pads (default auto: the cartridge's, as"
+        " nes20db or its NES 2.0 header says)",
+    )
+    parser.add_argument(
+        "--vaus-low",
+        type=lambda text: int(text, 0),
+        default=0x62,
+        help="the Vaus knob's value at the window's left edge (default 0x62, Arkanoid's;"
+        " Arkanoid II wants 0x4D)",
+    )
     args = parser.parse_args(argv)
     try:
         import pygame
@@ -402,6 +520,7 @@ def main(argv: list[str] | None = None) -> int:
     frontend = Frontend(
         pygame, args.rom, args.machine, args.palette, max(1, args.scale),
         not args.no_audio, args.fullscreen, not args.manual_disk,
+        DEVICES[args.device], args.vaus_low,
     )  # fmt: skip
     try:
         frontend.run()

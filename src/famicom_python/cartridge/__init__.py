@@ -603,6 +603,8 @@ def _differences(winner: BoardInfo, other: BoardInfo, label: str) -> list[str]:
         f"using {getattr(winner, field.name)!r}"
         for field in fields(BoardInfo)
         if getattr(winner, field.name) != getattr(other, field.name)
+        # An iNES header cannot name a device: 0 is "unspecified", not a claim.
+        and not (field.name == "expansion" and not getattr(other, field.name))
     ]
 
 

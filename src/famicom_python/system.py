@@ -14,6 +14,7 @@ from pathlib import Path
 
 from sixfiveohtwo import RP2A03
 
+from . import peripherals
 from .board import Board
 from .cartridge import BoardInfo, Loaded, load
 from .cartridge.connector import Cartridge
@@ -64,6 +65,8 @@ class System:
             return MACHINES["pal"]
         if timing == 3:
             return MACHINES["dendy"]
+        if loaded.image.board.expansion in peripherals.NES_ONLY:
+            return MACHINES["nes"]  # a Four Score, Power Pad or NES Vaus needs NES ports
         return MACHINES["famicom"]
 
     @classmethod
@@ -79,6 +82,14 @@ class System:
         system = cls(loaded.cartridge, machine)
         system.loaded = loaded
         return system
+
+    def plug(self, device: int | None = None) -> object | None:
+        """Put in the devices of NES 2.0 expansion number ``device`` (default: the
+        cartridge's, from its header or nes20db); the one to drive, as
+        :func:`.peripherals.plug` returns it."""
+        if device is None:
+            device = self.loaded.image.board.expansion if self.loaded is not None else 0
+        return peripherals.plug(self.board, device, self.machine.famicom_expansion_port)
 
     # -- power and reset -------------------------------------------------
 

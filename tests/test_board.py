@@ -10,8 +10,9 @@ import dataclasses
 
 from conftest import nrom_image, nrom_system
 
-from famicom_python.joypad import RIGHT, START, A, B, StandardController
+from famicom_python.joypad import RIGHT, START, A, B
 from famicom_python.machine import FAMICOM, NES_001, PowerOn
+from famicom_python.peripherals import ExpansionPads
 
 
 def _strobe(board, value: int) -> None:
@@ -170,9 +171,9 @@ def test_the_famicom_microphone_reads_on_4016_d2_and_nowhere_else() -> None:
 
 def test_expansion_pads_shift_out_on_d1_with_the_ports() -> None:
     board = nrom_system(b"", FAMICOM).board
-    board.expansion_pads = [StandardController(), StandardController()]
-    board.expansion_pads[0].buttons = B  # player 3: A clear, B pressed
-    board.expansion_pads[1].buttons = A  # player 4
+    board.expansion = ExpansionPads()
+    board.expansion.pads[0].buttons = B  # player 3: A clear, B pressed
+    board.expansion.pads[1].buttons = A  # player 4
     _strobe(board, 1)
     _strobe(board, 0)
     third = [(board.read_byte(0x4016) >> 1) & 1 for _ in range(3)]
