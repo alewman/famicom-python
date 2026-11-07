@@ -421,3 +421,103 @@ def test_hori_track_report_on_4016_d1() -> None:
     assert bits[:8] == [1, 0, 0, 0, 0, 0, 0, 0]
     assert int("".join(map(str, bits[8:16])), 2) == (3 ^ 15) << 4 | (2 ^ 15)
     assert int("".join(map(str, bits[16:24])), 2) == 0x10
+
+
+# -- the tail ------------------------------------------------------------------------
+
+
+def test_partytap_three_reads() -> None:
+    board = nrom_system(b"", FAMICOM).board
+    tap = p.plug(board, p.PARTYTAP, famicom=True)
+    tap.buttons = 0b100101  # buttons 1, 3, 6
+    _strobe(board, 1)
+    _strobe(board, 0)
+    reads = [board.read_byte(0x4017) & 0x1C for _ in range(3)]
+    assert reads == [0b10100, 0b10000, 0x14]
+
+
+def test_exciting_boxing_sensor_groups_active_low() -> None:
+    board = nrom_system(b"", FAMICOM).board
+    bag = p.plug(board, p.BOXING_BAG, famicom=True)
+    bag.sensors = 1 << 0 | 1 << 7  # left hook, straight
+    _strobe(board, 0)
+    assert board.read_byte(0x4017) & 0x1E == 0x1C
+    _strobe(board, 2)
+    assert board.read_byte(0x4017) & 0x1E == 0x0E
+
+
+def test_pachinko_report_pad_one_then_inverted_dial() -> None:
+    board = nrom_system(b"", FAMICOM).board
+    dial = p.plug(board, p.PACHINKO, famicom=True)
+    dial.pad.buttons = A
+    dial.dial = 0x40
+    _strobe(board, 1)
+    _strobe(board, 0)
+    bits = [board.read_byte(0x4016) >> 1 & 1 for _ in range(18)]
+    assert bits[:8] == [1, 0, 0, 0, 0, 0, 0, 0] and bits[8] == 1
+    assert int("".join(map(str, bits[9:16])), 2) == 0x40 ^ 0x7F and bits[16:] == [1, 1]
+
+
+def test_jissen_mahjong_rows() -> None:
+    board = nrom_system(b"", FAMICOM).board
+    panel = p.plug(board, p.JISSEN_MAHJONG, famicom=True)
+    panel.keys = {"A", "N", "RON"}
+    for row, expected in (
+        (3, [0, 1, 0, 0, 0, 0, 0, 0]),
+        (2, [0] * 7 + [1]),
+        (0, [0, 0, 1] + [0] * 4 + [1]),
+    ):
+        _strobe(board, row << 1 | 1)
+        _strobe(board, row << 1)
+        assert [board.read_byte(0x4017) >> 1 & 1 for _ in range(8)] == expected
+
+
+def test_oeka_kids_handshake_and_report() -> None:
+    board = nrom_system(b"", FAMICOM).board
+    tablet = p.plug(board, p.OEKA_KIDS, famicom=True)
+    tablet.x, tablet.y, tablet.touching, tablet.click = 0xA5, 0x3C, True, False
+    _strobe(board, 0)  # latch
+    _strobe(board, 1)
+    bits = []
+    for _ in range(18):
+        _strobe(board, 3)
+        assert board.read_byte(0x4017) & 0x04 == 0  # acknowledged
+        _strobe(board, 1)
+        bits.append(board.read_byte(0x4017) >> 3 & 1 ^ 1)
+    assert int("".join(map(str, bits[:8])), 2) == 0xA5
+    assert int("".join(map(str, bits[8:16])), 2) == 0x3C and bits[16:] == [1, 0]
+
+
+def test_port_test_signatures() -> None:
+    board = nrom_system(b"", NES_001).board  # a factory device for the NES's ports
+    p.plug(board, p.PORT_TEST, famicom=False)
+    _strobe(board, 1)
+    _strobe(board, 0)
+    first = [_read(board, 0x4016) for _ in range(10)]
+    assert [v >> 4 & 1 for v in first] == [1, 0, 1, 0, 1, 0, 1, 0, 1, 1]
+    assert [v >> 3 & 1 for v in first] == [1, 0, 1, 0, 1, 0, 1, 1, 1, 1]
+    second = [_read(board, 0x4017) >> 4 & 1 for _ in range(10)]
+    assert second == [0, 1, 0, 1, 0, 1, 0, 1, 0, 0]
+
+
+def test_rob_decodes_flashed_commands() -> None:
+    rob = p.Rob(PALETTE)
+    bright = [0x2A] * (256 * 240)
+    dark = [0x0F] * (256 * 240)
+    seen = []
+    for wxyz in (0b0110, 0b0100):  # close arms, left
+        w, x, y, z = (wxyz >> 3) & 1, (wxyz >> 2) & 1, (wxyz >> 1) & 1, wxyz & 1
+        frames = (0, 0, 0, 1, 0, 1, w, 1, x, 1, y, 1, z)
+        seen.extend(rob.see(bright if bit else dark) for bit in frames)
+    assert [s for s in seen if s] == ["close arms", "left"]
+    assert rob.arms_closed and rob.turn == -1
+
+
+def test_famicom_3d_follows_out1_and_passes_pads_through() -> None:
+    board = nrom_system(b"", FAMICOM).board
+    glasses = p.plug(board, p.FAMICOM_3D, famicom=True)
+    _strobe(board, 2)
+    assert glasses.eye == 1
+    glasses.through.pads[0].buttons = A
+    _strobe(board, 1)
+    assert board.read_byte(0x4016) & 0x02

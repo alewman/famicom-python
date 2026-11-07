@@ -942,6 +942,348 @@ class DataRecorder:
         return self.tape[index][1] if index >= 0 else 0
 
 
+# -- the tail: light guns, push buttons, dials, tablets, glasses, robots ----------------------
+
+
+class BandaiHyperShot:
+    """Bandai's Hyper Shot on the expansion port (Bandai_Hyper_Shot.wiki): a pad on
+    $4016 D1 (its A never reads pressed) and a Zapper on $4017 D3-D4 whose trigger
+    reads 1 while fully pulled. OUT1 and OUT2 run its vibration and speaker
+    (``rumble``, ``sound``). ``pad`` and ``zapper`` are what the player drives."""
+
+    def __init__(self, ppu: PPU, palette: Sequence[bytes]) -> None:
+        self.pad = StandardController()
+        self.zapper = Zapper(ppu, palette)
+        self.rumble = False
+        self.sound = False
+
+    def set_out(self, value: int) -> None:
+        self.pad.set_strobe(bool(value & 1))
+        self.rumble = bool(value & 2)
+        self.sound = bool(value & 4)
+
+    def read(self, port: int) -> int:
+        if not port:
+            buttons = self.pad.buttons
+            self.pad.buttons = buttons & ~1  # no A
+            value = self.pad.read() << 1
+            self.pad.buttons = buttons
+            return value
+        zapper = self.zapper
+        return (0 if zapper.light() else 0x08) | (0x10 if zapper.trigger else 0)
+
+    def clock(self, port: int) -> None:
+        if not port:
+            self.pad.clock()
+
+
+class Partytap:
+    """Yonezawa's Partytap on the expansion port (Partytap.wiki): six 1-button pads.
+    After a strobe, $4017 D2-D4 give buttons 1-3, then 4-6, then $14 (a detection
+    value); later reads repeat it (UNVERIFIED). ``buttons``: bits 0-5 for 1-6."""
+
+    def __init__(self) -> None:
+        self.buttons = 0
+        self.strobe = False
+        self._reads: list[int] = []
+        self._index = 0
+
+    def set_out(self, value: int) -> None:
+        high = bool(value & 1)
+        if self.strobe and not high:
+            b = self.buttons
+            self._reads = [(b & 7) << 2, (b >> 3 & 7) << 2, 0x14]
+            self._index = 0
+        self.strobe = high
+
+    def read(self, port: int) -> int:
+        if not port or self.strobe:
+            return 0
+        reads = self._reads
+        return reads[min(self._index, len(reads) - 1)] if reads else 0
+
+    def clock(self, port: int) -> None:
+        if port and not self.strobe:
+            self._index += 1
+
+
+class ExcitingBoxing:
+    """Konami's Exciting Boxing punching bag on the expansion port
+    (Exciting_Boxing_Punching_Bag.wiki; active low, as MAME's konamibag.cpp).
+    OUT1 picks the sensor group; $4017 D1-D4: left hook, move right, move left,
+    right hook (OUT1 = 0) or left jab, body, right jab, straight (OUT1 = 1).
+    ``sensors``: bits 0-3 the first group, 4-7 the second."""
+
+    def __init__(self) -> None:
+        self.sensors = 0
+        self._group = 0
+
+    def set_out(self, value: int) -> None:
+        self._group = value >> 1 & 1
+
+    def read(self, port: int) -> int:
+        if not port:
+            return 0
+        return ~((self.sensors >> (4 * self._group) & 15) << 1) & 0x1E
+
+    def clock(self, port: int) -> None:
+        pass
+
+
+class CoconutsPachinko(SerialReport):
+    """Coconuts Japan's pachinko controller (Hori CJPC-102) on the expansion port,
+    $4016 D1 (Coconuts_Japan_Pachinko_Controller.wiki): its pad's 8 bits, a 1, then
+    the dial's 7-bit value inverted, MSB first, then 1s. The dial converts all the
+    time, so a strobe takes the latest. ``pad``; ``dial``: $03 (rest) to about $73."""
+
+    bit = 1
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.pad = StandardController()
+        self.dial = 0x04
+
+    def report(self) -> list[int]:
+        dial = max(0, min(0x7F, self.dial))
+        pad = [self.pad.buttons >> i & 1 for i in range(8)]
+        return [*pad, 1, *_msb_first(dial ^ 0x7F, 7)]
+
+    def set_out(self, value: int) -> None:
+        self.set_strobe(bool(value & 1))
+
+    def read(self, port: int = 0) -> int:  # type: ignore[override]
+        if port:
+            return 0
+        if self.strobe:
+            return (self.pad.buttons & 1) << 1
+        return super().read()
+
+    def clock(self, port: int = 0) -> None:  # type: ignore[override]
+        if not port:
+            super().clock()
+
+
+JISSEN_MAHJONG_ROWS = (
+    ("", "", "N", "M", "L", "K", "J", "I"),  # row 1
+    ("H", "G", "F", "E", "D", "C", "B", "A"),  # row 2
+    ("", "RON", "RIICHI", "CHII", "PON", "KAN", "START", "SELECT"),  # row 3
+)
+
+
+class JissenMahjong:
+    """Capcom's Jissen Mahjong controller on the expansion port
+    (Jissen_Mahjong_controller.wiki): while OUT0 is 1, OUT2-OUT1 pick the row (0:
+    rows 1 and 2 ORed) that loads its 4021; after the fall, $4017 D1 gives 8 bits
+    in the listed order (1: held), then 1s. ``keys``: held buttons' names."""
+
+    def __init__(self) -> None:
+        self.keys: set[str] = set()
+        self.strobe = False
+        self._row = 0
+        self._shift = 0xFF
+
+    def _load(self) -> None:
+        rows = (
+            (JISSEN_MAHJONG_ROWS[0], JISSEN_MAHJONG_ROWS[1])
+            if self._row == 0
+            else (JISSEN_MAHJONG_ROWS[self._row - 1],)
+        )
+        value = 0
+        for row in rows:
+            value |= sum(1 << i for i, name in enumerate(row) if name and name in self.keys)
+        self._shift = value
+
+    def set_out(self, value: int) -> None:
+        self._row = value >> 1 & 3
+        high = bool(value & 1)
+        if high or self.strobe:
+            self._load()
+        self.strobe = high
+
+    def read(self, port: int) -> int:
+        if not port:
+            return 0
+        if self.strobe:
+            self._load()
+        return (self._shift & 1) << 1
+
+    def clock(self, port: int) -> None:
+        if port and not self.strobe:
+            self._shift = self._shift >> 1 | 0x80
+
+
+class OekaKidsTablet:
+    """Bandai's Oeka Kids tablet on the expansion port (Oeka_Kids_tablet.wiki, which
+    calls itself possibly incorrect). OUT0 = 0 latches a report; with OUT0 = 1, a
+    rise of OUT1 moves to the next bit. $4017 D2: the acknowledgement, 0 while OUT0
+    and OUT1 are both 1 (the slow MCU's delay is not modelled: it answers at once);
+    D3: 0 while OUT0 is 0, else the current bit inverted. The report, MSB first: X
+    (0-239), Y (0-255), touching, clicking. ``x``, ``y``, ``touching``, ``click``."""
+
+    def __init__(self) -> None:
+        self.x = 0
+        self.y = 0
+        self.touching = False
+        self.click = False
+        self._out = 0
+        self._bits: list[int] = []
+        self._index = 0
+
+    def set_out(self, value: int) -> None:
+        strobe, advance = value & 1, value >> 1 & 1
+        if not strobe:
+            x = max(0, min(239, self.x))
+            y = max(0, min(255, self.y))
+            self._bits = [
+                *_msb_first(x, 8),
+                *_msb_first(y, 8),
+                int(self.touching),
+                int(self.click),
+            ]
+            self._index = -1
+        elif advance and not self._out >> 1 & 1:
+            self._index += 1
+        self._out = value & 3
+
+    def read(self, port: int) -> int:
+        if not port:
+            return 0
+        strobe, advance = self._out & 1, self._out >> 1 & 1
+        ack = 0 if strobe and advance else 0x04
+        if not strobe:
+            return ack
+        index = self._index
+        bit = self._bits[index] if 0 <= index < len(self._bits) else 0
+        return ack | (bit ^ 1) << 3
+
+    def clock(self, port: int) -> None:
+        pass
+
+
+class Famicom3DSystem:
+    """The Famicom 3D System's control box (Famicom_3D_System.wiki): OUT1 says which
+    eye the next field is for (0 left, 1 right), kept as ``eye`` for a display; it
+    passes the expansion port through, here to ``through`` (players 3 and 4)."""
+
+    def __init__(self) -> None:
+        self.eye = 0
+        self.through = ExpansionPads()
+
+    def set_out(self, value: int) -> None:
+        self.eye = value >> 1 & 1
+        self.through.set_out(value)
+
+    def read(self, port: int) -> int:
+        return self.through.read(port)
+
+    def clock(self, port: int) -> None:
+        self.through.clock(port)
+
+
+class PortTestPort:
+    """One port of the factory port test controller (Port_test_controller.wiki): a
+    pad on D0, and a signature on D4 from a shift register that D3 taps two bits
+    later (Q6). Port 1's signature is 1, 0, 1, 0... then 1s; port 2's the inverse."""
+
+    def __init__(self, pad: StandardController, second: bool) -> None:
+        self.pad = pad
+        self.strobe = False
+        self._pattern = [(i & 1) ^ (0 if second else 1) for i in range(8)]
+        self._fill = 0 if second else 1
+        self._index = 0
+
+    def _bit(self, index: int) -> int:
+        return self._pattern[index] if index < 8 else self._fill
+
+    def set_strobe(self, high: bool) -> None:
+        self.pad.set_strobe(high)
+        self.strobe = high
+        if high:
+            self._index = 0
+
+    def read(self) -> int:
+        index = self._index
+        return self.pad.read() | self._bit(index + 2) << 3 | self._bit(index) << 4
+
+    def clock(self) -> None:
+        self.pad.clock()
+        if not self.strobe:
+            self._index += 1
+
+
+# R.O.B.'s commands (R.O.B..wiki): the four bits w x y z after 000101 in 000101w1x1y1z.
+ROB_COMMANDS = {
+    0b0101: "up 2",
+    0b1100: "up 1",
+    0b0010: "down 1",
+    0b1101: "down 2",
+    0b0100: "left",
+    0b1000: "right",
+    0b0110: "close arms",
+    0b1010: "open arms",
+    0b1001: "LED on",
+    0b0001: "reset",
+}
+
+
+class Rob:
+    """R.O.B. (the Family Computer Robot), which watches the TV, not the bus.
+
+    R.O.B..wiki: one bit per frame, a bright screen 1 and black 0, a command being
+    the 13 bits 000101w1x1y1z. ``see(picture)`` takes each frame the board drew; it
+    reads the frame as bright when the middle of the picture is mostly lit (official
+    games flash $2A green on $0F black). The decoded state is kept here (``height``
+    0-5, ``turn`` -2 to 2, ``arms_closed``, ``led``, ``commands``); the robot's
+    hands pressing pad 2's buttons in *Gyromite* is left to the player.
+    """
+
+    def __init__(self, palette: Sequence[bytes]) -> None:
+        self._bright = [luminance(rgb) > 60 for rgb in palette]
+        self._bits = 0
+        self.height = 2
+        self.turn = 0
+        self.arms_closed = False
+        self.led = False
+        self.commands: list[str] = []
+
+    def see(self, picture: Sequence[int]) -> str | None:
+        bright = self._bright
+        lit = sum(
+            bright[picture[y * 256 + x]] for y in range(80, 160, 8) for x in range(64, 192, 8)
+        )
+        self._bits = (self._bits << 1 | (lit > 80)) & 0x1FFF
+        # 000101w1x1y1z, oldest bit highest: the fixed bits are 12-7, 5, 3 and 1.
+        if self._bits & 0b1111110101010 != 0b0001010101010:
+            return None
+        bits = self._bits
+        command = (bits >> 6 & 1) << 3 | (bits >> 4 & 1) << 2 | (bits >> 2 & 1) << 1 | (bits & 1)
+        name = ROB_COMMANDS.get(command)
+        if name is None:
+            return None
+        self._bits = 0
+        self._act(name)
+        self.commands.append(name)
+        return name
+
+    def _act(self, name: str) -> None:
+        if name.startswith("up"):
+            self.height = min(5, self.height + int(name[-1]))
+        elif name.startswith("down"):
+            self.height = max(0, self.height - int(name[-1]))
+        elif name == "left":
+            self.turn = max(-2, self.turn - 1)
+        elif name == "right":
+            self.turn = min(2, self.turn + 1)
+        elif name == "close arms":
+            self.arms_closed = True
+        elif name == "open arms":
+            self.arms_closed = False
+        elif name == "LED on":
+            self.led = True
+        elif name == "reset":
+            self.led, self.arms_closed, self.height, self.turn = False, False, 2, 0
+
+
 # -- choosing devices -------------------------------------------------------------------
 
 # NES_2.0.wiki "Default Expansion Device": the numbers built here.
@@ -959,6 +1301,16 @@ VAUS_FAMICOM = 0x10
 VAUS_TWO_AND_RECORDER = 0x11  # Arkanoid II: its recorder needs the keyboard, not built here
 KONAMI_HYPER_SHOT = 0x12
 TAPTAP_MAT = 0x1A
+BANDAI_HYPER_SHOT = 0x0A
+PACHINKO = 0x13
+BOXING_BAG = 0x14
+JISSEN_MAHJONG = 0x15
+PARTYTAP = 0x16
+OEKA_KIDS = 0x17
+FAMICOM_3D = 0x1D
+ROB_GYROMITE = 0x1F
+ROB_STACK_UP = 0x2E
+PORT_TEST = 0x37
 DATA_RECORDER = 0x20
 TURBO_FILE = 0x21
 FAMILY_BASIC_KEYBOARD = 0x23
@@ -1008,6 +1360,16 @@ DEVICE_NAMES = {
     ZAPPER_4016: "Zapper ($4016)",
     SUBOR_KEYBOARD_MEGA_BOOK: "Subor Keyboard and Mega Book Mouse",
     HORI_TRACK: "Hori Track",
+    BANDAI_HYPER_SHOT: "Bandai Hyper Shot",
+    PACHINKO: "Coconuts Japan Pachinko Controller",
+    BOXING_BAG: "Exciting Boxing punching bag",
+    JISSEN_MAHJONG: "Jissen Mahjong controller",
+    PARTYTAP: "Partytap",
+    OEKA_KIDS: "Oeka Kids tablet",
+    FAMICOM_3D: "Famicom 3D System",
+    ROB_GYROMITE: "R.O.B. (Gyromite)",
+    ROB_STACK_UP: "R.O.B. (Stack-Up)",
+    PORT_TEST: "port test controller",
 }
 
 
@@ -1085,6 +1447,26 @@ def plug(
     if device == HORI_TRACK:
         board.expansion = HoriTrack()
         return board.expansion
+    simple = {
+        PACHINKO: CoconutsPachinko,
+        BOXING_BAG: ExcitingBoxing,
+        JISSEN_MAHJONG: JissenMahjong,
+        PARTYTAP: Partytap,
+        OEKA_KIDS: OekaKidsTablet,
+        FAMICOM_3D: Famicom3DSystem,
+    }
+    if device in simple:
+        board.expansion = simple[device]()
+        return board.expansion
+    if device == BANDAI_HYPER_SHOT:
+        board.expansion = BandaiHyperShot(ppu, palette)
+        return board.expansion
+    if device in (ROB_GYROMITE, ROB_STACK_UP):
+        return Rob(palette)  # it watches the picture; nothing on the bus
+    if device == PORT_TEST:
+        pads = [StandardController(), StandardController()]
+        board.pads = [PortTestPort(pads[0], False), PortTestPort(pads[1], True)]
+        return board.pads
     if device in SUBOR_SETS:
         keyboard = SuborKeyboard()
         board.expansion = keyboard
