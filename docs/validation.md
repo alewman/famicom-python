@@ -2316,9 +2316,22 @@ input). In games, headless with scripted input:
 | Family BASIC Keyboard | *Family BASIC* v2.1 | the wiki's scan ($05, then $04/$06 per row); keys move the opening dialogue on, and a typed name appears |
 | Konami Hyper Shot | *Hyper Olympic* | Run joins a 1UP lane to the attract race (CPU against CPU without it) |
 
-The frontend plugs the cartridge's device (`--device` to choose): the mouse is the
-Zapper and the Vaus knob, keys 1-4/Q-R/A-F the mats, the host keyboard the Family
-BASIC Keyboard. Not built: the Vs. Zapper, the Bandai Hyper Shot, mice, the Subor
-and other keyboards (nes20db's 119 type-38 dumps), the second *Arkanoid II* Vaus,
-the data recorder, the Turbo File, R.O.B.
+The second set, the same way (tests: 10 more cases, among them the SNES Mouse's
+report and sensitivity, each mouse's format, the Subor Keyboard's half-rows, the
+Turbo File written and read back LSB first, a tape recorded and played back):
+
+| Device | Game | What happened |
+| --- | --- | --- |
+| Super NES Mouse | *NESert Golfing* v1.5 | 32 bits per strobe; the game steps the sensitivity (its mouse check); a left click starts a hole |
+| Subor Keyboard | *Text Editor* (Russia) | a key leaves the opening page; typed P R I V E T reads ЗКШМУЕ, those keys on the ЙЦУКЕН layout, the cursor at X:07 |
+| Subor Keyboard and Mouse | *Subor V8.0* | the pointer follows the mouse from the top-left corner |
+| Turbo File, Data Recorder | *Castle Excellent*, *Excitebike* | plugged, the tape records and saves; neither game uses them before a save, which was not scripted |
+
+The frontend: the mouse drives the mice and the Hori Track, the host keyboard the
+Subor Keyboard, F9/F10 play and record the tape (`<rom>.tape`), and the Turbo File
+keeps `turbo-file.sav` in the cartridge's folder. Not built: the Vs. System's
+devices (no Vs. System on the board), the IGS Battle Box (its EEPROM commands are
+not on its page), the other Chinese keyboards (no description anywhere), and the
+rest of the tail (Bandai Hyper Shot, Partytap, mahjong and pachinko controllers,
+R.O.B., the pianos, Barcode Battler, Oeka Kids).
 

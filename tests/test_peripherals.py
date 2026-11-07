@@ -258,3 +258,166 @@ def test_nes2_header_names_the_device_and_routes_nes_only_ones_to_the_nes() -> N
     system.loaded = load(bytes(image), use_database=False)
     assert isinstance(system.plug(), p.Zapper)
     assert isinstance(system.board.expansion, p.FamicomZapper)
+
+
+# -- the second batch ---------------------------------------------------------------
+
+
+def _latch(device) -> None:
+    device.set_strobe(True)
+    device.set_strobe(False)
+
+
+def _bits(device, count: int, bit: int = 0) -> list[int]:
+    out = []
+    for _ in range(count):
+        out.append(device.read() >> bit & 1)
+        device.clock()
+    return out
+
+
+def test_snes_controller_sends_16_bits_b_first_then_ones() -> None:
+    pad = p.SnesController()
+    pad.buttons = 1 << 0 | 1 << 9  # B and X
+    _latch(pad)
+    assert _bits(pad, 18) == [1] + [0] * 8 + [1] + [0] * 6 + [1, 1]
+
+
+def test_snes_mouse_report_and_sensitivity() -> None:
+    # Super_NES_Mouse.wiki: $00, then RL ss 0001, then Y and X sign-magnitude.
+    mouse = p.SnesMouse()
+    mouse.left = True
+    mouse.move(-5, 3)
+    _latch(mouse)
+    bits = _bits(mouse, 33)
+    value = int("".join(map(str, bits[:32])), 2)
+    assert value == 0x00_41_03_85 and bits[32] == 1
+    mouse.set_strobe(True)
+    mouse.clock()  # a clock while latched steps the sensitivity
+    mouse.set_strobe(False)
+    assert mouse.sensitivity == 1
+    _latch(mouse)
+    third = int("".join(map(str, _bits(mouse, 32)[16:24])), 2)
+    assert third == 0x00  # no motion: magnitude 0, the last sign (down) kept
+
+
+def test_subor_mouse_small_and_large_motion() -> None:
+    mouse = p.SuborMouse()
+    mouse.move(1, 0)
+    _latch(mouse)
+    assert int("".join(map(str, _bits(mouse, 24))), 2) == 1 << 16  # right, E = 0
+    mouse.right = True
+    mouse.move(-20, 7)
+    _latch(mouse)
+    value = int("".join(map(str, _bits(mouse, 24))), 2)
+    assert value == 1 << 22 | 1 << 21 | 1 << 18 | 1 << 17 | 20 << 8 | 7
+
+
+def test_macro_winners_mouse_one_and_three_byte_reports() -> None:
+    mouse = p.MacroWinnersMouse()
+    mouse.left = True
+    mouse.move(-1, 1)
+    _latch(mouse)
+    assert int("".join(map(str, _bits(mouse, 8))), 2) == 0b1011_0100  # L, X 3, Y 1
+    mouse.move(18, -5)
+    reports = []
+    for _ in range(3):
+        _latch(mouse)
+        reports.append(int("".join(map(str, _bits(mouse, 8))), 2))
+    # L still held; X left, bit 4 set; Y up, bit 4 clear; then 01.
+    assert reports == [0b1001_1001, (18 & 15) << 2 | 2, 5 << 2 | 3]
+
+
+def test_yuxing_mouse_is_inverted_with_start_and_stop_bits() -> None:
+    mouse = p.YuxingMouse()
+    mouse.move(3, -2)
+    mouse.set_strobe(False)
+    mouse.set_strobe(True)  # its strobe is inverted: 0 then 1
+    raw = [b ^ 1 for b in _bits(mouse, 27)]
+    packets = [raw[i : i + 9] for i in range(0, 27, 9)]
+    assert all(packet[0] == 0 and packet[8] == 1 for packet in packets)
+    assert packets[0][1] == 1 and packets[1][1] == 0 and packets[2][1] == 0
+    assert int("".join(map(str, packets[2][2:8])), 2) == 3
+    assert int("".join(map(str, packets[1][2:8])), 2) == (-2) & 0x3F
+
+
+def test_subor_keyboard_reads_four_keys_at_a_time() -> None:
+    board = nrom_system(b"", FAMICOM).board
+    devices = p.plug(board, p.SUBOR_KEYBOARD_MOUSE_4016, famicom=True)
+    keyboard, mouse = devices
+    assert isinstance(mouse, p.SuborMouse) and board.pads[0] is mouse
+    keyboard.keys = {"G", "V"}  # row 0: bit 1 (low half), bit 7 (high half)
+    _strobe(board, 0x05)  # enabled, reset
+    _strobe(board, 0x04)  # low half
+    assert board.read_byte(0x4017) & 0x1E == 0x1E & ~0x04
+    _strobe(board, 0x06)  # high half
+    assert board.read_byte(0x4017) & 0x1E == 0x1E & ~0x10
+    _strobe(board, 0x04)  # the fall: row 1, nothing held
+    assert board.read_byte(0x4017) & 0x1E == 0x1E
+
+
+def test_turbo_file_writes_and_reads_back_lsb_first() -> None:
+    board = nrom_system(b"", FAMICOM).board
+    turbo = p.plug(board, p.TURBO_FILE, famicom=True)
+    _strobe(board, 0x00)
+    _strobe(board, 0x02)  # reset to $0000
+    for bit in (1, 0, 1, 1, 0, 0, 0, 0, 1):  # $0D, then bit 0 of $0001
+        _strobe(board, 0x06 | bit)
+        _strobe(board, 0x02 | bit)
+    assert turbo.data[0] == 0x0D and turbo.data[1] == 0x01
+    _strobe(board, 0x00)
+    _strobe(board, 0x02)
+    seen = []
+    for _ in range(8):
+        old = board.read_byte(0x4017) >> 2 & 1
+        seen.append(old)
+        _strobe(board, 0x06 | old)
+        _strobe(board, 0x02 | old)
+    assert seen == [1, 0, 1, 1, 0, 0, 0, 0] and turbo.data[0] == 0x0D
+
+
+def test_data_recorder_plays_back_what_was_recorded() -> None:
+    system = nrom_system(b"", FAMICOM)
+    board = system.board
+    keyboard = p.plug(board, p.FAMILY_BASIC_KEYBOARD, famicom=True)
+    tape = keyboard.recorder
+    tape.record()
+    for level in (1, 0, 1, 1, 0):
+        _strobe(board, 0x04 | level)
+        for _ in range(100):
+            board.read_byte(0x0000)
+    tape.stop()
+    tape.play()
+    heard = []
+    for _ in range(5):
+        for _ in range(50):  # the middle of each recorded level
+            board.read_byte(0x0000)
+        heard.append(board.read_byte(0x4016) >> 1 & 1)
+        for _ in range(49):
+            board.read_byte(0x0000)
+    assert heard == [1, 0, 1, 1, 0]
+    _strobe(board, 0x00)  # OUT2 = 0 forces the input to 0
+    assert all(board.read_byte(0x4016) & 2 == 0 for _ in range(3))
+
+
+def test_arkanoid_two_second_vaus_answers_on_4017_d3_d4() -> None:
+    board = nrom_system(b"", FAMICOM).board
+    first, second = p.plug(board, p.VAUS_TWO_AND_RECORDER, famicom=True)
+    second.fire = True
+    value = board.read_byte(0x4017)
+    assert value & 0x08 and not value & 0x02 & (first.fire << 1)
+
+
+def test_hori_track_report_on_4016_d1() -> None:
+    track = p.HoriTrack()
+    track.pad.buttons = A
+    track.move(-3, 2)  # mode R: axis 1 = left (3), axis 2 = down (2)
+    track.set_out(1)
+    track.set_out(0)
+    bits = []
+    for _ in range(24):
+        bits.append(track.read(0) >> 1 & 1)
+        track.clock(0)
+    assert bits[:8] == [1, 0, 0, 0, 0, 0, 0, 0]
+    assert int("".join(map(str, bits[8:16])), 2) == (3 ^ 15) << 4 | (2 ^ 15)
+    assert int("".join(map(str, bits[16:24])), 2) == 0x10

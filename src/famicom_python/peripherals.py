@@ -18,6 +18,7 @@ small protocols, the board's business being only when each signal moves:
 from __future__ import annotations
 
 import math
+from bisect import bisect_right
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING
 
@@ -339,23 +340,37 @@ class VausNES:
 
 
 class VausFamicom:
-    """The Famicom Vaus on the expansion port: $4016 D1 = fire, $4017 D1 = knob data."""
+    """The Famicom Vaus on the expansion port: $4016 D1 = fire, $4017 D1 = knob data.
 
-    def __init__(self, now: Callable[[], int], ticks_per_second: int) -> None:
+    ``second``: a second Vaus in the *Arkanoid II* controller's own expansion port,
+    which sees OUT0 and $4017's /OE and answers on $4017 D3 (fire) and D4 (knob)
+    (Arkanoid_controller.wiki "Arkanoid II expansion port").
+    """
+
+    def __init__(self, now: Callable[[], int], ticks_per_second: int, second: bool = False) -> None:
         self.vaus = Vaus(now, ticks_per_second)
+        self.second = Vaus(now, ticks_per_second) if second else None
 
     def set_out(self, value: int) -> None:
         self.vaus.set_out0(bool(value & 1))
+        if self.second is not None:
+            self.second.set_out0(bool(value & 1))
 
     def read(self, port: int) -> int:
         vaus = self.vaus
-        if port:
-            return vaus.data() << 1
-        return 0x02 if vaus.fire else 0
+        if not port:
+            return 0x02 if vaus.fire else 0
+        value = vaus.data() << 1
+        second = self.second
+        if second is not None:
+            value |= (0x08 if second.fire else 0) | second.data() << 4
+        return value
 
     def clock(self, port: int) -> None:
         if port:
             self.vaus.shift_out()
+            if self.second is not None:
+                self.second.shift_out()
 
 
 # -- mats ----------------------------------------------------------------------------
@@ -456,17 +471,21 @@ class FamilyBasicKeyboard:
     $4016 write: OUT0 resets to row 0; OUT1 selects the column, and a fall moves to
     the next row (from the keyless 10th, back to the first); OUT2 enables the
     matrix, else everything reads 0. $4017 D4-D1: the selected keys, 0 = held.
-    ``keys``: the held keys' names (``KEYBOARD_KEYS``). The Data Recorder on $4016
-    is not built; the matrix's settling times are not modelled.
+    ``keys``: the held keys' names (``KEYBOARD_KEYS``). ``recorder``: a Data
+    Recorder on its jacks, OUT0 out and $4016 D1 back. The matrix's settling times
+    are not modelled.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, recorder: DataRecorder | None = None) -> None:
         self.keys: set[str] = set()
+        self.recorder = recorder
         self.row = 0
         self._column = 0
         self._enabled = False
 
     def set_out(self, value: int) -> None:
+        if self.recorder is not None:
+            self.recorder.output(value & 1)
         column = value >> 1 & 1
         if value & 1:
             self.row = 0
@@ -476,8 +495,10 @@ class FamilyBasicKeyboard:
         self._enabled = bool(value & 4)
 
     def read(self, port: int) -> int:
-        if not port or not self._enabled:
+        if not self._enabled:
             return 0
+        if not port:
+            return self.recorder.input() << 1 if self.recorder is not None else 0
         if self.row >= len(KEYBOARD_MATRIX):
             return 0x1E
         names = KEYBOARD_MATRIX[self.row][self._column]
@@ -512,6 +533,415 @@ class KonamiHyperShot:
         pass
 
 
+# -- serial reports: mice, SNES pads, the Hori Track ---------------------------------------
+
+
+class SerialReport:
+    """A controller-port device that latches a report when OUT0 falls and shifts it out.
+
+    ``report()`` gives the bits in the order they are read; after them, ``fill``.
+    While OUT0 is high every read returns the report's first bit, as a 4021's does.
+    ``bit`` is the data line (0: D0; 1: D1 on the Famicom expansion port).
+    """
+
+    bit = 0
+    fill = 1
+
+    def __init__(self) -> None:
+        self.strobe = False
+        self._bits: list[int] = []
+        self._index = 0
+
+    def report(self) -> list[int]:
+        raise NotImplementedError
+
+    def set_strobe(self, high: bool) -> None:
+        if self.strobe and not high:
+            self._bits = self.report()
+            self._index = 0
+        self.strobe = high
+
+    def read(self) -> int:
+        if self.strobe:
+            return self.fill << self.bit
+        bits = self._bits
+        value = bits[self._index] if self._index < len(bits) else self.fill
+        return value << self.bit
+
+    def clock(self) -> None:
+        if not self.strobe:
+            self._index += 1
+
+
+def _msb_first(value: int, width: int) -> list[int]:
+    return [value >> (width - 1 - i) & 1 for i in range(width)]
+
+
+class _Pointer:
+    """Motion a host feeds in (``move``), taken whole at each report."""
+
+    def __init__(self) -> None:
+        self.left = False
+        self.right = False
+        self._dx = 0
+        self._dy = 0
+
+    def move(self, dx: int, dy: int) -> None:
+        self._dx += dx
+        self._dy += dy
+
+    def _take(self, limit: int) -> tuple[int, int]:
+        dx = max(-limit, min(limit, self._dx))
+        dy = max(-limit, min(limit, self._dy))
+        self._dx -= dx
+        self._dy -= dy
+        return dx, dy
+
+
+class SnesController(SerialReport):
+    """A Super NES controller through an adapter (SNES_controller.wiki): 16 bits, B
+    first, the last four 0, then 1s. ``buttons``: B Y Select Start Up Down Left Right
+    A X L R in bits 0-11 (so its low byte is an NES pad's)."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.buttons = 0
+
+    def set_strobe(self, high: bool) -> None:
+        super().set_strobe(high)
+
+    def read(self) -> int:
+        if self.strobe:
+            return self.buttons & 1
+        return super().read()
+
+    def report(self) -> list[int]:
+        return [self.buttons >> i & 1 for i in range(12)] + [0, 0, 0, 0]
+
+
+class SnesMouse(SerialReport, _Pointer):
+    """The Super NES Mouse through an adapter (Super_NES_Mouse.wiki): 32 bits MSB
+    first: $00; right, left, sensitivity, signature 0001; then Y and X as sign and
+    magnitude (1: up, left), the magnitude's sign repeating the last when 0. A clock
+    while OUT0 is high steps the sensitivity; motion is taken as setting 0's counts
+    and mapped through the wiki's table for 1 and 2."""
+
+    TABLES = ((0, 1, 2, 3, 4, 5, 6, 7), (0, 1, 2, 3, 8, 10, 12, 21), (0, 1, 4, 9, 12, 20, 24, 28))
+
+    def __init__(self) -> None:
+        SerialReport.__init__(self)
+        _Pointer.__init__(self)
+        self.sensitivity = 0
+        self._up = 0
+        self._leftward = 0
+
+    def clock(self) -> None:
+        if self.strobe:
+            self.sensitivity = (self.sensitivity + 1) % 3
+        else:
+            super().clock()
+
+    def _magnitude(self, value: int) -> int:
+        size = min(abs(value), 63)
+        if self.sensitivity:
+            table = self.TABLES[self.sensitivity]
+            size = table[min(size, 7)]
+        return size
+
+    def report(self) -> list[int]:
+        dx, dy = self._take(63)
+        if dy:
+            self._up = int(dy < 0)
+        if dx:
+            self._leftward = int(dx < 0)
+        second = self.right << 7 | self.left << 6 | self.sensitivity << 4 | 0x1
+        third = self._up << 7 | self._magnitude(dy)
+        fourth = self._leftward << 7 | self._magnitude(dx)
+        return (
+            _msb_first(0, 8) + _msb_first(second, 8) + _msb_first(third, 8) + _msb_first(fourth, 8)
+        )
+
+
+class SuborMouse(SerialReport, _Pointer):
+    """The Subor Mouse (Subor_Mouse.wiki): 24 bits, bit 23 first: left, right, E,
+    then up, down, left, right movement flags, then |X| and |Y| (0-127) when E is
+    1 (movement beyond one unit). Its first 8 bits read as a pad moved by one unit."""
+
+    def __init__(self) -> None:
+        SerialReport.__init__(self)
+        _Pointer.__init__(self)
+
+    def report(self) -> list[int]:
+        dx, dy = self._take(127)
+        big = abs(dx) > 1 or abs(dy) > 1
+        value = (
+            self.left << 23
+            | self.right << 22
+            | big << 21
+            | (dy < 0) << 19
+            | (dy > 0) << 18
+            | (dx < 0) << 17
+            | (dx > 0) << 16
+        )
+        if big:
+            value |= abs(dx) << 8 | abs(dy)
+        return _msb_first(value, 24)
+
+
+class MacroWinnersMouse(SerialReport, _Pointer):
+    """The Macro Winners (GameStar) Mouse, and the Mega Book's (Macro_Winners_Mouse.wiki).
+
+    One byte per strobe, MSB first. Motion within one unit each way: one byte; else
+    three, one per strobe. Movement beyond 31 units is held for the next report.
+    """
+
+    def __init__(self, mega_book: bool = False) -> None:
+        SerialReport.__init__(self)
+        _Pointer.__init__(self)
+        self.mega_book = mega_book
+        self._pending: list[int] = []
+
+    def report(self) -> list[int]:
+        if not self._pending:
+            dx, dy = self._take(31)
+            buttons = self.left << 7 | self.right << 6
+            if abs(dx) <= 1 and abs(dy) <= 1:
+                x = 3 if dx < 0 else dx
+                y = 3 if dy < 0 else dy
+                byte = buttons | (x << 2 | y if self.mega_book else x << 4 | y << 2)
+                self._pending = [byte]
+            else:
+                sx, sy = int(dx < 0), int(dy < 0)
+                ax, ay = abs(dx), abs(dy)
+                if self.mega_book:
+                    first = buttons | 0x10 | sx << 3 | (ax >> 4) << 2 | sy << 1 | ay >> 4
+                    self._pending = [first, 0x20 | (ax & 15), 0x30 | (ay & 15)]
+                else:
+                    first = buttons | sx << 5 | (ax >> 4) << 4 | sy << 3 | (ay >> 4) << 2 | 1
+                    self._pending = [first, (ax & 15) << 2 | 2, (ay & 15) << 2 | 3]
+        return _msb_first(self._pending.pop(0), 8)
+
+
+class YuxingMouse(SerialReport, _Pointer):
+    """The Yuxing Mouse (Yuxing_Mouse.wiki): a serial mouse with X and Y swapped,
+    strobed by writing 0 then 1, its data inverted. Three 9-bit packets (0 start
+    bit, seven data bits, 1 stop bit): sync, buttons and the top bits of Y and X,
+    then Y's low six bits, then X's. The order the 7 data bits leave in is taken as
+    MSB first (UNVERIFIED)."""
+
+    fill = 0
+
+    def __init__(self) -> None:
+        SerialReport.__init__(self)
+        _Pointer.__init__(self)
+
+    def set_strobe(self, high: bool) -> None:
+        if high and not self.strobe:  # the inverted strobe: a rise latches
+            self._bits = self.report()
+            self._index = 0
+        self.strobe = high
+
+    def read(self) -> int:
+        bits = self._bits
+        value = bits[self._index] if self._index < len(bits) else 1
+        return (value ^ 1) << self.bit
+
+    def clock(self) -> None:
+        self._index += 1
+
+    def report(self) -> list[int]:
+        dx, dy = self._take(127)
+        x, y = dx & 0xFF, dy & 0xFF
+        first = 1 << 6 | (not self.left) << 5 | self.right << 4 | (x >> 6) << 2 | y >> 6
+        bits: list[int] = []
+        for data in (first, y & 0x3F, x & 0x3F):
+            bits += [0, *_msb_first(data, 7), 1]
+        return bits
+
+
+class HoriTrack(SerialReport, _Pointer):
+    """The Hori Track (Hori_Track.wiki) on the Famicom expansion port, $4016 D1
+    (UNVERIFIED: the page does not say). Byte 1: its standard pad, A first; byte 2,
+    MSB first: axis 1 and axis 2, signed 4 bits, XOR $F; byte 3: rotation mode (0:
+    R), speed (0: Hi), ID 1, then 0000. Then 1s (UNVERIFIED). ``pad``: its buttons.
+    In mode R (the default) axis 1 points left and axis 2 down."""
+
+    bit = 1
+
+    def __init__(self) -> None:
+        SerialReport.__init__(self)
+        _Pointer.__init__(self)
+        self.pad = StandardController()
+        self.rotation_l = False
+        self.slow = False
+
+    def report(self) -> list[int]:
+        dx, dy = self._take(7)
+        if self.rotation_l:
+            axis1, axis2 = -dy, dx
+        else:
+            axis1, axis2 = -dx, dy
+        axes = ((axis1 & 15) ^ 15) << 4 | ((axis2 & 15) ^ 15)
+        third = self.rotation_l << 7 | self.slow << 6 | 1 << 4
+        pad = [self.pad.buttons >> i & 1 for i in range(8)]
+        return pad + _msb_first(axes, 8) + _msb_first(third, 8)
+
+    def set_out(self, value: int) -> None:
+        self.set_strobe(bool(value & 1))
+
+    def read(self, port: int = 0) -> int:  # type: ignore[override]
+        return super().read() if port == 0 else 0
+
+    def clock(self, port: int = 0) -> None:  # type: ignore[override]
+        if port == 0:
+            super().clock()
+
+
+# -- the Subor Keyboard ---------------------------------------------------------------------
+
+# MAME's src/devices/bus/nes_ctrl/suborkey.cpp (BSD-3-Clause, Fabio Priuli): no
+# NESdev wiki page describes it. 13 rows of 8 keys, bit 0 first; names as PC keys.
+SUBOR_MATRIX = (
+    ("4", "G", "F", "C", "F2", "E", "5", "V"),
+    ("2", "D", "S", "END", "F1", "W", "3", "X"),
+    ("INSERT", "BACKSPACE", "PAGEDOWN", "RIGHT", "F8", "PAGEUP", "DELETE", "HOME"),
+    ("9", "I", "L", ",", "F5", "O", "0", "."),
+    ("]", "ENTER", "UP", "LEFT", "F7", "[", "\\", "DOWN"),
+    ("Q", "CAPSLOCK", "Z", "TAB", "ESC", "A", "1", "LCTRL"),
+    ("7", "Y", "K", "M", "F4", "U", "8", "J"),
+    ("-", ";", "'", "/", "F6", "P", "=", "LSHIFT"),
+    ("T", "H", "N", "SPACE", "F3", "R", "6", "B"),
+    ("", "", "", "", "", "", "", ""),
+    ("LALT", "KP4", "KP7", "F11", "F12", "KP1", "KP2", "KP8"),
+    ("KP-", "KP+", "KP*", "KP9", "F10", "KP5", "KP/", "NUMLOCK"),
+    ("`", "KP6", "PAUSE", "SPACE2", "F9", "KP3", "KP.", "KP0"),
+)
+SUBOR_KEYS = frozenset(name for row in SUBOR_MATRIX for name in row if name)
+
+
+class SuborKeyboard:
+    """The Subor (Xiao Ba Wang) Keyboard on the expansion port, as MAME's suborkey.
+
+    $4016 write, while OUT2 is 1: OUT1 selects the row's low (0) or high (1) four
+    keys, its fall from 1 moves to the next row (past row 12, back to 0), OUT0
+    resets to row 0. $4017 D1-D4: the selected four keys, 0 = held (a row past the
+    matrix reads $1E). ``keys``: the held keys' names (``SUBOR_KEYS``).
+    """
+
+    def __init__(self) -> None:
+        self.keys: set[str] = set()
+        self.row = 0
+        self._high = 0
+
+    def set_out(self, value: int) -> None:
+        if not value & 4:
+            return
+        high = value >> 1 & 1
+        if self._high and not high:
+            self.row = self.row + 1 if self.row < 12 else 0
+        self._high = high
+        if value & 1:
+            self.row = 0
+
+    def read(self, port: int) -> int:
+        if not port:
+            return 0
+        if self.row >= len(SUBOR_MATRIX):
+            return 0x1E
+        names = SUBOR_MATRIX[self.row][4 * self._high : 4 * self._high + 4]
+        held = sum(1 << i for i, name in enumerate(names) if name and name in self.keys)
+        return ~(held << 1) & 0x1E
+
+    def clock(self, port: int) -> None:
+        pass
+
+
+# -- storage: the Turbo File and the Data Recorder ------------------------------------------
+
+
+class TurboFile:
+    """ASCII's Turbo File (AS-TFO2) on the expansion port: 8 KiB of battery RAM read
+    and written a bit at a time (Turbo_File.wiki; MAME's turbofile.cpp, BSD-3).
+
+    $4016 write: OUT1 = 0 resets to address 0, bit 0; a fall of OUT2 (the clock)
+    stores OUT0 in the current bit (LSB first) and steps to the next, the address
+    after 8. $4017 D2: the current bit. ``data`` is the RAM, for saving; ``locked``
+    is the write-protect switch.
+    """
+
+    def __init__(self, data: bytes | None = None) -> None:
+        self.data = bytearray(data or bytes(0x2000))
+        self.locked = False
+        self._address = 0
+        self._bit = 0
+        self._out = 0
+
+    def set_out(self, value: int) -> None:
+        if not value & 2:
+            self._address = 0
+            self._bit = 0
+        if self._out & 4 and not value & 4:
+            if not self.locked:
+                mask = 1 << self._bit
+                byte = self.data[self._address] & ~mask
+                self.data[self._address] = byte | (value & 1) << self._bit
+            self._bit = (self._bit + 1) & 7
+            if not self._bit:
+                self._address = (self._address + 1) & 0x1FFF
+        self._out = value
+
+    def read(self, port: int) -> int:
+        if not port:
+            return 0
+        return (self.data[self._address] >> self._bit & 1) << 2
+
+    def clock(self, port: int) -> None:
+        pass
+
+
+class DataRecorder:
+    """The Family BASIC Data Recorder (HVC-008), or any cassette deck on its jacks.
+
+    Family_BASIC_Data_Recorder.wiki: OUT0 is a 1-bit audio output to the tape, and
+    $4016 D1 the 1-bit input back; OUT2 = 0 forces the input to 0. "For an emulator,
+    just play back the same bit stream as it was emitted": the tape is the list of
+    level changes, at master-tick positions along it. ``play``, ``record`` and
+    ``stop`` are the deck's keys; both start from the tape's beginning.
+    """
+
+    def __init__(self, now: Callable[[], int], tape: list[tuple[int, int]] | None = None) -> None:
+        self.now = now
+        self.tape: list[tuple[int, int]] = list(tape or [])
+        self.mode = "stop"
+        self._start = 0
+        self._last = 0
+
+    def play(self) -> None:
+        self.mode, self._start = "play", self.now()
+
+    def record(self) -> None:
+        self.mode, self._start = "record", self.now()
+        self.tape = []
+        self._last = -1
+
+    def stop(self) -> None:
+        self.mode = "stop"
+
+    def output(self, level: int) -> None:
+        if self.mode == "record" and level != self._last:
+            self.tape.append((self.now() - self._start, level))
+            self._last = level
+
+    def input(self) -> int:
+        if self.mode != "play" or not self.tape:
+            return 0
+        position = self.now() - self._start
+        if position > self.tape[-1][0] + 1_000_000:
+            return 0
+        index = bisect_right(self.tape, (position, 2)) - 1
+        return self.tape[index][1] if index >= 0 else 0
+
+
 # -- choosing devices -------------------------------------------------------------------
 
 # NES_2.0.wiki "Default Expansion Device": the numbers built here.
@@ -526,10 +956,24 @@ FAMILY_TRAINER_A = 0x0D
 FAMILY_TRAINER_B = 0x0E
 VAUS_NES = 0x0F
 VAUS_FAMICOM = 0x10
-VAUS_TWO_AND_RECORDER = 0x11  # Arkanoid II: the first Vaus only is built here
+VAUS_TWO_AND_RECORDER = 0x11  # Arkanoid II: its recorder needs the keyboard, not built here
 KONAMI_HYPER_SHOT = 0x12
 TAPTAP_MAT = 0x1A
+DATA_RECORDER = 0x20
+TURBO_FILE = 0x21
 FAMILY_BASIC_KEYBOARD = 0x23
+SUBOR_KEYBOARD = 0x26
+SUBOR_KEYBOARD_MACRO_WINNERS = 0x27
+SUBOR_KEYBOARD_MOUSE_4016 = 0x28
+SNES_MOUSE_4016 = 0x29
+SNES_CONTROLLERS = 0x2B
+SUBOR_KEYBOARD_MOUSE_4017 = 0x36
+YUXING_MOUSE = 0x43
+SUBOR_KEYBOARD_YUXING = 0x44
+SNES_MOUSE_4017 = 0x48
+ZAPPER_4016 = 0x49
+SUBOR_KEYBOARD_MEGA_BOOK = 0x4F
+HORI_TRACK = 0x50
 
 # Devices only the NES's controller ports take: such a cartridge runs on the NES.
 NES_ONLY = frozenset({FOUR_SCORE, POWER_PAD_A, POWER_PAD_B, VAUS_NES, TWO_ZAPPERS})
@@ -546,10 +990,24 @@ DEVICE_NAMES = {
     FAMILY_TRAINER_B: "Family Trainer Mat (side B)",
     VAUS_NES: "Arkanoid Vaus (NES)",
     VAUS_FAMICOM: "Arkanoid Vaus (Famicom)",
-    VAUS_TWO_AND_RECORDER: "Arkanoid Vaus (Famicom; the second Vaus is not built)",
+    VAUS_TWO_AND_RECORDER: "two Arkanoid Vaus (Famicom; no data recorder)",
     KONAMI_HYPER_SHOT: "Konami Hyper Shot",
     TAPTAP_MAT: "Tap-tap Mat",
-    FAMILY_BASIC_KEYBOARD: "Family BASIC Keyboard",
+    DATA_RECORDER: "Family BASIC Data Recorder",
+    TURBO_FILE: "ASCII Turbo File",
+    FAMILY_BASIC_KEYBOARD: "Family BASIC Keyboard and Data Recorder",
+    SUBOR_KEYBOARD: "Subor Keyboard",
+    SUBOR_KEYBOARD_MACRO_WINNERS: "Subor Keyboard and Macro Winners Mouse",
+    SUBOR_KEYBOARD_MOUSE_4016: "Subor Keyboard and Subor Mouse ($4016)",
+    SNES_MOUSE_4016: "Super NES Mouse ($4016)",
+    SNES_CONTROLLERS: "two Super NES controllers",
+    SUBOR_KEYBOARD_MOUSE_4017: "Subor Keyboard and Subor Mouse ($4017)",
+    YUXING_MOUSE: "Yuxing Mouse ($4016)",
+    SUBOR_KEYBOARD_YUXING: "Subor Keyboard and Yuxing Mouse ($4016)",
+    SNES_MOUSE_4017: "Super NES Mouse ($4017)",
+    ZAPPER_4016: "Zapper ($4016)",
+    SUBOR_KEYBOARD_MEGA_BOOK: "Subor Keyboard and Mega Book Mouse",
+    HORI_TRACK: "Hori Track",
 }
 
 
@@ -592,7 +1050,8 @@ def plug(
         board.expansion = FamilyTrainer()
         return board.expansion
     if device == VAUS_TWO_AND_RECORDER:
-        device = VAUS_FAMICOM
+        board.expansion = VausFamicom(lambda: ppu.time, ticks, second=True)
+        return [board.expansion.vaus, board.expansion.second]
     if device == VAUS_NES or (device == VAUS_FAMICOM and not famicom):
         vaus = VausNES(lambda: ppu.time, ticks)
         board.pads[1] = vaus
@@ -603,7 +1062,47 @@ def plug(
     if device == KONAMI_HYPER_SHOT:
         board.expansion = KonamiHyperShot()
         return board.expansion
-    if device == FAMILY_BASIC_KEYBOARD:
-        board.expansion = FamilyBasicKeyboard()
+    if device in (FAMILY_BASIC_KEYBOARD, DATA_RECORDER):
+        recorder = DataRecorder(lambda: ppu.time)
+        board.expansion = FamilyBasicKeyboard(recorder)
+        return board.expansion if device == FAMILY_BASIC_KEYBOARD else recorder
+    if device == TURBO_FILE:
+        board.expansion = TurboFile()
         return board.expansion
+    if device == ZAPPER_4016:
+        board.pads[0] = Zapper(ppu, palette)
+        return board.pads[0]
+    if device in (SNES_MOUSE_4016, SNES_MOUSE_4017):
+        mouse = SnesMouse()
+        board.pads[0 if device == SNES_MOUSE_4016 else 1] = mouse
+        return mouse
+    if device == SNES_CONTROLLERS:
+        board.pads = [SnesController(), SnesController()]
+        return board.pads
+    if device == YUXING_MOUSE:
+        board.pads[0] = YuxingMouse()
+        return board.pads[0]
+    if device == HORI_TRACK:
+        board.expansion = HoriTrack()
+        return board.expansion
+    if device in SUBOR_SETS:
+        keyboard = SuborKeyboard()
+        board.expansion = keyboard
+        port, mouse_type = SUBOR_SETS[device]
+        if mouse_type is None:
+            return keyboard
+        mouse = mouse_type()
+        board.pads[port] = mouse
+        return [keyboard, mouse]
     return None
+
+
+# The Subor Keyboard's sets: the mouse's port and kind (NES_2.0.wiki).
+SUBOR_SETS: dict[int, tuple[int, Callable[[], object] | None]] = {
+    SUBOR_KEYBOARD: (0, None),
+    SUBOR_KEYBOARD_MACRO_WINNERS: (1, MacroWinnersMouse),
+    SUBOR_KEYBOARD_MOUSE_4016: (0, SuborMouse),
+    SUBOR_KEYBOARD_MOUSE_4017: (1, SuborMouse),
+    SUBOR_KEYBOARD_YUXING: (0, YuxingMouse),
+    SUBOR_KEYBOARD_MEGA_BOOK: (1, lambda: MacroWinnersMouse(mega_book=True)),
+}

@@ -21,6 +21,7 @@ power-on and written there on quit and on power cycle.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import threading
 import time
@@ -37,13 +38,22 @@ from .peripherals import (
     FAMILY_BASIC_KEYBOARD,
     VAUS_FAMICOM,
     VAUS_NES,
+    DataRecorder,
     ExpansionPads,
     FamilyBasicKeyboard,
     FamilyTrainer,
     FourScore,
+    HoriTrack,
     KonamiHyperShot,
+    MacroWinnersMouse,
     PowerPad,
+    SnesController,
+    SnesMouse,
+    SuborKeyboard,
+    SuborMouse,
+    TurboFile,
     Vaus,
+    YuxingMouse,
     Zapper,
 )
 from .ppu import DOTS, HEIGHT, WIDTH
@@ -72,7 +82,12 @@ Devices (--device, default the cartridge's from nes20db or its NES 2.0 header):
   Vaus        the mouse's left-right is the knob, left button fires
   Power Pad / Family Trainer   keys 1 2 3 4 / Q W E R / A S D F are its rows
   Family BASIC Keyboard        the host keyboard types on it (pads: gamepads)
-  Hyper Shot  each gamepad's A is Run, B is Jump"""
+  Hyper Shot  each gamepad's A is Run, B is Jump
+  Mice, Hori Track   the mouse (left and right buttons)
+  Subor Keyboard     the host keyboard, PC layout
+  Super NES pads     gamepads (shoulders are L and R); keys C V = A X, A S = L R
+  Data Recorder      F9 plays the tape from its start, F10 records; again stops
+                     (<rom>.tape); the Turbo File keeps turbo-file.sav per folder"""
 
 # --device names: NES 2.0 expansion numbers (peripherals.py); "vaus" is the
 # console's own version.
@@ -89,6 +104,27 @@ DEVICES = {
     "hyper-shot": 0x12,
     "keyboard": FAMILY_BASIC_KEYBOARD,
 }
+
+# A Super NES pad's extra buttons on the keyboard: A, X, L, R.
+SNES_KEYS = ((8, "K_c"), (9, "K_v"), (10, "K_a"), (11, "K_s"))
+
+# The host keyboard on the Subor Keyboard (a PC-style layout; peripherals.SUBOR_MATRIX).
+SUBOR_HOST_KEYS = {
+    **{f"K_{c.lower()}": c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"},
+    **{f"K_{d}": d for d in "0123456789"},
+    **{f"K_F{n}": f"F{n}" for n in range(1, 13)},
+    **{f"K_KP{d}": f"KP{d}" for d in "0123456789"},
+    "K_KP_MINUS": "KP-", "K_KP_PLUS": "KP+", "K_KP_MULTIPLY": "KP*", "K_KP_DIVIDE": "KP/",
+    "K_KP_PERIOD": "KP.", "K_NUMLOCK": "NUMLOCK", "K_NUMLOCKCLEAR": "NUMLOCK",
+    "K_MINUS": "-", "K_EQUALS": "=", "K_LEFTBRACKET": "[", "K_RIGHTBRACKET": "]",
+    "K_BACKSLASH": "\\", "K_SEMICOLON": ";", "K_QUOTE": "'", "K_COMMA": ",",
+    "K_PERIOD": ".", "K_SLASH": "/", "K_BACKQUOTE": "`", "K_RETURN": "ENTER",
+    "K_SPACE": "SPACE", "K_BACKSPACE": "BACKSPACE", "K_TAB": "TAB",
+    "K_CAPSLOCK": "CAPSLOCK", "K_LSHIFT": "LSHIFT", "K_RSHIFT": "LSHIFT",
+    "K_LCTRL": "LCTRL", "K_LALT": "LALT", "K_INSERT": "INSERT", "K_DELETE": "DELETE",
+    "K_HOME": "HOME", "K_END": "END", "K_PAGEUP": "PAGEUP", "K_PAGEDOWN": "PAGEDOWN",
+    "K_PAUSE": "PAUSE", "K_UP": "UP", "K_DOWN": "DOWN", "K_LEFT": "LEFT", "K_RIGHT": "RIGHT",
+}  # fmt: skip
 
 MAT_KEYS = ("K_1", "K_2", "K_3", "K_4", "K_q", "K_w", "K_e", "K_r", "K_a", "K_s", "K_d", "K_f")
 
@@ -147,6 +183,16 @@ def samples_s16(samples: list[float], gain: float = 1.5) -> bytes:
 
 def save_path(rom: Path) -> Path:
     return rom.with_name(rom.name + ".sav")
+
+
+def tape_path(rom: Path) -> Path:
+    """The cassette a Data Recorder plays: level changes, as JSON."""
+    return rom.with_name(rom.name + ".tape")
+
+
+def turbo_file_path(rom: Path) -> Path:
+    """The Turbo File's 8 KiB: one per folder, as the device moves between games."""
+    return rom.with_name("turbo-file.sav")
 
 
 class SoundBuffer:
@@ -242,6 +288,7 @@ class Frontend:
         self.peripheral = system.plug(device)
         if self.peripheral is not None:
             print(f"device: {DEVICE_NAMES[device]}", file=sys.stderr)
+        self._load_storage(system)
         if system.board.expansion is None and machine.famicom_expansion_port:
             system.board.expansion = ExpansionPads()  # players 3 and 4
         if isinstance(system.cartridge, FDS) and self.auto_disk:
@@ -264,6 +311,25 @@ class Frontend:
         data = self.system.cartridge.battery_ram()
         if data is not None:
             save_path(self.rom).write_bytes(data)
+        expansion = self.system.board.expansion
+        if isinstance(expansion, TurboFile):
+            turbo_file_path(self.rom).write_bytes(bytes(expansion.data))
+        tape = self._recorder()
+        if tape is not None and tape.tape:
+            tape_path(self.rom).write_text(json.dumps(tape.tape))
+
+    def _load_storage(self, system: System) -> None:
+        """The Turbo File's RAM and the tape, from beside the cartridge."""
+        expansion = system.board.expansion
+        path = turbo_file_path(self.rom)
+        if isinstance(expansion, TurboFile) and path.exists():
+            expansion.data[:] = path.read_bytes()[:0x2000].ljust(0x2000, b"\0")
+        tape = self._recorder()
+        path = tape_path(self.rom)
+        if tape is not None and path.exists():
+            tape.tape = [
+                (int(position), int(level)) for position, level in json.loads(path.read_text())
+            ]
 
     def _open_audio(self):
         from pygame._sdl2.audio import AUDIO_S16, AudioDevice
@@ -341,40 +407,117 @@ class Frontend:
             players += board.expansion.pads
         return players
 
+    def _devices(self) -> list:
+        device = self.peripheral
+        if device is None:
+            return []
+        return list(device) if isinstance(device, list) else [device]
+
     def _apply_inputs(self) -> None:
         pg = self.pg
         board = self.system.board
-        device = self.peripheral
+        devices = self._devices()
         pads = [self._controller(c) for c in self.controllers.values()]
         pads += [0] * (4 - len(pads))
-        typing = isinstance(device, FamilyBasicKeyboard)
+        typing = any(isinstance(d, (FamilyBasicKeyboard, SuborKeyboard)) for d in devices)
         pads[0] |= 0 if typing else self._keyboard()
         for pad, buttons in zip(self._players(), pads, strict=False):
             pad.buttons = buttons
         board.microphone = not typing and bool(pg.key.get_pressed()[pg.K_m])
-        if device is None:
+        if not devices:
             return
         keys = pg.key.get_pressed()
         x, y = pg.mouse.get_pos()
+        dx, dy = pg.mouse.get_rel()
         left, _, right = pg.mouse.get_pressed()[:3]
-        zappers = device if isinstance(device, list) else [device]
-        if isinstance(zappers[0], Zapper):
-            zapper = zappers[0]
-            zapper.aim = (x, y) if pg.mouse.get_focused() and not right else None
-            zapper.trigger = bool(left)
-        elif isinstance(device, Vaus):
-            device.position = (self.vaus_low + min(max(x, 0), WIDTH - 1) * 0xA0 // WIDTH) & 0xFF
-            device.fire = bool(left)
-        elif isinstance(device, (PowerPad, FamilyTrainer)):
-            device.buttons = sum(
-                1 << n for n, name in enumerate(MAT_KEYS) if keys[getattr(pg, name)]
+        zapped = vaused = False
+        snes = 0
+        for device in devices:
+            if isinstance(device, Zapper) and not zapped:  # one mouse: the first gun
+                zapped = True
+                device.aim = (x, y) if pg.mouse.get_focused() and not right else None
+                device.trigger = bool(left)
+            elif isinstance(device, Vaus):
+                if not vaused:
+                    vaused = True
+                    knob = self.vaus_low + min(max(x, 0), WIDTH - 1) * 0xA0 // WIDTH
+                    device.position = knob & 0xFF
+                    device.fire = bool(left)
+                else:  # a second Vaus: gamepad 2's left and right turn it, A fires
+                    step = 3 * (bool(pads[1] & RIGHT) - bool(pads[1] & LEFT))
+                    device.position = (device.position + step) & 0xFF
+                    device.fire = bool(pads[1] & A)
+            elif isinstance(device, (PowerPad, FamilyTrainer)):
+                device.buttons = sum(
+                    1 << n for n, name in enumerate(MAT_KEYS) if keys[getattr(pg, name)]
+                )
+            elif isinstance(device, FamilyBasicKeyboard):
+                device.keys = {
+                    name for key, name in KEYBOARD_KEYS.items() if keys[getattr(pg, key)]
+                }
+            elif isinstance(device, SuborKeyboard):
+                device.keys = {
+                    name for key, name in SUBOR_HOST_KEYS.items()
+                    if hasattr(pg, key) and keys[getattr(pg, key)]
+                }  # fmt: skip
+            elif isinstance(device, KonamiHyperShot):
+                device.buttons = sum(
+                    (bool(pads[p] & A) << (2 * p)) | (bool(pads[p] & B) << (2 * p + 1))
+                    for p in (0, 1)
+                )
+            elif isinstance(device, (SnesMouse, SuborMouse, MacroWinnersMouse, YuxingMouse)):
+                device.move(dx, dy)
+                device.left, device.right = bool(left), bool(right)
+            elif isinstance(device, HoriTrack):
+                device.move(dx, dy)
+                device.pad.buttons = pads[0]
+            elif isinstance(device, SnesController):
+                controllers = list(self.controllers.values())
+                buttons = pads[snes]
+                if snes < len(controllers):
+                    buttons |= self._snes_extra(controllers[snes])
+                if snes == 0 and not typing:
+                    buttons |= sum(1 << bit for bit, name in SNES_KEYS if keys[getattr(pg, name)])
+                device.buttons = buttons
+                snes += 1
+
+    def _snes_extra(self, controller) -> int:
+        """A Super NES pad's buttons beyond the NES's: A, X, L, R (bits 8-11)."""
+        pg = self.pg
+        return sum(
+            1 << bit
+            for bit, name in (
+                (8, pg.CONTROLLER_BUTTON_B),
+                (9, pg.CONTROLLER_BUTTON_Y),
+                (10, pg.CONTROLLER_BUTTON_LEFTSHOULDER),
+                (11, pg.CONTROLLER_BUTTON_RIGHTSHOULDER),
             )
-        elif isinstance(device, FamilyBasicKeyboard):
-            device.keys = {name for key, name in KEYBOARD_KEYS.items() if keys[getattr(pg, key)]}
-        elif isinstance(device, KonamiHyperShot):
-            device.buttons = sum(
-                (bool(pads[p] & A) << (2 * p)) | (bool(pads[p] & B) << (2 * p + 1)) for p in (0, 1)
-            )
+            if controller.get_button(name)
+        )
+
+    def _recorder(self) -> DataRecorder | None:
+        for device in self._devices():
+            if isinstance(device, DataRecorder):
+                return device
+            if isinstance(device, FamilyBasicKeyboard):
+                return device.recorder
+        return None
+
+    def _tape_key(self, record: bool) -> None:
+        """F9: play the tape from its start (again: stop); F10: record over it."""
+        tape = self._recorder()
+        if tape is None:
+            return
+        if tape.mode != "stop":
+            tape.stop()
+            self.save()
+            print("tape: stopped")
+        elif record:
+            tape.record()
+            print("tape: recording")
+        else:
+            tape.play()
+            print("tape: playing")
 
     # -- events ---------------------------------------------------------------------
 
@@ -404,6 +547,8 @@ class Frontend:
                 self.sound.clear()
             elif event.key == pg.K_d and isinstance(self.system.cartridge, FDS):
                 self.change_disk()
+            elif event.key in (pg.K_F9, pg.K_F10):
+                self._tape_key(event.key == pg.K_F10)
             elif event.key == pg.K_F11:
                 pg.display.toggle_fullscreen()
             elif event.key == pg.K_F12:
