@@ -468,7 +468,12 @@ class DMC:
 
 class APU:
     def __init__(
-        self, put_first: bool = False, sample_rate: int = 44100, tables: str = "NTSC"
+        self,
+        put_first: bool = False,
+        sample_rate: int = 44100,
+        tables: str = "NTSC",
+        unexpected_reload: bool = False,
+        late_stop: bool = False,
     ) -> None:
         self.tables = TABLES[tables]
         # Whether the current CPU cycle is an APU put; clock() flips it first.
@@ -506,6 +511,20 @@ class APU:
         self.dmc_abort = False
         self._apu_cycle = 0  # APU cycles since power, counted on gets
         self._stopped_in = -2  # the APU cycle playback last stopped in
+        # The unexpected reload (DMA.wiki "Bugs", late RP2A03G and RP2A03H;
+        # AccuracyCoin "Implicit DMA Abort", behaviour 1): an output cycle ending
+        # with the buffer empty while a sample plays, in the APU cycle a load
+        # DMA's byte arrives, takes that byte into the shifter, and a reload
+        # DMA follows even when the byte ended the sample.
+        self.unexpected_reload = unexpected_reload
+        self._empty_end = -2  # the APU cycle an output cycle last ended empty
+        # The UA6527P ends a sample 1 APU cycle late (CPU_variants.wiki: $4015's
+        # DMC bit clears 1 APU cycle later; DMA.wiki: the implicit-stop glitches
+        # need the last byte fetched 1 APU cycle earlier). The bit reads 1 for
+        # 2 more CPU cycles, and the stop counts in the next APU cycle.
+        self.late_stop = late_stop
+        self._late_reload = late_stop and unexpected_reload
+        self._ending = 0
         # Length counters written this cycle, settled at the next clock.
         self._unsettled: list[LengthCounter] = []
         # The mixer: a box filter at OVERSAMPLE times the host rate, then a
@@ -573,6 +592,8 @@ class APU:
                 self._reload_waiting = False
                 if self.dmc.buffer is None and self.dmc.remaining:
                     self.dmc_request = True
+        if self._ending:
+            self._ending -= 1
         if self._load_countdown:
             self._load_countdown -= 1
             if not self._load_countdown and self.dmc.buffer is None and self.dmc.remaining:
@@ -601,8 +622,12 @@ class APU:
                         self._reload_waiting = True
                     else:
                         self.dmc_request = True
+                elif self._late_reload and self._stopped_in == self._apu_cycle:
+                    self.dmc_request = True  # the unexpected reload, 1 APU cycle late
                 elif self._stopped_in == self._apu_cycle - 1:
                     self.dmc_abort = True
+            elif dmc.reloaded and dmc.bits == 8 and dmc.buffer is None and dmc.remaining:
+                self._empty_end = self._apu_cycle
         # The mixer, one CPU cycle's worth.
         if self._level_dirty:
             self._level = self._mix()
@@ -708,7 +733,19 @@ class APU:
         "Memory reader"); the IRQ is set when the last byte is *fetched*."""
         dmc = self.dmc
         self.dmc_request = False
-        dmc.buffer = value
+        late = (
+            self.unexpected_reload
+            and not self.late_stop
+            and self._empty_end == self._apu_cycle
+            and dmc.buffer is None
+        )
+        if late:
+            self._empty_end = -2
+            dmc.shift = value
+            dmc.silence = False
+            self.dmc_request = True
+        else:
+            dmc.buffer = value
         dmc.address = (dmc.address + 1) & 0xFFFF or 0x8000
         if not dmc.remaining:  # stopped after this DMA was scheduled
             return
@@ -717,7 +754,9 @@ class APU:
             if dmc.loop:
                 dmc.restart()
                 return
-            self._stopped_in = self._apu_cycle
+            self._stopped_in = self._apu_cycle + self.late_stop
+            if self.late_stop:
+                self._ending = 3  # clocked before each read: 2 CPU cycles
             if dmc.irq_enabled:
                 dmc.irq = True
                 self.irq = True
@@ -768,6 +807,7 @@ class APU:
             if dmc.remaining:
                 self._stopped_in = self._apu_cycle
             dmc.remaining = 0
+            self._ending = 0
             # A DMA already scheduled still runs (AccuracyCoin "Explicit DMA
             # Abort": 3 and 4 cycles in hardware's answer key at those points).
             self._load_countdown = 0
@@ -786,7 +826,7 @@ class APU:
         value = (
             (self.dmc.irq << 7)
             | (self.frame_irq << 6)
-            | (self.dmc.remaining > 0) << 4
+            | (self.dmc.remaining > 0 or self._ending > 0) << 4
             | (lengths[3].value > 0) << 3
             | (lengths[2].value > 0) << 2
             | (lengths[1].value > 0) << 1

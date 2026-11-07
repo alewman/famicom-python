@@ -53,7 +53,12 @@ class Board:
         self.ppu.status = power.ppustatus & 0xE0
         self.ppu.dot = power.ppu_dot
         self.ppu.time = power.ppu_ticks
-        self.apu = APU(power.apu_put_first, tables=machine.apu_tables)
+        self.apu = APU(
+            power.apu_put_first,
+            tables=machine.apu_tables,
+            unexpected_reload=machine.dmc_unexpected_reload_bug,
+            late_stop=machine.dmc_late_stop,
+        )
         self.apu.dmc.timer = power.dmc_timer
         self.apu.set_cpu_rate(timing.master_hz / timing.cpu_divider)
         self.analogue = AnalogueStage(
