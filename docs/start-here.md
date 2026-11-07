@@ -130,6 +130,21 @@ AccuracyCoin "Open Bus", README l.93–102).
   pad II** (an immediate level, read through $4016, not $4017); $4017 D0 = pad
   II, D1–D4 = expansion port (Famicom Zapper on D3/D4) (`Standard_controller.wiki`,
   `Controller_reading.wiki`, `Zapper.wiki`).
+- **Other devices** (`peripherals.py`, 2026-11-07): each answers one of two
+  protocols, a controller-port device (OUT0, its /OE, D0–D4) or an
+  expansion-port device (OUT0–2, both /OEs). Built, each from its wiki page:
+  the NES Four Score and the Hori 4 Players Adapter (two pads' reports, then an
+  address's signature), the "simple" Famicom adapters, the Zapper (NES on a
+  port, Famicom on the expansion port; light from the picture as the beam passes
+  the aimed pixel, a capacitor model fitted to Zap Ruder's 26/24/19 lines), the
+  Arkanoid Vaus (both versions; the conversion timed from OUT0's rise), the
+  Power Pad, the Family Trainer and Tap-tap Mats, the Family BASIC Keyboard
+  (without its data recorder) and Konami's Hyper Shot. `System.plug` puts in a
+  cartridge's device from NES 2.0 byte 15 or nes20db's `<expansion>`;
+  `System.machine_for` picks the NES for one only its ports take (Four Score,
+  Power Pad, NES Vaus, two Zappers). Not built: the Vs. Zapper, the Bandai
+  Hyper Shot, mice, the Subor and other keyboards, the second *Arkanoid II*
+  Vaus, the data recorder, the Turbo File, R.O.B.
 
 ### Power-up and reset (CPU)
 

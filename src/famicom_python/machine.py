@@ -224,6 +224,11 @@ class Machine:
     # tier, no test ROM answer). The DMC IRQ, which the wiki "suspects" is late
     # too, is not moved.
     dmc_late_stop: bool = False
+    # The Famicom's 15-pin expansion port, where its Zapper, Vaus and four-player
+    # adapters plug in (Expansion_port.wiki); the NES takes its versions on the
+    # controller ports. The Dendy is taken as the NES: its light guns and pads
+    # plug into 9-pin ports (UNVERIFIED for every Dendy model).
+    famicom_expansion_port: bool = False
     certified: bool = True
 
 
@@ -253,6 +258,7 @@ FAMICOM = Machine(
     audio_low_pass_hz=None,
     microphone=True,
     pad_open_bus=(0x18, 0),
+    famicom_expansion_port=True,
 )
 
 AV_FAMICOM = Machine(
@@ -266,6 +272,7 @@ AV_FAMICOM = Machine(
     famicom_audio_through_cart=True,
     dmc_unexpected_reload_bug=False,
     pad_open_bus=(0x18, 0),  # the wiki's "Famicom" column: UNVERIFIED for this model
+    famicom_expansion_port=True,
 )
 
 NES_101 = Machine(

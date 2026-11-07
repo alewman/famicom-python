@@ -64,11 +64,11 @@ class Board:
         self.analogue = AnalogueStage(
             self.apu.sample_rate, machine.audio_high_pass_hz, machine.audio_low_pass_hz
         )
-        self.pads = [StandardController(), StandardController()]
-        # Pads on the Famicom expansion port's D1 of $4016 and $4017: the
-        # third and fourth players of the four-player adapters
-        # (Expansion_port.wiki). None: nothing there.
-        self.expansion_pads: list[StandardController | None] = [None, None]
+        # The devices on the two controller ports, and on the Famicom expansion
+        # port (or the NES's, underneath): peripherals.py's two protocols. None:
+        # nothing in the expansion port.
+        self.pads: list = [StandardController(), StandardController()]
+        self.expansion = None
         # The player-2 microphone's report, $4016 D2, on a machine that has one.
         self.microphone = False
         self._has_microphone = machine.microphone
@@ -85,7 +85,7 @@ class Board:
         # read, and only that read can be halted for a DMA.
         self._halts_on_opcode = machine.dma_halts_on_opcode
         self.opcode_read = False
-        self._strobe: bool | None = None  # a $4016 OUT0 write, until the next put
+        self._strobe: int | None = None  # a $4016 write's OUT0-2, until the next put
         # The CPU, told when a DMA stretched its read (6502-python's
         # ``dma_stalled``: SHA/SHX/SHY/TAS drop their AND after one). Set by System.
         self.cpu = None
@@ -143,19 +143,18 @@ class Board:
         if self._strobe is not None and self.apu.put:
             # OUT0-2 update on the get -> put transition (Expansion_port.wiki
             # l.43; AccuracyCoin "Controller Strobing" 3 and 4).
+            out = self._strobe
             for pad in self.pads:
-                pad.set_strobe(self._strobe)
-            for pad in self.expansion_pads:
-                if pad is not None:
-                    pad.set_strobe(self._strobe)
+                pad.set_strobe(bool(out & 1))
+            if self.expansion is not None:
+                self.expansion.set_out(out)
             self._strobe = None
         oe = self._pad_oe
         if oe >= 0 and (self._oe_per_cycle or not reading or address != 0x4016 + oe):
             # /OE rose: the end of the pulse shifts the pad.
             self.pads[oe].clock()
-            expansion = self.expansion_pads[oe]
-            if expansion is not None:
-                expansion.clock()
+            if self.expansion is not None:
+                self.expansion.clock(oe)
             self._pad_oe = -1
         return t
 
@@ -277,11 +276,10 @@ class Board:
         return value
 
     def _port_bits(self, port: int) -> int:
-        """D0-D4 of $4016 (port 0) or $4017: the pad, the expansion port's D1, the microphone."""
+        """D0-D4 of $4016 (port 0) or $4017: the port's device, the expansion's, the microphone."""
         bits = self.pads[port].read()
-        expansion = self.expansion_pads[port]
-        if expansion is not None:
-            bits |= expansion.read() << 1
+        if self.expansion is not None:
+            bits |= self.expansion.read(port)
         if not port and self.microphone and self._has_microphone:
             bits |= 4
         return bits
@@ -290,8 +288,9 @@ class Board:
         if address == 0x4014:
             self._oam_dma_page = value
         elif address == 0x4016:
-            # OUT0 is both pads' strobe; it reaches them at the next put.
-            self._strobe = bool(value & 1)
+            # OUT0 is both ports' strobe, OUT0-2 the expansion port's; they
+            # reach the devices at the next put.
+            self._strobe = value & 7
         else:
             self.apu.write(address, value)
 
