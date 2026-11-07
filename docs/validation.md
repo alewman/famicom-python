@@ -2327,11 +2327,20 @@ Turbo File written and read back LSB first, a tape recorded and played back):
 | Subor Keyboard and Mouse | *Subor V8.0* | the pointer follows the mouse from the top-left corner |
 | Turbo File, Data Recorder | *Castle Excellent*, *Excitebike* | plugged, the tape records and saves; neither game uses them before a save, which was not scripted |
 
+The tail (tests: 8 more), with each game's own use of the ports logged over 600
+frames: *Space Shadow* strobes the Hyper Shot with its speaker on and reads the gun
+on $4017; *Pachinko Daisakusen* reads the dial's report on $4016 D1; *Exciting
+Boxing* switches the bag's sensor groups with OUT1; *Jissen Mahjong* selects all
+its rows; *Casino Derby* reads the Partytap's $14; and in *Gyromite*'s DIRECT mode
+each pad button flashes a command R.O.B. decodes from the board's picture (up,
+down, left, right, open and close the arms). *Oeka Kids* and *Highway Star* did
+not reach the tablet or 3D mode in the frames run.
+
 The frontend: the mouse drives the mice and the Hori Track, the host keyboard the
 Subor Keyboard, F9/F10 play and record the tape (`<rom>.tape`), and the Turbo File
 keeps `turbo-file.sav` in the cartridge's folder. Not built: the Vs. System's
 devices (no Vs. System on the board), the IGS Battle Box (its EEPROM commands are
-not on its page), the other Chinese keyboards (no description anywhere), and the
-rest of the tail (Bandai Hyper Shot, Partytap, mahjong and pachinko controllers,
-R.O.B., the pianos, Barcode Battler, Oeka Kids).
+not on its page), the other Chinese keyboards (no description anywhere), the
+Miracle Piano, Doremikko, the Barcode Battler, Top Rider and the *Arkanoid II*
+prototype controller.
 

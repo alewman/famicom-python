@@ -147,11 +147,16 @@ AccuracyCoin "Open Bus", README l.93–102).
   BSD-3: no wiki page) with the Subor, Macro Winners/Mega Book and Yuxing mice,
   the Hori Track (its port and trailing bits UNVERIFIED), the ASCII Turbo File,
   the Family BASIC Data Recorder (the bit stream as emitted, as the wiki
-  advises) and *Arkanoid II*'s second Vaus. Not built: the Vs. System's devices
-  (the board has no Vs. System), the IGS Battle Box (its EEPROM's commands are
-  not on its page), the other Chinese keyboards (no description anywhere), and
-  the rest of the tail (Bandai Hyper Shot, Partytap, mahjong and pachinko
-  controllers, R.O.B., the pianos, Barcode Battler, Oeka Kids).
+  advises) and *Arkanoid II*'s second Vaus; then the tail: Bandai's Hyper Shot,
+  the Partytap, Exciting Boxing's punching bag, the Coconuts pachinko dial, the
+  Jissen Mahjong panel, the Oeka Kids tablet (its page calls itself possibly
+  wrong; the MCU's handshake delay is not modelled), the Famicom 3D System's
+  eye signal, the port test controller, and R.O.B., which reads the picture the
+  board draws (its hands on pad 2 are the player's). Not built: the Vs.
+  System's devices (the board has no Vs. System), the IGS Battle Box (its
+  EEPROM's commands are not on its page), the other Chinese keyboards (no
+  description anywhere), the Miracle Piano (MIDI), Doremikko, the Barcode
+  Battler, Top Rider and the *Arkanoid II* prototype controller.
 
 ### Power-up and reset (CPU)
 

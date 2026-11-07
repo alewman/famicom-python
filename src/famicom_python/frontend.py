@@ -38,15 +38,24 @@ from .peripherals import (
     FAMILY_BASIC_KEYBOARD,
     VAUS_FAMICOM,
     VAUS_NES,
+    BandaiHyperShot,
+    CoconutsPachinko,
     DataRecorder,
+    ExcitingBoxing,
     ExpansionPads,
+    Famicom3DSystem,
     FamilyBasicKeyboard,
     FamilyTrainer,
     FourScore,
     HoriTrack,
+    JissenMahjong,
     KonamiHyperShot,
     MacroWinnersMouse,
+    OekaKidsTablet,
+    Partytap,
+    PortTestPort,
     PowerPad,
+    Rob,
     SnesController,
     SnesMouse,
     SuborKeyboard,
@@ -87,7 +96,15 @@ Devices (--device, default the cartridge's from nes20db or its NES 2.0 header):
   Subor Keyboard     the host keyboard, PC layout
   Super NES pads     gamepads (shoulders are L and R); keys C V = A X, A S = L R
   Data Recorder      F9 plays the tape from its start, F10 records; again stops
-                     (<rom>.tape); the Turbo File keeps turbo-file.sav per folder"""
+                     (<rom>.tape); the Turbo File keeps turbo-file.sav per folder
+  Bandai Hyper Shot  the mouse is the gun; its pad is player 1's
+  Pachinko dial      the mouse's left-right
+  Punching bag       keys 1 2 3 4 Q W E R: hooks, moves, jabs, body, straight
+  Jissen Mahjong     letters A-N are the tiles, 1-5 Kan Pon Chii Riichi Ron
+  Partytap           keys 1-6
+  Oeka Kids tablet   the mouse; left button touches, right clicks
+  R.O.B.             watches the screen and prints its moves; press pad 2's
+                     buttons for it in Gyromite"""
 
 # --device names: NES 2.0 expansion numbers (peripherals.py); "vaus" is the
 # console's own version.
@@ -103,6 +120,11 @@ DEVICES = {
     "vaus": VAUS_NES,
     "hyper-shot": 0x12,
     "keyboard": FAMILY_BASIC_KEYBOARD,
+    "subor-keyboard": 0x26,
+    "snes-mouse": 0x29,
+    "snes-pads": 0x2B,
+    "turbo-file": 0x21,
+    "rob": 0x1F,
 }
 
 # A Super NES pad's extra buttons on the keyboard: A, X, L, R.
@@ -124,6 +146,13 @@ SUBOR_HOST_KEYS = {
     "K_LCTRL": "LCTRL", "K_LALT": "LALT", "K_INSERT": "INSERT", "K_DELETE": "DELETE",
     "K_HOME": "HOME", "K_END": "END", "K_PAGEUP": "PAGEUP", "K_PAGEDOWN": "PAGEDOWN",
     "K_PAUSE": "PAUSE", "K_UP": "UP", "K_DOWN": "DOWN", "K_LEFT": "LEFT", "K_RIGHT": "RIGHT",
+}  # fmt: skip
+
+# The Jissen Mahjong panel: tiles A-N on those letters, the calls on 1-5.
+MAHJONG_KEYS = {
+    **{f"K_{c.lower()}": c for c in "ABCDEFGHIJKLMN"},
+    "K_1": "KAN", "K_2": "PON", "K_3": "CHII", "K_4": "RIICHI", "K_5": "RON",
+    "K_RETURN": "START", "K_RSHIFT": "SELECT",
 }  # fmt: skip
 
 MAT_KEYS = ("K_1", "K_2", "K_3", "K_4", "K_q", "K_w", "K_e", "K_r", "K_a", "K_s", "K_d", "K_f")
@@ -360,6 +389,11 @@ class Frontend:
     def run_frame(self) -> None:
         self._apply_inputs()
         self.system.run_frames(1)
+        for device in self._devices():
+            if isinstance(device, Rob):
+                command = device.see(self.system.board.ppu.picture)
+                if command is not None:
+                    print(f"R.O.B.: {command}")
         samples = self.system.take_samples()
         if self.device is not None and not self.fast:
             self.sound.push(samples_s16(samples))
@@ -403,8 +437,14 @@ class Frontend:
             players = list(device.pads)
         else:
             players = [pad for pad in board.pads if isinstance(pad, StandardController)]
-        if isinstance(board.expansion, ExpansionPads):
-            players += board.expansion.pads
+        players += [pad.pad for pad in board.pads if isinstance(pad, PortTestPort)]
+        expansion = board.expansion
+        if isinstance(expansion, Famicom3DSystem):
+            expansion = expansion.through
+        if isinstance(expansion, ExpansionPads):
+            players += expansion.pads
+        if isinstance(expansion, (BandaiHyperShot, CoconutsPachinko)):
+            players = [*players[:1], expansion.pad, *players[1:]]  # its pad is player 1's too
         return players
 
     def _devices(self) -> list:
@@ -419,7 +459,9 @@ class Frontend:
         devices = self._devices()
         pads = [self._controller(c) for c in self.controllers.values()]
         pads += [0] * (4 - len(pads))
-        typing = any(isinstance(d, (FamilyBasicKeyboard, SuborKeyboard)) for d in devices)
+        typing = any(
+            isinstance(d, (FamilyBasicKeyboard, SuborKeyboard, JissenMahjong)) for d in devices
+        )
         pads[0] |= 0 if typing else self._keyboard()
         for pad, buttons in zip(self._players(), pads, strict=False):
             pad.buttons = buttons
@@ -471,6 +513,25 @@ class Frontend:
             elif isinstance(device, HoriTrack):
                 device.move(dx, dy)
                 device.pad.buttons = pads[0]
+            elif isinstance(device, BandaiHyperShot):
+                gun = device.zapper
+                gun.aim = (x, y) if pg.mouse.get_focused() and not right else None
+                gun.trigger = bool(left)
+            elif isinstance(device, CoconutsPachinko):
+                device.dial = 3 + min(max(x, 0), WIDTH - 1) * 0x70 // WIDTH
+            elif isinstance(device, ExcitingBoxing):
+                device.sensors = sum(
+                    1 << n for n, name in enumerate(MAT_KEYS[:8]) if keys[getattr(pg, name)]
+                )
+            elif isinstance(device, Partytap):
+                device.buttons = sum(1 << n for n in range(6) if keys[getattr(pg, f"K_{n + 1}")])
+            elif isinstance(device, JissenMahjong):
+                device.keys = {name for key, name in MAHJONG_KEYS.items() if keys[getattr(pg, key)]}
+            elif isinstance(device, OekaKidsTablet):
+                device.x = min(max(x, 0), WIDTH - 1) * 240 // WIDTH
+                device.y = min(max(y, 0), HEIGHT - 1) * 256 // HEIGHT
+                device.touching = bool(left) and pg.mouse.get_focused()
+                device.click = bool(right)
             elif isinstance(device, SnesController):
                 controllers = list(self.controllers.values())
                 buttons = pads[snes]
