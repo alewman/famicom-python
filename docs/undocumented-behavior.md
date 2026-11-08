@@ -948,3 +948,10 @@ before the board takes a side.
     with OAMADDR). The board starts with nothing frozen and copies only at the
     pre-render line; hardware judges keep it so (C26), and the C73 goldens stop
     before dot 89.
+25. **Deferred after the peripherals (Aubrey, 2026-11-07).** The Vs. System and
+    PlayChoice-10 as machines (RGB PPUs with their own palettes, DIP switches, coin
+    inputs; about 70 dumps), and with them the Vs. Zapper and the Vs. pads. The
+    controllers no source describes well enough to build: the IGS Battle Box (its
+    TC89102 commands), the Chinese keyboards beyond Subor's (Dongda PEC, Keda,
+    Kingwon, Zecheng, BBK, Bit-79), the Miracle Piano (MIDI), Doremikko, the
+    Barcode Battler, Top Rider, the *Arkanoid II* prototype controller.
