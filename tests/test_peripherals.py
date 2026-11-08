@@ -69,7 +69,10 @@ def _ppu(line: int = 0, dot: int = 0, value: int = 0x0F) -> SimpleNamespace:
     return SimpleNamespace(timing=NTSC, picture=picture, line=line, dot=dot, time=0)
 
 
-PALETTE = load_palette(palette_for(NTSC))
+try:
+    PALETTE = load_palette(palette_for(NTSC))
+except FileNotFoundError:  # CI: reference/ is not fetched there
+    PALETTE = p.grey_palette()
 
 
 def test_zapper_lines_fit_zap_ruder() -> None:

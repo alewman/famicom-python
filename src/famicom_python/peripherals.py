@@ -155,6 +155,19 @@ class ExpansionPads:
 ZAP_RUDER = ((0x00, 19.0), (0x10, 24.0), (0x20, 26.0))
 
 
+def grey_palette() -> list[bytes]:
+    """A stand-in for the palette when its file is absent: each 9-bit value as the
+    grey of its row's luma ($0x 102, $1x 173, $2x and $3x 255), columns $D-$F
+    black. Enough for the light sensors' fit; not a picture palette."""
+    levels = (102, 173, 255, 255)
+    out = []
+    for value in range(512):
+        column, row = value & 0x0F, value >> 4 & 3
+        grey = 0 if column >= 0x0D else levels[row]
+        out.append(bytes((grey, grey, grey)))
+    return out
+
+
 def luminance(rgb: bytes) -> float:
     return 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
 
@@ -1388,7 +1401,10 @@ def plug(
     if palette is None:
         from .video import load_palette, palette_for
 
-        palette = load_palette(palette_for(timing), timing.swapped_emphasis)
+        try:
+            palette = load_palette(palette_for(timing), timing.swapped_emphasis)
+        except FileNotFoundError:  # the pally palettes come with fetch_references.py
+            palette = grey_palette()
     if device == FOUR_SCORE:
         four = FourScore()
         board.pads = list(four.ports)
