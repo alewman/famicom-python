@@ -46,7 +46,6 @@ cartridge that sets ``watches_ppu_address`` also sees every ALE dot's address.
 from __future__ import annotations
 
 from array import array
-from collections.abc import Callable
 
 from .cartridge.connector import Cartridge
 from .machine import Timing
@@ -119,9 +118,10 @@ class PPU:
         # (Machine.ppu_latch_decay_seconds; contradiction C1).
         self.latch_decay_ticks = int(latch_decay_seconds * timing.master_hz)
         self._latch_times = [0] * 8  # when each latch bit was last driven
-        # Register effects that land some dots after the access: (time, action),
-        # applied as the first dot at or after ``time`` begins (DELAYS).
-        self._events: list[tuple[int, Callable[[], None]]] = []
+        # Register effects that land some dots after the access: (time, method
+        # name, arguments), applied as the first dot at or after ``time`` begins
+        # (DELAYS). Data, not closures, so a save state can hold them (state.py).
+        self._events: list[tuple[int, str, tuple]] = []
         self._read_in_flight_until = -1  # a $2007 read's refill and increment pending
         self._oam_corrupt: int | None = None  # the OAM row a frozen OAM2 address will corrupt
         self._refill_from_fetch = False  # a $2007 read's refill, waiting on a fetch
@@ -280,11 +280,12 @@ class PPU:
         self._last_value = raw
         self._last_pixel_time = last_time
 
-    def _schedule(self, dots: int, action: Callable[[], None]) -> None:
-        """Run ``action`` before the work of the ``dots``-th dot after the next."""
+    def _schedule(self, dots: int, action: str, *args: int) -> None:
+        """Run method ``action`` with ``args`` before the work of the ``dots``-th dot
+        after the next."""
         due = self.time + (dots + 1) * self.dot_ticks
         events = self._events
-        events.append((due, action))
+        events.append((due, action, args))
         events.sort(key=lambda event: event[0])
 
     def _step(self) -> None:
@@ -293,7 +294,8 @@ class PPU:
         if self._events:
             events = self._events
             while events and events[0][0] <= self.time:
-                events.pop(0)[1]()
+                _, action, args = events.pop(0)
+                getattr(self, action)(*args)
         dot = self.dot + 1
         line = self.line
         rendering = self._on
@@ -686,7 +688,7 @@ class PPU:
         elif 0 <= line - value < height:
             # PPUSTATUS shows it a dot later (PPUSim; AccuracyCoin "$2002 flag
             # timing" 2, read as M2 falls).
-            self._schedule(0, self._set_overflow)
+            self._schedule(0, "_set_overflow")
             self._copying = 3
             address = (address + 1) & 0xFF
         else:
@@ -1212,8 +1214,8 @@ class PPU:
                 dots = DELAYS["2007_increment"]
                 self._read_in_flight_until = self.time + (dots + 1) * self.dot_ticks  # as _schedule
                 if self.rendering_now:
-                    self._schedule(DELAYS["2007_read_ale"], self._read_2007_ale)
-                self._schedule(dots, self._complete_2007_read)
+                    self._schedule(DELAYS["2007_read_ale"], "_read_2007_ale")
+                self._schedule(dots, "_complete_2007_read")
             return value
         return self._decayed_latch()  # write-only registers read the I/O latch
 
@@ -1341,7 +1343,7 @@ class PPU:
                 target = bool(value & 0x18)
                 if target != self._target:
                     self._target = target
-                    self._schedule(1, self._wake_up if target else self._turn_off)
+                    self._schedule(1, "_wake_up" if target else "_turn_off")
                 # The multiplexer's enable and clip bits are latched: the pixel
                 # this dot computes still sees the old ones (the sprite bits,
                 # the next one too). Emphasis acts a
@@ -1351,8 +1353,8 @@ class PPU:
                 # turn off the monochrome flag for one pixel", PPU_glitches.wiki;
                 # PPUSim, scripts/ppusim_compare.py c12, both bus models).
                 # The sprite bits a dot after the background's.
-                self._schedule(1, lambda: self._latch_mux(0x0A, value))
-                self._schedule(2, lambda: self._latch_mux(0x14, value))
+                self._schedule(1, "_latch_mux", 0x0A, value)
+                self._schedule(2, "_latch_mux", 0x14, value)
                 grey = 0x30 if value & 0x01 else 0x3F
                 first = 0x30 if (value if early is None else early) & 0x01 else 0x3F
                 picture = self.picture
@@ -1374,7 +1376,7 @@ class PPU:
                 or not refresh[0] <= self.line <= refresh[1]
                 or phase != 1
             ):
-                self._schedule(DELAYS["2003_delayed"], lambda: self._set_oam_addr(value))
+                self._schedule(DELAYS["2003_delayed"], "_set_oam_addr", value)
             # else lost: during the 2C07's refresh, a write at this phase meets a
             # refresh step with its delayed load, and the step wins (PPUSim's
             # RP2C07-0 blocks OMOUT while OMSTEP is active; ppusim_compare.py
@@ -1389,7 +1391,7 @@ class PPU:
                 # refresh has moved the address on (PPUSim, ppusim_compare.py
                 # pal_oam); elsewhere the address holds still and the delay is
                 # invisible.
-                self._schedule(DELAYS["2004_refresh"], lambda: self._write_oam_refreshing(value))
+                self._schedule(DELAYS["2004_refresh"], "_write_oam_refreshing", value)
             else:
                 self._write_oam(value)
         elif register == 5:
@@ -1408,14 +1410,14 @@ class PPU:
                 self.t = (self.t & 0x00FF) | ((value & 0x3F) << 8)
             else:
                 self.t = (self.t & 0x7F00) | value
-                self._schedule(DELAYS["2006_copy"], self._copy_t)
+                self._schedule(DELAYS["2006_copy"], "_copy_t")
             self.w ^= 1
         elif register == 7:
             # The address is v as the write lands, not as it was at the access:
             # a read one CPU cycle earlier has incremented v by then (blargg
             # dmc_dma_during_read4/read_write_2007, STA $2007,X).
-            self._schedule(DELAYS["2007_write"], lambda: self._write_2007(self.v & 0x3FFF, value))
-            self._schedule(DELAYS["2007_increment"], self._increment_after_2007)
+            self._schedule(DELAYS["2007_write"], "_write_2007_landing", value)
+            self._schedule(DELAYS["2007_increment"], "_increment_after_2007")
 
     def _copy_t(self) -> None:
         """The second $2006 write's t -> v copy. Landing on a rendering fetch's
@@ -1428,6 +1430,10 @@ class PPU:
         self.v = self.t
         if self._watch and not self.rendering_now:
             self._ale(self.v & 0x3FFF)
+
+    def _write_2007_landing(self, value: int) -> None:
+        """A $2007 write lands: at v as it is then (write_register)."""
+        self._write_2007(self.v & 0x3FFF, value)
 
     def _write_2007(self, v: int, value: int) -> None:
         if self.rendering_now:
