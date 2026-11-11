@@ -2,14 +2,27 @@
 Sunsoft-1 (184) and Sunsoft-2 (89, 93).
 
 69 is judged by Holy Mapperel and tepples's ``fme7acktest`` and
-``fme7ramtest`` (docs/claims.md), and the 5B's sound is milestone 8's; the
-others have no judge ROM and rest on sweeps against Mesen2, a detector.
+``fme7ramtest`` (docs/claims.md); the 5B's sound is ay8910-python's YM2149
+variant, judged there against the AY-3-8910's die model; the others have no
+judge ROM and rest on sweeps against Mesen2, a detector.
 """
 
 from __future__ import annotations
 
+from ay8910_python import PSG, SUNSOFT_5B
+
 from .banked import HORIZONTAL, SCREEN_A, SCREEN_B, VERTICAL, Banked
 from .ines import RomImage
+
+#: One 5B channel's DAC level (ay8910-python's ``mix()``: 0.0-1.0 a channel) in
+#: the APU mixer's units. rainwarrior's ``db_5b`` on an AV Famicom measured the
+#: 5B's square at volume 12 as 1.3 dB below a full-volume APU square
+#: (nesdev-forum/17741.html, hardware-captured on one console and one
+#: cartridge); fitted so db_5b measures that through the board
+#: (scripts/expansion_levels.py). The amplifier's compression above one channel
+#: at volume 14 and its filtering (Sunsoft_5B_audio.wiki "Output": "ongoing")
+#: are not modelled: no measurement gives the curve.
+SUNSOFT_5B_GAIN = 0.364
 
 
 class FME7(Banked):
@@ -24,9 +37,16 @@ class FME7(Banked):
     low and high bytes. Counting, the 16-bit counter decrements each CPU
     cycle, and the decrement from $0000 to $FFFF asserts /IRQ. Power-on
     registers unspecified: 0 here (ROM bank 0 at $6000).
+
+    The 5B adds a YM2149F (Sunsoft_5B_audio.wiki): $C000 selects its register,
+    $E000 writes it, and it is clocked by M2, one input clock a CPU cycle
+    (the variant halves it). Neither the header nor nes20db tells a 5B from an
+    FME-7 or 5A, which have no sound and whose games never write there, so
+    every mapper 69 cartridge carries the chip.
     """
 
     counts_m2 = True
+    expansion_audio = True
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
         super().__init__(image, cpu_cycle_ticks)
@@ -34,9 +54,17 @@ class FME7(Banked):
         self.low_bank = 0  # command 8
         self.counter = 0
         self.counting = self.irq_enabled = False
+        self.sound = PSG(SUNSOFT_5B, record=False)
+        self._levels = self.sound.levels()  # the levels last sent to the mixer
         self.map_prg(3, 8, len(self.prg) // 0x2000 - 1)
 
     def m2(self, t: int) -> None:
+        sound = self.sound
+        sound.tick()
+        levels = sound.levels()
+        if levels is not self._levels:
+            self._levels = levels
+            self.audio_out.expansion = sound.mix() * SUNSOFT_5B_GAIN
         if self.counting:
             self.counter = (self.counter - 1) & 0xFFFF
             if self.counter == 0xFFFF and self.irq_enabled:
@@ -61,6 +89,10 @@ class FME7(Banked):
             self.command = value & 0x0F
         elif region == 0xA000:
             self.parameter(self.command, value)
+        elif region == 0xC000:
+            self.sound.select(value)
+        else:
+            self.sound.write(value)
 
     def parameter(self, command: int, value: int) -> None:
         if command < 8:

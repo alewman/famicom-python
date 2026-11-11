@@ -8,12 +8,15 @@ console that routes the cartridge's sound (the Famicom's pins 45/46).
 
 from __future__ import annotations
 
+from itertools import pairwise
+
 from conftest import nrom_image
 from test_mappers import TICKS, build
 
 from famicom_python.cartridge import load
 from famicom_python.cartridge.connector import APU_SQUARE, Unplugged, expansion_gain
 from famicom_python.cartridge.konami import VRC6, VRC6_DB
+from famicom_python.cartridge.sunsoft import FME7, SUNSOFT_5B_GAIN
 from famicom_python.machine import FAMICOM, NES_001
 from famicom_python.system import System
 
@@ -194,3 +197,35 @@ def test_n163_phase_steps_through_the_wave() -> None:
 def test_n163_submapper_sets_the_level_or_silence() -> None:
     assert build(19, 3).gain < build(19, 4).gain < build(19, 5).gain
     assert not build(19, 2).expansion_audio and build(19, 0).expansion_audio
+
+
+def test_5b_tone_period_and_volume() -> None:
+    """Sunsoft_5B_audio.wiki: a tone flips every 16 CPU cycles times its period,
+    and volume 12 is the DAC's code 25 (2v + 1)."""
+    from ay8910_python import SUNSOFT_5B
+
+    cart = build(69)
+    assert isinstance(cart, FME7)
+    for register, value in ((0, 2), (1, 0), (7, 0x3E), (8, 12)):  # tone A, period 2
+        cart.cpu_write(0xC000, register, 0)
+        cart.cpu_write(0xE000, value, 0)
+    seen = []
+    for i in range(400):
+        cart.m2(i * TICKS)
+        seen.append(cart.audio_out.expansion)
+    high = SUNSOFT_5B.dac[25] * SUNSOFT_5B_GAIN
+    assert set(seen[100:]) == {0.0, high}
+    flips = [i for i in range(101, 400) if seen[i] != seen[i - 1]]
+    assert {b - a for a, b in pairwise(flips)} == {32}
+
+
+def test_5b_select_above_15_deselects_the_chip() -> None:
+    """A $C000 byte with its high nibble set selects nothing: the write is lost."""
+    cart = build(69)
+    cart.cpu_write(0xC000, 0x18, 0)
+    cart.cpu_write(0xE000, 15, 0)
+    cart.cpu_write(0xC000, 0x07, 0)
+    cart.cpu_write(0xE000, 0x3F, 0)  # all tones and noise off: the levels show
+    for i in range(64):
+        cart.m2(i * TICKS)
+    assert cart.audio_out.expansion == 0.0
