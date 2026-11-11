@@ -41,6 +41,11 @@ board's frames either side. Every run lists its dumps that differ in
 ``failures.txt`` beside ``--out``; ``--list FILE`` runs only the dumps named
 there, the quick sweep while fixing.
 
+``--pc10 DIR`` sweeps the PlayChoice-10 images ``scripts/pc10_images.py``
+assembled into DIR, as their game boards alone (Mesen2 runs no supervisor),
+with ``scripts/pc10_judge.py``'s buttons (``--vs-script play``: Start, Start, A,
+Start) or none (``attract``), as DAC levels.
+
 ``--vs DIR`` sweeps the Vs. System images ``scripts/vs_images.py`` assembled
 into DIR (UniSystem; the DualSystem's wait for their second side). Both sides
 get one input script (``scripts/vs_judge.py``: ``--vs-script play``, two coins
@@ -66,6 +71,7 @@ import time
 import zipfile
 from pathlib import Path
 
+import pc10_judge
 import vs_judge
 from count_mappers import BASE, classify
 from mame_frames import COLOURS, mame_frames
@@ -74,6 +80,7 @@ from mesen_run import FRAMES_LUA, REGIONS, ROOT, decode_frames, run_mesen
 
 from famicom_python.cartridge import MAPPERS, fds_bios
 from famicom_python.machine import MACHINES
+from famicom_python.peripherals import ZAPPER
 from famicom_python.ppu import HEIGHT
 from famicom_python.system import System
 from famicom_python.video import load_palette, write_png
@@ -143,12 +150,18 @@ def licensed_dumps(
 
 
 def mesen_frames(
-    rom: Path, frames: list[int], home: Path, region: int = 1, ppu_reset_at_power: bool = True
+    rom: Path,
+    frames: list[int],
+    home: Path,
+    region: int = 1,
+    ppu_reset_at_power: bool = True,
+    ports: str = "",
+    oam_row_corruption: bool = True,
 ) -> dict[int, list[int]]:
     if rom.name.lower().endswith((".fds", ".fds.zip")) or rom.parent.name == FDS_SET:
         (home / "Firmware").mkdir(exist_ok=True)
         (home / "Firmware" / "disksys.rom").write_bytes(fds_bios())
-    lua = FRAMES_LUA % (", ".join(f"[{f}]=true" for f in frames), max(frames))
+    lua = ports + FRAMES_LUA % (", ".join(f"[{f}]=true" for f in frames), max(frames))
     lines: dict[str, str] = {}
     run_mesen(
         mesen_path(rom),
@@ -161,6 +174,7 @@ def mesen_frames(
         region=region,
         ppu_reset_at_power=ppu_reset_at_power,
         collect=lines,
+        oam_row_corruption=oam_row_corruption,
     )
     return decode_frames(lines)
 
@@ -210,6 +224,16 @@ def check(
         result["script"] = vs_script
         if probe.loaded.image.board.vs_hardware >= 5:
             return result | {"status": "dual"}  # a DualSystem game: two sides to judge
+    # A PlayChoice-10 game board: scripted buttons for both. Mesen2 colours it
+    # through the palette it is given (measured: the identity palette comes
+    # back), so the pictures are compared as pixel values, as a console's.
+    ports = ""
+    pc10_script = None
+    if machine.playchoice:
+        pc10_script = pc10_judge.PLAY if vs_script == "play" else pc10_judge.ATTRACT
+        gun = System.from_rom(rom, machine).loaded.image.board.expansion == ZAPPER
+        ports = pc10_judge.lua(pc10_script, gun)
+        result["script"] = vs_script
     border = machine.timing.border
     # PAL's border (line 0, x 0-1 and 254-255) is not compared.
     keep = [i for i in range(PIXELS) if not (border and (i < 256 or i % 256 in (0, 1, 254, 255)))]
@@ -247,6 +271,8 @@ def check(
                     Path(home),
                     REGIONS[machine.timing.name],
                     machine.ppu_reset_at_power,
+                    ports,
+                    machine.timing.oam_corruption,
                 )
             if machine.timing.swapped_emphasis:
                 theirs = {f: [unswap_emphasis(v) for v in p] for f, p in theirs.items()}
@@ -259,7 +285,10 @@ def check(
         return result | {"status": "unsupported", "error": str(error)}
     board = system.loaded.image.board
     result["mapper"] = f"{board.mapper}.{board.submapper}"
-    if script is not None:
+    if machine.playchoice:
+        system.plug()
+        pc10_judge.apply(system, pc10_script)
+    elif script is not None:
         vs_judge.apply(system, script)
         result["vs"] = f"hardware {board.vs_hardware}, {machine.ppu_variant}"
     began = time.monotonic()
@@ -358,6 +387,12 @@ def main() -> int:
         "--programs", action="store_true", help="the test carts and programs instead"
     )
     parser.add_argument("--vs", type=Path, metavar="DIR", help="the Vs. System images in DIR")
+    parser.add_argument(
+        "--pc10",
+        type=Path,
+        metavar="DIR",
+        help="the PlayChoice-10 images in DIR (scripts/pc10_images.py): the game boards alone",
+    )
     parser.add_argument("--vs-script", choices=("play", "attract"), default="play")
     args = parser.parse_args()
     frames = sorted(int(f) for f in args.frames.split(","))
@@ -366,8 +401,8 @@ def main() -> int:
     if args.out.exists():
         done = {json.loads(line)["rom"] for line in args.out.read_text().splitlines() if line}
     mappers = {int(m) for m in args.mappers.split(",")} if args.mappers else None
-    if args.vs:
-        roms = sorted(args.vs.glob("*.nes"))
+    if args.vs or args.pc10:
+        roms = sorted((args.vs or args.pc10).glob("*.nes"))
         if args.only:
             roms = [r for r in roms if re.search(args.only, r.name)]
         roms = roms[:: args.every]

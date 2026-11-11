@@ -20,6 +20,7 @@ from .cartridge import BoardInfo, Loaded, load
 from .cartridge.connector import Cartridge
 from .joypad import START
 from .machine import MACHINES, NES_001, Machine, vs_machine
+from .playchoice import PlayChoiceGun, is_playchoice
 from .vs import VS_DEVICES, VS_ZAPPER, VsStick, VsZapper
 
 
@@ -57,7 +58,8 @@ class System:
     def machine_for(rom: str | Path | bytes) -> Machine:
         """The console a cartridge asks for: a Vs. UniSystem with the game's PPU
         if the NES 2.0 header or nes20db says console type 1 (and which PPU:
-        machine.VS_PPUS); else by their timing (1 PAL, 3 Dendy), else a
+        machine.VS_PPUS), a PlayChoice-10's game board for type 2; else by
+        their timing (1 PAL, 3 Dendy), else a
         Famicom. Neither source tells a Famicom
         cartridge from an NES one, and the Famicom runs both: a sound chip or a
         disk reaches the mix only through its cartridge pins 45 and 46, and
@@ -66,6 +68,10 @@ class System:
         loaded = load(rom)
         if loaded.image.board.console == 1:
             return vs_machine(loaded.image.board.vs_ppu)
+        if is_playchoice(loaded.image):
+            return MACHINES[
+                "playchoice"
+            ]  # the game board alone: supervisor.PlayChoice adds the Z80
         timing = loaded.image.board.timing
         if timing == 1:
             return MACHINES["pal"]
@@ -111,6 +117,17 @@ class System:
             return None
         if device in VS_DEVICES:
             return None  # a Vs. game on a home console: standard pads
+        if self.machine.playchoice:
+            # The cabinet's panel is its own; a gun game's gun shares $4017
+            # with player 2's shift register (playchoice.PlayChoiceGun).
+            if isinstance(self.board.pads[1], PlayChoiceGun):
+                return self.board.pads[1]  # plugged already
+            if device == peripherals.ZAPPER:
+                self.board.pads[1] = PlayChoiceGun(
+                    self.board.ppu, peripherals.palette_of(self.board), self.board.pads[1]
+                )
+                return self.board.pads[1]
+            return None
         return peripherals.plug(self.board, device, self.machine.famicom_expansion_port)
 
     # -- power and reset -------------------------------------------------

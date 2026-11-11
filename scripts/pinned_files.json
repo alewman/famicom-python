@@ -6848,5 +6848,41 @@
   "kind": "live-wiki",
   "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
   "note": "NESdev wiki snapshot 2026-11-11: INES_Mapper_099 (the Vs. System)"
+ },
+ {
+  "path": "reference/mame-nes/playch10.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/mame/nintendo/playch10.cpp",
+  "sha256": "d5904a91f522204e783ac4fd03e73ac560bd43c1d734c97a8518e3a2b3b71872",
+  "size": 115557,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME's PlayChoice-10 driver: the Z80's memory and port map, the control latches, the second screen, the panel's wiring, each set's ROMs"
+ },
+ {
+  "path": "reference/mame-nes/rp5h01.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/devices/machine/rp5h01.cpp",
+  "sha256": "3f5915bf990106be72b3f017928b732d3655b62d6c972d55649a4dafd75d9778",
+  "size": 4533,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME's RP5H01 (the PlayChoice-10's security PROM): counter, reset, the 6/7-bit mode, the dummy bits"
+ },
+ {
+  "path": "reference/docs/Playchoice.pdf",
+  "url": "https://www.nesdev.org/Playchoice.pdf",
+  "sha256": "12406c78cdaea7f6c1a982c7beed105c8b9870376858de63c9d0324731698dee",
+  "size": 1703797,
+  "kind": "document",
+  "license": "(c) 1986 Nintendo of America Inc.; no licence; linked from the NESdev wiki (CPU_Test_Mode); fetch, do not commit",
+  "note": "PCH1-CPU schematic, sheets 1-6 and the board assembly (and the Vs. MDS-02-CPU sheet): the PlayChoice-10's Z80, latches, second screen's counters, panel registers, game-stop flip-flops; manufacturer's documentation, 300 dpi scan"
+ },
+ {
+  "path": "reference/nesdev-wiki/PC10_ROM-Images.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=PC10_ROM-Images&action=raw",
+  "sha256": "0a595b5759dbb51ade6cca6a42a959610f0ef1e21ad82fd87b712527291488d7",
+  "size": 1406,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-11-11: PC10 ROM-Images (the INST ROM and PROM areas; MAME's security.prm is inverted and bit-reversed)"
  }
 ]

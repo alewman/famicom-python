@@ -89,7 +89,7 @@ def lockstep_machine(name: str, ppu_dot: int | None, ppu_ticks: int | None = Non
     elif name == "dendy":
         base = MACHINES["dendy"]
         machine = replace(base, power_on=replace(base.power_on, **DENDY_POWER_ON))
-    elif name.startswith("vs"):
+    elif name.startswith("vs") or name == "playchoice":
         machine = replace(MACHINES[name], power_on=MACHINE.power_on)
     else:
         raise SystemExit(f"no Mesen2 power-on for {name}")
