@@ -2421,6 +2421,55 @@ anything. The DIP switches against Mesen2, where they were all off (against MAME
 28 of the 43 sets ran with switches on, MAME's defaults, and the board with the same:
 the switch bits are judged there). The Vs. Zapper in a game (its report is unit-tested; the sweep
 holds it off the screen). Hardware: none of this has met a Vs. board; C75 to C79 are
-the open disagreements. The home consoles after the change: AccuracyCoin and the PPU
-test ROMs, at the end of this section's work (below).
+the open disagreements.
+
+**The home consoles after the change** (the same tree, PyPy): AccuracyCoin **147 of
+147** (`scripts/accuracycoin.py`, 126,984,584 CPU cycles), `pytest -m slow
+tests/test_ppu_test_roms.py` **42 of 42**, the quick suite green.
+
+### The Vs. DualSystem (2026-11-11)
+
+`dual.py`: both sides of the mainboard as two `System`s on Vs. rows, wired by the
+shared RAM (the primary side's OUT1 chooses its owner), the cross interrupt (each
+side's OUT1 is the other's /IRQ) and the watchdog (1.3 s without a `$4017` read on the
+secondary side resets both). An image is split as NES_2.0.wiki says. The two CPUs are
+interleaved an instruction at a time, the side behind stepping next: a write on one
+side reaches the other within an instruction, not on its cycle. That is the limit of
+this model, and MAME's too; no source here needs better, and none measures it.
+
+**MAME 0.285** (`scripts/vs_mame.py --dual`: both screens, each side's DIP switches
+MAME's defaults, frames 180, 420 and 900, the board's closest within 6): **16 of the
+22 DualSystem images identical on both screens at all three frames**: *Balloon
+Fight*, *Baseball* (four sets), *Tennis* (two sets), *Ice Climber* and *Raid on
+Bungeling Bay*, with their overdumped and padded copies. The six others are three
+games: *Wrecking Crew* (two images; 248 and 281 pixels of 122,880 at frames 420 and
+900: the demo's figures, a step apart on one screen), *Mahjong* (three images; 656
+pixels at frame 900, tiles being dealt), and the *Tennis* set nes20db itself names
+"right screen stays black" (MAME flags it imperfect). The board's two screens begin
+every frame on the same master tick, as the wiki says the hardware's do; MAME's two
+PPUs are separate devices, and which is right about a moving figure is not settled
+here.
+
+*Raid on Bungeling Bay* is the handshake's test. MAME does not run its second CPU:
+it fakes `$4016` D7 and pokes an interrupt from a RAM address (`set_bnglngby_irq_w`,
+"this is a bad hack"). The board runs the image's 8 KiB program on the primary side
+and the game on the secondary, joined only by the wiring above, and the game reaches
+the same title and attract frames as MAME's (identical at 180, 420 and 900).
+
+**Mesen2** runs both sides of a DualSystem image and hands scripts one screen, the
+primary side's; its Lua callbacks do not say which CPU read a port, so the judge's
+input script cannot be given to it. Natively, attract mode, *Balloon Fight*: frame 200
+identical; frames 700 and 1,200 differ by 7,278 and 9,840 pixels, where MAME's two
+screens are within 112 and 14 pixels of the board's (C80).
+
+**The tests** (`tests/test_vs_dual.py`, 7 quick cases, 1 with a game): the split,
+each side's D7, the RAM's handover and the secondary side's lack of control over it,
+the cross interrupt and its state out of reset, the two clocks within an instruction
+and the two frame counts equal, the watchdog, the window with both screens.
+
+**Not done, plainly.** The DualSystem in `compat_sweep.py` (it reports `dual` and
+moves on) and in lockstep; `famicom-python run` and `System.from_rom` on a DualSystem
+image still run one side alone; save states of a DualSystem; the second side's sound
+and its service button in the window; coins and play on a DualSystem against any
+detector (attract mode only); cycle-exact coupling of the two CPUs.
 

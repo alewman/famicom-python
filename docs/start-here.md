@@ -30,7 +30,7 @@ start, so that adding them later is data, not a refactor.
 | PAL NES | RP2A07 | 2C07 | CPU and PPU | as NES | none | later |
 | Dendy (UMC clones) | UA6527P | UA6538 | — | Famicom-style | — | later |
 | Vs. UniSystem | RP2A03 (letterless: no tonal noise) | RP2C03B, RP2C04-0001 to -0004 or RC2C05-01 to -04, as the game's ROMs need (RGB) | CPU and PPU (the watchdog's reset) | two sticks on the mainboard's shift registers, coins, a service button, 8 DIP switches | none | **built** (2026-11-11; "The Vs. System" below) |
-| Vs. DualSystem | two of each | two | both sides | four sticks | none | see "The Vs. System" |
+| Vs. DualSystem | two of each | two | both sides | four sticks | none | **first pass** (`dual.py`: the two sides coupled an instruction at a time) |
 | PlayChoice-10 | RP2A03G | 2C03 (RGB) | | | | later (adds a Z80: z80-python) |
 
 Sources: `Family_Computer.wiki`, `PPU_power_up_state.wiki` l.49/76,
@@ -201,9 +201,11 @@ A coin is a contact closed for about 50 ms on the board's clock
 (`System.insert_coin`); the sticks report as controllers do, with the panel's
 buttons 1-4 where Select and Start sit (`vs.panel` puts player 1 on the stick
 the game reads: NES 2.0 devices $04 and $05); the light gun reports through
-`$4016`'s shift register (`vs.VsZapper`, device $07). What is not modelled, and
+`$4016`'s shift register (`vs.VsZapper`, device $07). A DualSystem game is `dual.VsDualSystem`: two `System`s, one on
+each side's row, wired by the shared RAM, the cross interrupt and the watchdog
+(validation.md "The Vs. DualSystem"). What is not modelled, and
 the contradictions between the wiki and the two emulators, are in
-[undocumented-behavior.md](undocumented-behavior.md) (C75 on) and
+[undocumented-behavior.md](undocumented-behavior.md) (C75-C81) and
 [validation.md](validation.md) "The Vs. System".
 
 ## The PPU side
