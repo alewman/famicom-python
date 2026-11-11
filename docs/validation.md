@@ -2404,7 +2404,7 @@ pixels and *T.K.O. Boxing* by 9 at frame 900, moving objects a frame or two apar
 So every UniSystem image matches at least one detector on a picture that is not
 blank, and 35 match both.
 
-**The tests** (`tests/test_vs_system.py`, 29 quick cases on synthetic images, 2 with
+**The tests** (`tests/test_vs_system.py`, 30 quick cases on synthetic images, 2 with
 the games): the header's byte 13 and the rows; the colour tables against the pinned
 wiki page and `2C03_wiki.pal`, and the four RP2C04s as permutations of one palette;
 emphasis; the RC2C05's swap and identifiers; a frame's length with rendering on (the
@@ -2412,7 +2412,8 @@ same every frame on a Vs. row, alternating on the NES); the letterless 2A03's no
 and reset; every port bit, the coin pulse's length, the coin counter and its mirror
 and its read, the RAM's mirrors under each of the six mappers, four screens under
 each; mapper 99's CHR select, empty sockets, the 24 KiB layout, Gumshoe's fifth bank;
-the three protection chips' answers; the Vs. Zapper's report; the panel's wiring.
+the three protection chips' answers; the Vs. Zapper's report; the panel's wiring; a
+save state taken with a coin in the slot, loaded and run on.
 *Vs. Super Mario Bros.* takes a coin (and pulses the coin counter once), starts on
 button 1 and reaches the game.
 
