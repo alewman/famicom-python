@@ -53,7 +53,7 @@ VERSION = 1
 # Modules whose objects are part of the state.
 MODULES = ("famicom_python", "ym2413_python")
 # Attributes that are not state: the loader's record, observers of the bus.
-SKIPPED = {"loaded", "bus_observers"}
+SKIPPED = {"loaded", "bus_observers", "_tiles", "_colours"}
 
 
 class StateError(ValueError):
@@ -141,7 +141,28 @@ class _Encoder:
 
 
 def save_state(system: System) -> bytes:
-    """The state of ``system`` as bytes (between two of its steps)."""
+    """The state of ``system`` as bytes (between two of its steps). A
+    PlayChoice-10 cabinet (supervisor.PlayChoice) is saved whole: the game's
+    System as any other, with the supervisor and its Z80 beside it."""
+    if hasattr(system, "supervisor"):
+        return _save_cabinet(system)
+    return zlib.compress(json.dumps(_body(system), separators=(",", ":")).encode(), 6)
+
+
+def _save_cabinet(cabinet: Any) -> bytes:
+    supervisor = cabinet.supervisor
+    encoder = _Encoder(cabinet.game)
+    encoder.cpu = supervisor.cpu  # the Z80: its capture_state is saved instead
+    body = _body(cabinet.game)
+    body["supervisor"] = {
+        "cpu": dataclasses.asdict(supervisor.cpu.capture_state()),
+        "state": encoder.value(supervisor, "supervisor"),
+        "lines": [cabinet.in_reset, cabinet.stopped, cabinet._nmi],
+    }
+    return zlib.compress(json.dumps(body, separators=(",", ":")).encode(), 6)
+
+
+def _body(system: System) -> dict:
     encoder = _Encoder(system)
     cpu = dataclasses.asdict(system.cpu.capture_state())
     body = {
@@ -153,7 +174,7 @@ def save_state(system: System) -> bytes:
         "instructions": system.instructions,
         "board": encoder.value(system.board, "board"),
     }
-    return zlib.compress(json.dumps(body, separators=(",", ":")).encode(), 6)
+    return body
 
 
 class _Decoder:
@@ -288,6 +309,9 @@ def _class(name: str) -> type:
 
 def load_state(system: System, data: bytes) -> None:
     """Put ``system`` in the state ``data`` was saved from (same cartridge and machine)."""
+    cabinet: Any = None
+    if hasattr(system, "supervisor"):
+        cabinet, system = system, system.game  # type: ignore[attr-defined]
     try:
         body = json.loads(zlib.decompress(data))
     except (zlib.error, ValueError) as error:
@@ -298,7 +322,16 @@ def load_state(system: System, data: bytes) -> None:
         raise StateError("a state of another cartridge")
     if body["machine"] != system.machine.name:
         raise StateError(f"a state of the {body['machine']}, not the {system.machine.name}")
+    if (cabinet is None) != ("supervisor" not in body):
+        raise StateError("a cabinet's state and a console's are not each other's")
     decoder = _Decoder(system)
     decoder.into(system.board, body["board"], "board")
     system.cpu.restore_state(CPUState(**body["cpu"]))
     system.instructions = body["instructions"]
+    if cabinet is not None:
+        saved = body["supervisor"]
+        supervisor = cabinet.supervisor
+        _Decoder(system).into(supervisor, saved["state"], "supervisor")
+        z80 = supervisor.cpu
+        z80.restore_state(type(z80.capture_state())(**saved["cpu"]))
+        cabinet.in_reset, cabinet.stopped, cabinet._nmi = saved["lines"]
