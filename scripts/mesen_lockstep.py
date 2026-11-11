@@ -37,6 +37,7 @@ import sys
 import tempfile
 import time
 import zipfile
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -88,6 +89,8 @@ def lockstep_machine(name: str, ppu_dot: int | None, ppu_ticks: int | None = Non
     elif name == "dendy":
         base = MACHINES["dendy"]
         machine = replace(base, power_on=replace(base.power_on, **DENDY_POWER_ON))
+    elif name.startswith("vs"):
+        machine = replace(MACHINES[name], power_on=MACHINE.power_on)
     else:
         raise SystemExit(f"no Mesen2 power-on for {name}")
     if ppu_dot is not None:
@@ -185,6 +188,7 @@ def compare(
     context: int = 6,
     tolerate_2007: bool = False,
     machine: Machine = MACHINE,
+    prepare: Callable[[System], None] | None = None,
 ) -> tuple[int, str]:
     """Rows that agree before the first divergence, and a report.
 
@@ -195,6 +199,8 @@ def compare(
     must the next row.
     """
     system = System.from_rom(rom, machine)
+    if prepare is not None:
+        prepare(system)
     history: list[tuple[tuple, tuple]] = []
     cycle_offset = dot_offset = None
     count = 0
@@ -261,20 +267,46 @@ def main() -> int:
         action="store_true",
         help="pass over a register differing only after a rendering-time $2007 read (C31)",
     )
-    parser.add_argument("--machine", choices=("nes", "famicom", "pal", "dendy"), default="nes")
+    parser.add_argument(
+        "--machine", choices=("nes", "famicom", "pal", "dendy", "vs"), default="nes"
+    )
+    parser.add_argument(
+        "--vs-script",
+        choices=("play", "attract"),
+        default="play",
+        help="--machine vs: coins and a start button for both sides (scripts/vs_judge.py)",
+    )
     parser.add_argument("--ppu-dot", type=int, help="the board's power-on PPU dot (a sweep)")
     parser.add_argument("--ppu-ticks", type=int, help="... and master ticks into it (PAL)")
     args = parser.parse_args()
     global LINES
-    machine = lockstep_machine(args.machine, args.ppu_dot, args.ppu_ticks)
+    name = args.machine
+    lua = STOP_AFTER_FRAMES.replace("{frames}", str(args.frames))
+    prepare = None
+    if name == "vs":
+        # The Vs. UniSystem with the game's PPU, and one input script for both
+        # sides: Mesen2's $4016/$4017 are replaced by the mainboard's.
+        import vs_judge
+
+        chosen = System.machine_for(args.rom)
+        name = next(key for key, row in MACHINES.items() if row is chosen)
+        if not name.startswith("vs"):
+            raise SystemExit(f"{args.rom.name} is not a Vs. System image")
+        script = vs_judge.PLAY if args.vs_script == "play" else vs_judge.ATTRACT
+        probe = System.from_rom(args.rom, chosen)
+        lua = vs_judge.lua(script, vs_judge.held_bits(probe), vs_judge.side_of(chosen)) + lua
+
+        def prepare(system: System) -> None:
+            vs_judge.apply(system, script)
+
+    machine = lockstep_machine(name, args.ppu_dot, args.ppu_ticks)
     LINES = machine.timing.lines
     args.trace_dir.mkdir(parents=True, exist_ok=True)
     trace = args.trace_dir / f"{args.rom.stem}.{args.machine}.{args.frames}.trace"
     if not (args.reuse and trace.exists()):
-        lua = STOP_AFTER_FRAMES.replace("{frames}", str(args.frames)).encode()
         code, _, wall = run_mesen(
             mesen_path(args.rom),
-            lua=lua,
+            lua=lua.encode(),
             seconds=3600,
             # A fresh home each run: Mesen2 keeps battery saves there, and a
             # save from an earlier run would be the cartridge's RAM at power.
@@ -283,10 +315,13 @@ def main() -> int:
             for_comparison=True,
             region=REGIONS[machine.timing.name],
             ppu_reset_at_power=machine.ppu_reset_at_power,
+            oam_row_corruption=machine.timing.oam_corruption,
         )
         print(f"Mesen2: stop code {code}, {wall:.0f} s, {trace.stat().st_size:,} bytes of trace")
     start = time.perf_counter()
-    _, report = compare(args.rom, trace, tolerate_2007=args.tolerate_2007, machine=machine)
+    _, report = compare(
+        args.rom, trace, tolerate_2007=args.tolerate_2007, machine=machine, prepare=prepare
+    )
     print(report)
     print(f"compared in {time.perf_counter() - start:.0f} s")
     return 0 if report.startswith("identical") else 1

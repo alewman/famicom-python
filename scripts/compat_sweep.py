@@ -41,6 +41,13 @@ board's frames either side. Every run lists its dumps that differ in
 ``failures.txt`` beside ``--out``; ``--list FILE`` runs only the dumps named
 there, the quick sweep while fixing.
 
+``--vs DIR`` sweeps the Vs. System images ``scripts/vs_images.py`` assembled
+into DIR (UniSystem; the DualSystem's wait for their second side). Both sides
+get one input script (``scripts/vs_judge.py``: ``--vs-script play``, two coins
+and the start button, or ``attract``, nothing), and the pictures are compared
+as the RGB PPU's DAC levels, since Mesen2 colours a Vs. game itself: the
+palette tables are judged too. Use later frames: ``--frames 200,700,1200,1800``.
+
 One line of JSON per dump in ``--out`` (appended; dumps already there are
 skipped, so an interrupted sweep resumes), and Mesen2's first differing frame
 as a PNG, differing pixels magenta, beside it. Nothing it writes is committed.
@@ -59,6 +66,7 @@ import time
 import zipfile
 from pathlib import Path
 
+import vs_judge
 from count_mappers import BASE, classify
 from mame_frames import COLOURS, mame_frames
 from mesen_lockstep import lockstep_machine, mesen_path
@@ -180,12 +188,28 @@ def console_for(rom: Path) -> str:
     return next(name for name, machine in MACHINES.items() if machine is chosen)
 
 
-def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "auto") -> dict:
+def check(
+    rom: Path,
+    frames: list[int],
+    slack: int = 1,
+    machine_name: str = "auto",
+    vs_script: str = "play",
+) -> dict:
     result: dict = {"rom": rom.name, "set": rom.parent.name}
     if machine_name == "auto":
         machine_name = console_for(rom)
     result["machine"] = machine_name
     machine = lockstep_machine(machine_name, None)
+    # A Vs. System game: one input script for both sides, pictures as DAC levels.
+    script = levels = None
+    if machine.vs_side is not None:
+        script = vs_judge.PLAY if vs_script == "play" else vs_judge.ATTRACT
+        levels = vs_judge.dac_levels(machine.timing.palette)
+        probe = System.from_rom(rom, machine)
+        held = vs_judge.held_bits(probe)
+        result["script"] = vs_script
+        if probe.loaded.image.board.vs_hardware >= 5:
+            return result | {"status": "dual"}  # a DualSystem game: two sides to judge
     border = machine.timing.border
     # PAL's border (line 0, x 0-1 and 254-255) is not compared.
     keep = [i for i in range(PIXELS) if not (border and (i < 256 or i % 256 in (0, 1, 254, 255)))]
@@ -206,6 +230,16 @@ def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "aut
                 theirs = mame_frames(extracted, frames)
                 if not theirs:
                     raise SystemExit("LoadRom failed")
+            elif script is not None:
+                theirs = vs_judge.mesen_level_frames(
+                    rom,
+                    frames,
+                    script,
+                    held,
+                    Path(home),
+                    machine.ppu_reset_at_power,
+                    vs_judge.side_of(machine),
+                )
             else:
                 theirs = mesen_frames(
                     rom,
@@ -225,6 +259,9 @@ def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "aut
         return result | {"status": "unsupported", "error": str(error)}
     board = system.loaded.image.board
     result["mapper"] = f"{board.mapper}.{board.submapper}"
+    if script is not None:
+        vs_judge.apply(system, script)
+        result["vs"] = f"hardware {board.vs_hardware}, {machine.ppu_variant}"
     began = time.monotonic()
     ours: dict[int, list[int]] = {}
     report = []
@@ -238,6 +275,8 @@ def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "aut
                     ours[candidate] = finished_picture(system)
                     if use_mame:
                         ours[candidate] = [COLOURS[v & 0x1FF] for v in ours[candidate]]
+                    elif levels is not None:
+                        ours[candidate] = [levels[v & 0x1FF] for v in ours[candidate]]
             if frame not in theirs or len(theirs[frame]) != PIXELS:
                 report.append({"frame": frame, "error": "Mesen2 gave no 256x240 frame"})
                 continue
@@ -263,12 +302,19 @@ def check(rom: Path, frames: list[int], slack: int = 1, machine_name: str = "aut
             first = differing[0]
             frame = first["frame"]
             best = frame - 1 + first.get("closest", 0)
-            save_diff(OUT / f"{rom.stem}.f{frame}.png", ours[best], theirs[frame])
+            folder = Path(os.environ.get("FAMICOM_SWEEP_DIR", OUT))
+            path = folder / f"{rom.stem}.f{frame}.png"
+            save_diff(path, ours[best], theirs[frame], levels is not None)
     return result
 
 
-def save_diff(path: Path, ours: list[int], theirs: list[int]) -> None:
-    colours = load_palette()
+def save_diff(path: Path, ours: list[int], theirs: list[int], dac: bool = False) -> None:
+    if dac:  # DAC levels 0oRGB, each channel 0-7
+        colours = [
+            bytes(round(255 * (v >> shift & 7) / 7) for shift in (6, 3, 0)) for v in range(512)
+        ]
+    else:
+        colours = load_palette()
     write_png(
         path,
         b"".join(
@@ -278,10 +324,10 @@ def save_diff(path: Path, ours: list[int], theirs: list[int]) -> None:
     )
 
 
-def worker(job: tuple[str, list[int], int, str]) -> str:
-    rom, frames, slack, machine = job
+def worker(job: tuple[str, list[int], int, str, str]) -> str:
+    rom, frames, slack, machine, vs_script = job
     try:
-        return json.dumps(check(Path(rom), frames, slack, machine))
+        return json.dumps(check(Path(rom), frames, slack, machine, vs_script))
     except BaseException as error:  # recorded; the sweep goes on
         return json.dumps({"rom": Path(rom).name, "status": "error", "error": repr(error)})
 
@@ -311,6 +357,8 @@ def main() -> int:
     parser.add_argument(
         "--programs", action="store_true", help="the test carts and programs instead"
     )
+    parser.add_argument("--vs", type=Path, metavar="DIR", help="the Vs. System images in DIR")
+    parser.add_argument("--vs-script", choices=("play", "attract"), default="play")
     args = parser.parse_args()
     frames = sorted(int(f) for f in args.frames.split(","))
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -318,7 +366,12 @@ def main() -> int:
     if args.out.exists():
         done = {json.loads(line)["rom"] for line in args.out.read_text().splitlines() if line}
     mappers = {int(m) for m in args.mappers.split(",")} if args.mappers else None
-    if args.fds:
+    if args.vs:
+        roms = sorted(args.vs.glob("*.nes"))
+        if args.only:
+            roms = [r for r in roms if re.search(args.only, r.name)]
+        roms = roms[:: args.every]
+    elif args.fds:
         roms = disk_dumps(args.only)[:: args.every]
     else:
         every_dump_of = AFTERMARKET if args.aftermarket else PRIVATE if args.private else None
@@ -332,10 +385,11 @@ def main() -> int:
     roms = [r for r in roms if r.name not in done]
     print(f"{len(roms)} dumps to run ({len(done)} already in {args.out})", flush=True)
     os.environ["FAMICOM_DETECTOR"] = args.detector
+    os.environ["FAMICOM_SWEEP_DIR"] = str(args.out.parent.resolve())
     # One process per dump: MesenCore keeps global state between loads.
     context = multiprocessing.get_context("spawn")
     with context.Pool(args.jobs, maxtasksperchild=1) as pool, args.out.open("a") as out:
-        jobs = [(str(r), frames, args.slack, args.machine) for r in roms]
+        jobs = [(str(r), frames, args.slack, args.machine, args.vs_script) for r in roms]
         for count, line in enumerate(pool.imap_unordered(worker, jobs), 1):
             out.write(line + "\n")
             out.flush()

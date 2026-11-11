@@ -87,7 +87,10 @@ def load_library() -> ctypes.CDLL:
 
 
 def configure_for_comparison(
-    m: ctypes.CDLL, region: int = 1, ppu_reset_at_power: bool = True
+    m: ctypes.CDLL,
+    region: int = 1,
+    ppu_reset_at_power: bool = True,
+    oam_row_corruption: bool = True,
 ) -> None:
     """Make Mesen2's frames comparable with the board's, pixel value for pixel value.
 
@@ -111,6 +114,8 @@ def configure_for_comparison(
       address frozen), which the board always models (C26, AccuracyCoin's
       hardware answer key); off by default in Mesen2. Found by lockstep:
       The Legend of Zelda turns rendering off mid-frame on its title screen.
+      Off again (``oam_row_corruption``) for a machine whose PPU has none: the
+      Vs. System's RGB PPUs (machine.Timing.oam_corruption, C76).
     """
     config = m.GetNesConfig()
     raw = config.raw
@@ -128,7 +133,7 @@ def configure_for_comparison(
         raw[port : port + 4] = [NES_CONTROLLER, 0, 0, 0]
     raw[NES_CONFIG_RESTRICT_FIRST_FRAME] = int(ppu_reset_at_power)
     raw[NES_CONFIG_RAM_POWER_ON] = 1
-    raw[NES_CONFIG_OAM_ROW_CORRUPTION] = 1
+    raw[NES_CONFIG_OAM_ROW_CORRUPTION] = int(oam_row_corruption)
     raw[NES_CONFIG_FULL_COLOR_PALETTE] = 1
     for i in range(512):
         at = NES_CONFIG_USER_PALETTE + 4 * i
@@ -197,6 +202,7 @@ def run_mesen(
     region: int = 1,
     ppu_reset_at_power: bool = True,
     collect: dict[str, str] | None = None,
+    oam_row_corruption: bool = True,
 ) -> tuple[int, str, float]:
     """Run ``rom`` at maximum speed until the Lua script stops it or ``seconds`` pass.
 
@@ -213,7 +219,7 @@ def run_mesen(
     m.Pause()
     m.SetEmulationFlag(CONSOLE_MODE, True)
     if for_comparison:
-        configure_for_comparison(m, region, ppu_reset_at_power)
+        configure_for_comparison(m, region, ppu_reset_at_power, oam_row_corruption)
     if not m.LoadRom(str(rom.resolve()).encode(), b""):
         raise SystemExit("LoadRom failed")
     m.InitializeDebugger()

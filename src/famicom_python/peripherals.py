@@ -1386,6 +1386,16 @@ DEVICE_NAMES = {
 }
 
 
+def palette_of(board: Board) -> Sequence[bytes]:
+    """The colours a light sensor sees: the machine's palette, or greys without it."""
+    from .video import machine_palette
+
+    try:
+        return machine_palette(board.ppu.timing)
+    except FileNotFoundError:  # the pally palettes come with fetch_references.py
+        return grey_palette()
+
+
 def plug(
     board: Board, device: int, famicom: bool, palette: Sequence[bytes] | None = None
 ) -> object | None:
@@ -1399,12 +1409,7 @@ def plug(
     timing = ppu.timing
     ticks = timing.master_hz
     if palette is None:
-        from .video import load_palette, palette_for
-
-        try:
-            palette = load_palette(palette_for(timing), timing.swapped_emphasis)
-        except FileNotFoundError:  # the pally palettes come with fetch_references.py
-            palette = grey_palette()
+        palette = palette_of(board)
     if device == FOUR_SCORE:
         four = FourScore()
         board.pads = list(four.ports)

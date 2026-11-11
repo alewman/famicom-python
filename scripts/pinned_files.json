@@ -6830,5 +6830,23 @@
   "kind": "live-forum",
   "license": "NESdev forum post content (authors' copyright)",
   "note": "Mapper 549: KS-7016B"
+ },
+ {
+  "path": "reference/mame-nes/vsnes.cpp",
+  "url": "https://raw.githubusercontent.com/mamedev/mame/e31391f32a0f3b7f12fbadb393e7eb809e575f0b/src/mame/nintendo/vsnes.cpp",
+  "sha256": "f70458a060e126cf8d1ee8b9653a3e30a78293c3e0ca40aead67202ddeeaff0e",
+  "size": 167178,
+  "kind": "document",
+  "license": "BSD-3-Clause (MAME); read, not vendored; fetch, do not commit",
+  "note": "MAME's Vs. System driver: the protection chips' answers, the port wiring, coin timing, each set's PPU and DIP switches"
+ },
+ {
+  "path": "reference/nesdev-wiki/INES_Mapper_099.wiki",
+  "url": "https://www.nesdev.org/w/index.php?title=INES_Mapper_099&action=raw",
+  "sha256": "24b7c2fe6f0620932aac1dcc26183f1f609a14f193f898ae72ae7d09552b21f5",
+  "size": 2999,
+  "kind": "live-wiki",
+  "license": "NESdev wiki (CC BY-SA 3.0 unless page says otherwise)",
+  "note": "NESdev wiki snapshot 2026-11-11: INES_Mapper_099 (the Vs. System)"
  }
 ]

@@ -73,6 +73,73 @@ class Namco108(Banked):
             self.map_chr(4 + i, 1, r[2 + i] & 0x3F)
 
 
+# (the addresses decoded, as a mask and a value; the 32 bytes)
+VS_SEQUENCES = {
+    # Vs. Atari R.B.I. Baseball: $5600-$5601 and $5E00-$5E01 ("address
+    # fully decoded except A11").
+    1: (
+        0xF7FE,
+        0x5600,
+        bytes.fromhex("fffdf5f4b4b4a62e2f6f6f7dd5d49494862e2f6f6b79d1d092928d656434b0a2"),
+    ),
+    # Vs. T.K.O. Boxing (chip "128"): $5E00-$5E01.
+    2: (
+        0xFFFE,
+        0x5E00,
+        bytes.fromhex("ffbfb7979717574f6f6beba9b1909414564e6f6beba9b190d45c3e2687831300"),
+    ),
+}
+# Vs. Super Xevious: $54FF returns $05 and flips the bit; the others
+# answer by it.
+VS_XEVIOUS = {0x5678: (0x00, 0x01), 0x578F: (0xD1, 0x89), 0x5567: (0x3E, 0x37)}
+
+
+class VsProtected108(Namco108):
+    """A Namco 108 daughterboard of the Vs. System with a protection chip in
+    $4020-$5FFF (NES 2.0 Vs. hardware types 1 to 3; Vs._System.wiki "Copy
+    Protection": "a few third-party games added an extra IC as well").
+
+    What the chips answer is known only as the bytes each game expects:
+    MAME's vsnes.cpp (BSD-3; emulator-derived) holds them, and says of chip
+    "127" that it "uses a LFSR with taps: 23, 18, 0" whose read-back shuffle
+    is unknown. Types 1 and 2 are a sequence of 32 bytes: a read of an even
+    address returns 0 and rewinds it, a read of an odd address returns the
+    next byte. Type 3 is four fixed addresses, one of which flips a bit that
+    picks between two answers at the other three.
+    """
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.protection = image.board.vs_hardware
+        self.protection_index = 0
+
+    def cpu_read(self, address: int, t: int) -> int | None:
+        if address >= 0x8000:
+            return self.prg[self.prg_offsets[(address >> 13) & 3] + (address & 0x1FFF)]
+        if self.protection == 3:
+            if address == 0x54FF:
+                self.protection_index ^= 1
+                return 0x05
+            answers = VS_XEVIOUS.get(address)
+            return None if answers is None else answers[self.protection_index]
+        mask, base, data = VS_SEQUENCES[self.protection]
+        if address & mask != base:
+            return None
+        if not address & 1:
+            self.protection_index = 0
+            return 0
+        value = data[self.protection_index & 0x1F]
+        self.protection_index += 1
+        return value
+
+
+def namco108_for(image: RomImage, cpu_cycle_ticks: int) -> Namco108:
+    """Mapper 206: the plain board, or a Vs. System daughterboard with its chip."""
+    if image.board.console == 1 and image.board.vs_hardware in (1, 2, 3):
+        return VsProtected108(image, cpu_cycle_ticks)
+    return Namco108(image, cpu_cycle_ticks)
+
+
 class Namco3446(Namco108):
     """Mapper 76: NAMCOT-3446 (Megami Tensei): four 2 KiB CHR banks from R2-R5, 128 KiB.
 

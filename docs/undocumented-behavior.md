@@ -153,7 +153,7 @@ by console revision.
 | **G** | $2004 and palette readable (palette read corrupt on one alignment); $2003 corruption; render-start copy. Visual 2C02 and PPUSim model it |
 | H | as G; "thought to have fixed some glitches (which?)" |
 | 2C07 (PAL) | 312 lines, no odd-frame skip, R/G emphasis swapped, forced OAM refresh lines 265–310, black border |
-| 2C03/2C04/2C05 (RGB) | no odd-frame skip (except 2C05-99), emphasis = channel full scale; 2C04 scrambled palettes; 2C05 swaps $2000/$2001 and returns a constant in $2002's low bits |
+| 2C03/2C04/2C05 (RGB) | no odd-frame skip (except 2C05-99), emphasis = channel full scale; 2C04 scrambled palettes; 2C05 swaps $2000/$2001 and returns a constant in $2002's low bits. Built as rows of `machine.VS_PPUS` (C76, C77) |
 
 ### Region table (later phases)
 
@@ -807,6 +807,63 @@ before the board takes a side.
   (148 identical, as before; *Krusty's Fun House* at frame 600 goes from 8 pixels to
   4), so it does not pay for a second PPU run in every cycle's end for the nine
   mappers that raise IRQs from the PPU's bus. No hardware answer on PAL.
+- **C75. Which side of the Vs. mainboard a UniSystem game's CPU is on.** Three things
+  follow from the socket: `$4016` D7, the RAM at `$6000`, and the /IRQ line.
+  `Vs._System.wiki` (specification): D7 is "0: game is running on the primary CPU ...
+  1: ... the secondary CPU (it must prevent watchdog timer timeout)"; "the secondary
+  CPU must be present in socket 8J" and read `$4017` every 1.2 s; the RAM is the
+  primary side's while the primary's OUT1 is 1 and the secondary's while it is 0; and
+  *Vs. Super Mario Bros.* comes with an "RP2A04", "nothing but a jumper that ties the
+  primary socket's OUT1 pin to ground", so that its CPU, in the secondary socket, has
+  the RAM and has "/IRQ ... always asserted". MAME's `vsnes.cpp` (emulator-derived)
+  runs every UniSystem game as the main side (D7 = 0, no IRQ, RAM always there) and
+  says so of itself: "the UniSystem emulation uses the wrong side of the PCB", "this
+  is one reason UniSystem games too must be installed on the Sub side"; for *Raid on
+  Bungeling Bay*, which looks at D7, it fakes a 1. Mesen2 returns `$00` from `$4016`
+  for *Vs. Super Mario Bros.* (`scripts/vs_judge.py --probe`: D7 = 0). nocash's
+  Everynes (not pinned) has both polarities the other way round: D7 "0=Slave CPU,
+  1=Master CPU", OUT1 "1=IRQ". *Board*: the wiki's account, the higher tier: a
+  UniSystem row is the secondary side (`Machine.vs_side`, D7 = 1). Every UniSystem
+  game gets the RAM, as with the jumper (which games shipped with one is not
+  recorded anywhere pinned); none gets the jumper's /IRQ. The games do not tell the
+  two answers apart so far: *Vs. Super Mario Bros.* is in lockstep with Mesen2 for 900
+  frames with D7 = 0 on both sides, and the sweep, with the board's D7 = 1 given to
+  Mesen2 through the judge's script, is identical on 41 of 43 images (validation.md
+  "The Vs. System"). No hardware answer here.
+- **C76. What an RGB PPU's core is.** `PPU_variants.wiki` (specification, much of it
+  "believed"): the RP2C03B is "believed identical to 2C02B. OAMDATA and PPU palette
+  are not readable"; the RP2C03C "the same core as 2C02C"; the RP2C04 "equivalent to
+  2C02D"; the consumer RC2C05-99 has "RP2C02E behavior: ... OAM corruption added in
+  revision E is present". `PPU_registers.wiki` "OAMADDR precautions": "in the 2C03,
+  2C04, 2C05 ... OAMADDR works as intended" (lidnariq on a Vs. System, forum
+  p=179676). This file's own revision table has revisions C and E copying an OAM row
+  when rendering starts, which would include the 2C03C. *Board*: an RGB PPU is the
+  board's 2C02G with four differences (`machine.Timing`): no skipped dot, the DAC's
+  colours and emphasis, no OAM row copy after rendering is switched off mid-line
+  (C26's, taken as "added in revision E"), and the RC2C05's swap and identifier.
+  `$2004` and the palette stay readable as on the G, and the 2C02A/B's stray sprite
+  pixels at x = 255 are not drawn: nothing pinned says what an unreadable register
+  returns, and no test ROM here was run on one. Mesen2 was run with its OAM row
+  corruption off for these machines to match.
+- **C77. The RC2C05-01's identifier.** `NES_2.0.wiki`: "RC2C05-01 (signature
+  unknown)"; its one game, *Ninja Jajamaru-kun*, "does not check `$2002` for a
+  signature". MAME returns `$1B` and says the same of the game. *Board*: `$1B`,
+  emulator-derived, unobservable in the one game. The other three are "what the games
+  expect", not chip measurements (`PPU_registers.wiki` "2C05 identifier"): `$3D` on
+  six bits for the -02, which covers the sprite overflow flag's bit.
+- **C78. The sticks' reports after eight bits.** A controller's 4021 has its serial
+  input tied so that a ninth read returns 1 (`Standard_controller.wiki`); the Vs.
+  mainboard has its own 4021s and nothing pinned says what their serial inputs see.
+  MAME shifts in 0. *Board*: 1, as a controller (`vs.VsStick`); no Vs. game in the
+  sweep reads a ninth bit differently on the two. Unverified likewise: whether a run
+  of back-to-back reads clocks the register once (the NES-001's 2A03G, which the
+  board assumes) or on every cycle (the RF Famicom, whose CPU is also early).
+- **C79. *Vs. T.K.O. Boxing*'s PPU.** MAME's notes: "Manual states this is an
+  RP2C04-0004 - though the palette doesn't agree", and it runs it on the -0003;
+  nes20db says PPU type 4, the RP2C04-0003. The game is one of those that "use some
+  of the DIP switches to support multiple different PPUs" (`PPU_palettes.wiki`), so
+  both may be right for different switch settings. *Board*: nes20db's, the -0003,
+  with the switches off.
 
 ## Open items
 
@@ -948,9 +1005,14 @@ before the board takes a side.
     with OAMADDR). The board starts with nothing frozen and copies only at the
     pre-render line; hardware judges keep it so (C26), and the C73 goldens stop
     before dot 89.
-25. **Deferred after the peripherals (Aubrey, 2026-11-07).** The Vs. System and
-    PlayChoice-10 as machines (RGB PPUs with their own palettes, DIP switches, coin
-    inputs; about 70 dumps), and with them the Vs. Zapper and the Vs. pads. The
+25. **Deferred after the peripherals (Aubrey, 2026-11-07).** *The Vs. UniSystem:
+    done 2026-11-11* (machine rows per RGB PPU, the mainboard's ports, coins and DIP
+    switches, mapper 99, the protection chips, the Vs. Zapper and sticks:
+    validation.md "The Vs. System"; C75-C79). Still open: the PlayChoice-10 (a Z80
+    and its own screen), and what the Vs. rows leave unmodelled: the watchdog, the
+    service button's debounce, the letterless 2A03's M2 duty, unreadable `$2004` and
+    palette on the early cores (C76), the 2A04 jumper's /IRQ (C75), saving the
+    battery-backed RAM from the window. The
     controllers no source describes well enough to build: the IGS Battle Box (its
     TC89102 commands), the Chinese keyboards beyond Subor's (Dongda PEC, Keda,
     Kingwon, Zecheng, BBK, Bit-79), the Miracle Piano (MIDI), Doremikko, the

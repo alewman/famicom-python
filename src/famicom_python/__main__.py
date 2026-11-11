@@ -18,7 +18,7 @@ from array import array
 from .machine import MACHINES
 from .system import System
 from .testrom import SIGNATURE, blargg_text, peek, run_blargg, screen_text
-from .video import load_palette, palette_for, to_rgb, write_png
+from .video import machine_palette, to_rgb, write_png
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"{system.cycles:,} CPU cycles, {system.instructions:,} instructions, {wall:.1f} s")
     if args.png:
         timing = machine.timing
-        palette = load_palette(args.palette or palette_for(timing), timing.swapped_emphasis)
+        palette = machine_palette(timing, args.palette)
         write_png(args.png, to_rgb(system.board.ppu.picture, palette))
         print(f"frame {system.board.ppu.frame} written to {args.png}")
     return 0

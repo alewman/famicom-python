@@ -67,7 +67,8 @@ from .peripherals import (
 )
 from .ppu import DOTS, HEIGHT, WIDTH
 from .system import System
-from .video import load_palette, palette_for, to_rgb, write_png
+from .video import machine_palette, to_rgb, write_png
+from .vs import VS_1P_4017, panel
 
 SAMPLE_RATE = 44_100
 #: Frames of sound kept queued ahead of the speaker when the board keeps up.
@@ -83,6 +84,10 @@ F12         screenshot (PNG)                       Esc  quit
 D           FDS: eject the disk, then put the next side in (sides change by
             themselves unless --manual-disk)
 F6          the reset button too (when Backspace is the keyboard's DEL)
+Vs. System: 5 and 6 drop a coin in acceptor 1 and 2, 9 (hold) is the service
+            button; Right Shift and Enter are panel buttons 1 and 3 (player
+            2's: 2 and 4); --dip sets the eight DIP switches; the light gun
+            is the mouse
 Gamepads: the first two are players 1 and 2; on a Famicom a third and fourth
 are players 3 and 4 through the expansion port (a four-player adapter), and
 with a Four Score (--device four-score) on the NES as well.
@@ -261,8 +266,10 @@ class Frontend:
 
     def __init__(self, pygame, rom: Path, machine: str, palette: Path | None, scale: int,
                  audio: bool, fullscreen: bool, auto_disk: bool = True,
-                 device: int | None = None, vaus_low: int = 0x62) -> None:  # fmt: skip
+                 device: int | None = None, vaus_low: int = 0x62,
+                 dip: int = 0) -> None:  # fmt: skip
         self.pg = pygame
+        self.dip = dip
         self.rom, self.machine_name = rom, machine
         self.device_choice, self.vaus_low = device, vaus_low
         self.peripheral: object | None = None
@@ -270,7 +277,7 @@ class Frontend:
         self.last_side = -1  # the FDS side the D key last took out
         self.system = self._power_on()
         timing = self.system.machine.timing
-        self.palette = load_palette(palette or palette_for(timing), timing.swapped_emphasis)
+        self.palette = machine_palette(timing, palette)
         self.words = palette_words(self.palette)
         self.scale, self.fullscreen = scale, fullscreen
         self.window = self._open_window()
@@ -316,7 +323,11 @@ class Frontend:
             device = VAUS_FAMICOM
         self.peripheral = system.plug(device)
         if self.peripheral is not None:
-            print(f"device: {DEVICE_NAMES[device]}", file=sys.stderr)
+            print(f"device: {DEVICE_NAMES.get(device, 'Vs. Zapper')}", file=sys.stderr)
+        if system.board.vs is not None:
+            system.board.vs.dip = self.dip
+            # NES 2.0 device $05: the game reads player 1 from the left stick.
+            self.first_on_4017 = device == VS_1P_4017
         self._load_storage(system)
         if system.board.expansion is None and machine.famicom_expansion_port:
             system.board.expansion = ExpansionPads()  # players 3 and 4
@@ -463,8 +474,12 @@ class Frontend:
             isinstance(d, (FamilyBasicKeyboard, SuborKeyboard, JissenMahjong)) for d in devices
         )
         pads[0] |= 0 if typing else self._keyboard()
-        for pad, buttons in zip(self._players(), pads, strict=False):
-            pad.buttons = buttons
+        if board.vs is not None:
+            panel(board.pads, pads, self.first_on_4017)
+            board.vs.service = bool(pg.key.get_pressed()[pg.K_9])
+        else:
+            for pad, buttons in zip(self._players(), pads, strict=False):
+                pad.buttons = buttons
         board.microphone = not typing and bool(pg.key.get_pressed()[pg.K_m])
         if not devices:
             return
@@ -617,6 +632,8 @@ class Frontend:
             elif event.key == pg.K_TAB:
                 self.fast = True
                 self.sound.clear()
+            elif event.key in (pg.K_5, pg.K_6) and self.system.board.vs is not None:
+                self.system.insert_coin(event.key == pg.K_6)
         elif event.type == pg.KEYUP and event.key == pg.K_TAB:
             self.fast = False
         return True
@@ -671,6 +688,13 @@ class Frontend:
                 time.sleep(0.002)
 
 
+def dip_switches(text: str) -> int:
+    """``--dip``: eight digits, switch 1 first, as vs.VsMainboard.dip (switch 1 = bit 0)."""
+    if len(text) != 8 or set(text) - {"0", "1"}:
+        raise argparse.ArgumentTypeError("eight digits, each 0 or 1, switch 1 first")
+    return int(text[::-1], 2)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="famicom-python play",
@@ -711,6 +735,14 @@ def main(argv: list[str] | None = None) -> int:
         help="the Vaus knob's value at the window's left edge (default 0x62, Arkanoid's;"
         " Arkanoid II wants 0x4D)",
     )
+    parser.add_argument(
+        "--dip",
+        type=dip_switches,
+        default=0,
+        metavar="SWITCHES",
+        help="a Vs. System's DIP switches 1 to 8, as eight digits, 1 = on, switch 1"
+        " first (default 00000000)",
+    )
     args = parser.parse_args(argv)
     try:
         import pygame
@@ -726,7 +758,7 @@ def main(argv: list[str] | None = None) -> int:
     frontend = Frontend(
         pygame, args.rom, args.machine, args.palette, max(1, args.scale),
         not args.no_audio, args.fullscreen, not args.manual_disk,
-        DEVICES[args.device], args.vaus_low,
+        DEVICES[args.device], args.vaus_low, args.dip,
     )  # fmt: skip
     try:
         frontend.run()
