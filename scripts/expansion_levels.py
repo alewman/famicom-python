@@ -37,6 +37,7 @@ MEASURED = {
     # the board takes as the measured games' median.
     "db_n163": 18.0,
     "db_vrc7": 11.3,
+    "db_5b": -1.3,
     "db_fds": 6.6,  # a disk: needs the BIOS (FAMICOM_FDS_BIOS or NO_INTRO_DIR)
 }
 

@@ -1342,7 +1342,7 @@ through SDL's dummy drivers (`tests/test_frontend.py`: frames run, a save
 written and restored); not tested on a display here.
 
 **Not reached.** NewRisingSun's hardware recordings of his expansion-audio
-test ROMs (open item 20); the 5B (an AY-3-8910 core, later), the VRC7
+test ROMs (open item 20); the 5B (done 2026-11-11: "The Sunsoft 5B's sound" below), the VRC7
 (YM2413, later) and the FDS.
 
 **Everything again**, on PyPy with milestone 8: CPU 14 of 14, PPU 42 of 42,
@@ -2473,4 +2473,27 @@ moves on) and in lockstep; `famicom-python run` and `System.from_rom` on a DualS
 image still run one side alone; save states of a DualSystem; the second side's sound
 and its service button in the window; coins and play on a DualSystem against any
 detector (attract mode only); cycle-exact coupling of the two CPUs.
+
+## The Sunsoft 5B's sound (2026-11-11)
+
+Mapper 69 now carries the 5B's YM2149F: ay8910-python's `SUNSOFT_5B` variant
+(pinned `5abe2df`), clocked once a CPU cycle from `FME7.m2`, selected at
+`$C000` and written at `$E000` (Sunsoft_5B_audio.wiki). The chip's own claims
+are that core's: every input clock equal to the AY-3-8910's die model on
+synthetic streams and on this board's bus writes for *Gimmick!* and
+rainwarrior's 5B tests (132.9M clocks, as an AY at half clock and as the 5B);
+the Yamaha parts' 32-step envelope against the YM2203's die as waveforms only
+(ay8910-python `docs/claims.md`). No recording of a real 5B was compared:
+NewRisingSun's set has none.
+
+| Check | Result |
+| --- | --- |
+| `db_5b` through the board (`scripts/expansion_levels.py`) | −1.29 dB, measured −1.30 (rainwarrior, one AV Famicom, one cartridge): the gain is fitted to it |
+| Tone period and volume code, a deselecting `$C000` byte (`tests/test_expansion_audio.py`) | pass |
+| Save, load and continue with the chip in the state (`state.MODULES`) | see the round-trip gate |
+
+Not modelled: the 5B amplifier's compression above one channel at volume 14 and
+its filtering (the wiki calls the investigation ongoing; `clip_5b` has no
+published answer). Every mapper 69 cartridge gets the chip, since nothing in a
+header or nes20db tells a 5B from an FME-7 or 5A.
 
