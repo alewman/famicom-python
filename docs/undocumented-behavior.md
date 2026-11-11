@@ -885,6 +885,65 @@ before the board takes a side.
   with nothing faked. MAME shares the RAM between its two CPUs without OUT1's gate
   (`vsnes_cpu1_map`, `vsnes_cpu2_map`); the board follows the wiki: one owner at a
   time, the other side reading open bus.
+- **C82. The PlayChoice-10 panel's reports after eight bits, and player 2's Start.**
+  Nintendo's PCH1-CPU schematic (sheet 5; manufacturer's documentation, read by eye:
+  `reference/docs/Playchoice.pdf`): the two 74LS165s' serial inputs (pin 10) are tied
+  to ground with their clock inhibits, and their outputs reach D0 through inverting
+  buffers (74LS368A), so a ninth read returns 1; player 2's register has nothing drawn
+  on its E and F inputs (Start and Game Select on player 1's). MAME's `pc10_in0_r`
+  shifts in 0, and its port for player 2 has the two bits unused under the comment
+  "wired to 1p select button". Mesen2 runs the image as an NES with two whole
+  controllers. *Board*: the schematic's (`playchoice.PlayChoicePad`); the Mesen2
+  judge replaces D0 on both sides with the same model, so no detector run here tells.
+- **C83. The PlayChoice-10's menu screen: its lines, its rate, its blank.** The
+  schematic (sheet 2): a 20.160 MHz crystal, a quarter of it the dot clock; the
+  horizontal counters (74LS161s 6L, 6K) count 256 dots and reload to 185, so 327 dots
+  a line; the vertical ones (6J, 6H) count 256 lines with no reload: 60.21 Hz. The
+  vertical blank flip-flop (5M) is set by V4's rise with V5-V7 high (line 240) and
+  cleared by its rise with them low (line 16), and gates the picture with the
+  horizontal blank and SDCS: 224 lines, character rows 2 to 29. MAME: a 60 Hz screen
+  of 240 lines, rows 0 to 29, and the Z80's interrupt 60 times a second. Whether the
+  screen blanks while the Z80 holds its RAM (SDCS low) differs between MAME versions:
+  the driver as pinned blanks it; a fork (theklap's, read here) draws it regardless,
+  "that ... caused the top screen to flash every 5 seconds". *Board*: the schematic's
+  counts and blank (`supervisor.Supervisor`); `picture((0, 240))` draws MAME's thirty
+  rows for the comparison. The BIOS draws nothing in rows 0 and 1 in any frame judged
+  (validation.md "The PlayChoice-10"), which fits the schematic and does not prove it.
+  The reload value 185 is read from which load inputs are drawn to HB and which to
+  ground: UNVERIFIED by any measurement.
+- **C84. The PlayChoice-10's watchdog.** The schematic (sheet 1): a 74LS161 (4R)
+  clocked by the vertical blank, held at zero (synchronous load) while NMI EI or DOG
+  DI is high; its QD, the eighth blank, resets the Z80 and clears the counter. MAME's
+  `vblank_irq` resets the Z80 at any blank with both low. *Board*: eight. The BIOS
+  never leaves both low that long in any run here, so nothing run tells.
+- **C85. When /GAME STOP stops the game.** The schematic (sheet 5): /GAME STOP is
+  sampled by a flip-flop (7J) clocked from the PPU's /INT through a shift register on
+  M2 (8H), and a second flip-flop drives the 2A03E's pin 30 (/RDY, CPU_Test_Mode.wiki);
+  /GAME RES presets both. So the game stops and resumes just after one of its own
+  vertical-blank interrupts, and a game with NMIs off is not stopped. MAME ties the
+  latch bit to the CPU's halt line, at once. *Board*: the schematic's, to the
+  instruction (the few M2 cycles of the shift register are not counted). Also the
+  schematic's, not MAME's: the Z80's port reads decode two address lines and its
+  writes four (MAME maps ports `$00-$0F` exactly), and INT DETECT is that same pulse.
+- **C86. The RP5H01's reset and polarity.** MAME's `rp5h01.cpp` as pinned (mainline,
+  `e31391f`): "reset holds the counter at zero while asserted", clocks counted only
+  while it is released. MAME 0.285's and the fork's: the counter clears on RESET's
+  rising edge only. Its own header: "not sure if the polarity of our PROM dumps
+  (playch10) is correct, same goes for the bit order". PC10_ROM-Images.wiki: MAME's
+  `security.prm` is the chip's data inverted and bit-reversed, which the schematic's
+  inverting buffers (5S) between the socket and the Z80's D3 and D4 explain. *Board*:
+  the level rule; the image's recordings played back, inverted on the way to the Z80
+  (`supervisor.RP5H01`). The BIOS accepts every game's PROM that way
+  (validation.md), which a wrong polarity or order would not survive.
+- **C87. Three PlayChoice-10 dumps where nes20db and MAME's sets differ.** nes20db's
+  miscellaneous-ROM hash for *Gradius* (both revisions) and *Teenage Mutant Ninja
+  Turtles* is not that of MAME's INST ROM + PROM (inverted and reversed as the wiki
+  says, which is right for the other 53), though PRG and CHR agree: another dump of
+  one of the two chips, not found here. *Bases Loaded*'s CHR is 64 KiB in nes20db and
+  a 128 KiB file in MAME whose first half it is (the second half is other data).
+  *Pro Wrestling*'s 96 KiB of EPROM is nes20db's 128 KiB image behind 32 KiB of
+  zeros. `scripts/pc10_images.py` writes the first three with MAME's area and says so
+  in its manifest; the BIOS accepts MAME's PROMs for them.
 
 ## Open items
 
@@ -1032,8 +1091,13 @@ before the board takes a side.
     validation.md "The Vs. System"; C75-C79). *The Vs. DualSystem: a first pass the
     same day* (`dual.py`: two sides coupled by instruction, judged in attract mode
     against MAME; validation.md "The Vs. DualSystem"; C80, C81), with the sweep,
-    lockstep, save states and cycle-exact coupling not done. Still open: the PlayChoice-10 (a Z80
-    and its own screen), and what the Vs. rows leave unmodelled: the watchdog, the
+    lockstep, save states and cycle-exact coupling not done. *The PlayChoice-10: a
+    first pass the same day* (`playchoice.py`, `supervisor.py`: the game board, and a
+    Z80 on z80-python running Nintendo's BIOS with its own screen, the security PROM
+    and the lines to the game; judged against Mesen2, MAME and the BIOS's own PROM
+    check; validation.md "The PlayChoice-10"; C82-C87), with one game of ten channels,
+    the one-monitor board, the backed-up RAM's file and cycle-exact coupling not done.
+    Still open: what the Vs. rows leave unmodelled: the watchdog, the
     service button's debounce, the letterless 2A03's M2 duty, unreadable `$2004` and
     palette on the early cores (C76), the 2A04 jumper's /IRQ (C75), saving the
     battery-backed RAM from the window. The

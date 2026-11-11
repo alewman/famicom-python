@@ -31,7 +31,7 @@ start, so that adding them later is data, not a refactor.
 | Dendy (UMC clones) | UA6527P | UA6538 | — | Famicom-style | — | later |
 | Vs. UniSystem | RP2A03 (letterless: no tonal noise) | RP2C03B, RP2C04-0001 to -0004 or RC2C05-01 to -04, as the game's ROMs need (RGB) | CPU and PPU (the watchdog's reset) | two sticks on the mainboard's shift registers, coins, a service button, 8 DIP switches | none | **built** (2026-11-11; "The Vs. System" below) |
 | Vs. DualSystem | two of each | two | both sides | four sticks | none | **first pass** (`dual.py`: the two sides coupled an instruction at a time) |
-| PlayChoice-10 | RP2A03G | 2C03 (RGB) | | | | later (adds a Z80: z80-python) |
+| PlayChoice-10 | RP2A03E (pin 30 is /RDY: the supervisor's stop) | RP2C03B (RGB) | the supervisor's two lines: /GAME RES the CPU, /PPU RES the PPU | the panel's two shift registers: player 1 with Game Select and Start, player 2 without; a light gun on `$4017` D3-D4 | none | **first pass** (2026-11-11; `playchoice.py`, `supervisor.py`: a Z80 on z80-python with Nintendo's BIOS, its own screen, the security PROM; "The PlayChoice-10" below) |
 
 Sources: `Family_Computer.wiki`, `PPU_power_up_state.wiki` l.49/76,
 `Controller_reading.wiki`, `DMA.wiki` "Register conflicts", `Expansion_port.wiki`,
@@ -207,6 +207,44 @@ each side's row, wired by the shared RAM, the cross interrupt and the watchdog
 the contradictions between the wiki and the two emulators, are in
 [undocumented-behavior.md](undocumented-behavior.md) (C75-C81) and
 [validation.md](validation.md) "The Vs. System".
+
+### The PlayChoice-10
+
+Nintendo's PCH1-CPU schematic (`reference/docs/Playchoice.pdf`, manufacturer's
+documentation, read by eye), MAME's `playch10.cpp` and `rp5h01.cpp` (BSD-3,
+emulator-derived), `PC10_ROM-Images.wiki`, `NES_2.0.wiki` (console type 2). An
+NES on an arcade board under a Z80 supervisor that sells time. Two objects:
+
+- **The game board** is a row of `machine.py` (`playchoice`; `System.machine_for`
+  picks it for console type 2) and `playchoice.py`: the panel's 74LS165s where
+  the controller ports are, the gun, and the image's INST ROM and PROM
+  recordings (`game_roms`). Run alone (`System`) it is the game as Mesen2 runs
+  it.
+- **The cabinet** is `supervisor.PlayChoice`: that `System` plus
+  `supervisor.Supervisor`, the Z80 with the BIOS (never shipped:
+  `FAMICOM_PC10_BIOS` names MAME's `playch10.zip`, else `playch10.zip` under
+  `MAME_ROM_DIR`), its RAM, its 32 x 32 character screen and colour PROMs, the
+  two latches and the game's RP5H01 security PROM.
+
+| The Z80's | |
+| --- | --- |
+| `$0000-$3FFF` | BIOS |
+| `$8000-$87FF`, `$8800-$8FFF` | RAM; the second kept by a capacitor, its upper half behind the "BUP KEY" latch bit |
+| `$9000-$97FF` | the screen's RAM, the Z80's only while SDCS is low (the screen is then blank) |
+| `$C000-$DFFF` | the selected channel's INST ROM: the game's name and instructions, and Z80 code |
+| `$E000-$FFFF` | the selected channel's RP5H01: write D0 /RESET, D3 clock, D4 TEST; read D3 data, D4 counter out, both inverted |
+| ports, read | 0: Channel Select, Enter, Reset, INT DETECT, -, Coin 2, Service, Coin 1; 1 and 2: DIP switches A-H, I-P; 3: clears INT DETECT |
+| ports, write (bit 0) | 0 SDCS, 1 /CNTRL MASK, 2 /DISP MASK, 3 /SOUND MASK, 4 /GAME RES, 5 /GAME STOP, 8 NMI EI, 9 DOG DI, A /PPU RES, B-E the channel, F BUP KEY |
+
+The Z80 is interrupted (NMI) at its own screen's vertical blank, 60.21 times a
+second, and must re-arm the interrupt each time; eight blanks with neither
+NMI EI nor DOG DI set reset it. /GAME STOP reaches the 2A03E's pin 30 only at
+one of the game's own NMIs. The BIOS, not this code, reads the PROM, checks it
+against the INST ROM, lists the game, counts coins and time, and takes the game
+away when the time is gone. The two processors are interleaved an instruction
+at a time (`supervisor.py`'s notes say what that costs). One game, in channel
+1; the contradictions are C82-C87, the numbers and what is not done in
+[validation.md](validation.md) "The PlayChoice-10".
 
 ## The PPU side
 

@@ -2474,6 +2474,161 @@ image still run one side alone; save states of a DualSystem; the second side's s
 and its service button in the window; coins and play on a DualSystem against any
 detector (attract mode only); cycle-exact coupling of the two CPUs.
 
+### The PlayChoice-10 (2026-11-11)
+
+Open item 25's last machine: an NES on an arcade board under a Z80 that sells time.
+The game board is a row of `machine.py` and `playchoice.py`; the Z80, its BIOS, its
+screen, the security PROM and the lines to the game are `supervisor.py`
+(start-here.md "The PlayChoice-10"). The sources are Nintendo's own schematic of the
+board (PCH1-CPU, 1986; manufacturer's documentation, the highest tier this machine
+has, read by eye from a 300 dpi scan and so only as good as the reading), the wiki's
+two pages on the image format, and MAME's driver. No test ROM was written for a
+PlayChoice-10 and none pinned ran on one: what follows are two detectors, the
+BIOS's own checks, and the games.
+
+**The dumps.** `scripts/pc10_images.py` assembles NES 2.0 images from MAME's sets by
+nes20db's hashes, the miscellaneous-ROM area (INST ROM, PROM data, PROM counter
+output) included: **56 of nes20db's 65 PlayChoice-10 images, from all 56 of MAME
+0.285's game sets**. 53 are whole to nes20db's hash; three (*Gradius*, both
+revisions, and *Teenage Mutant Ninja Turtles*) have nes20db's PRG and CHR and MAME's
+INST ROM and PROM, which nes20db's hash is not (C87). The nine without a set: four
+copies of the homebrew *Magic Floor*, and five dumps nes20db itself files under "bad
+dumps, missing PROM". Images and manifest live outside the repository.
+
+**The game board against Mesen2** (`scripts/compat_sweep.py --pc10 DIR --frames
+200,700,1200,1800`). Mesen2 runs a PlayChoice-10 image as its game board alone (whether
+it skips the odd frames' dot was not probed: the runs that match do so against the
+board's row, which does not), and colours it through whatever palette it is given (the identity
+palette comes back, so pictures are compared as pixel values, as a console's; the
+RP2C03's colours are judged by MAME, below). Both sides get one script of buttons on
+the CPU's cycle count (`scripts/pc10_judge.py`: Start at frames 300 and 420, A at
+540, Start at 660), Mesen2's `$4016`/`$4017` D0 replaced read for read by a Lua model
+of the panel's register (C82); a gun game's D3 and D4 are held at "no light, no
+trigger" on both. Mesen2 ran with the power-on window and without OAM row corruption
+(C76).
+
+| | Images | Identical at all four frames | Not |
+| --- | --- | --- | --- |
+| All | 56 | **53** | 3 |
+| mapper 0 (NROM) | 13 | 12 | *Duck Hunt* |
+| 1 (MMC1) | 15 | 14 | *Yo! Noid* |
+| 4 (MMC3) | 13 | 12 | *Rad Racer II* |
+| 2, 3, 7, 9, 87, 119 | 7 / 3 / 2 / 1 / 1 / 1 | all | |
+
+No picture of the 53 is blank at every frame; the script takes most games past their
+title. The three: *Rad Racer II* differs by 4 pixels at frame 700 and *Yo! Noid* by 2
+to 7 at three frames (not looked into; whether their cartridge versions do the same
+under input is not known here, the console sweeps having none); *Duck Hunt* is
+identical at 200 and 700 and has its ducks elsewhere at 1,200 and 1,800 (451 and 527
+pixels), with the gun's lines held alike on both sides: not explained. The other two
+gun games, *Hogan's Alley* and *Wild Gunman*, are identical. (49 of the results are
+one run; 7 were run again after the judge lost a gun game's gun and the loader took
+two images for their cartridges: `playchoice.is_playchoice`.)
+
+**The cabinet against MAME 0.285's `playch10`** (`scripts/pc10_mame.py`): the same
+BIOS (the dual-monitor one, `pch1-c__8t_e-2`), the image's INST ROM and PROM, MAME's
+default DIP switches, and one script in sixtieths of a second: nothing until the
+BIOS's ten-second wait is over; a coin at 760; the cabinet's Enter at 940; the
+panel's Start at 1150. Both screens are compared at 700 (the channel menu above, the
+game's attract mode below), 860 (300 units of time bought; the game held in reset,
+its screen masked), 1100 (the game's instructions above, drawn by the BIOS from the
+INST ROM; the game released below) and 1400 (the game after Start). The menu screen
+is compared as RGB, all thirty of MAME's rows; the game screen as the RP2C03's DAC
+levels. MAME interrupts its Z80 60 times a second and the board 60.21 (C83), so each
+screen is matched to the board's closest sixtieth within 8, separately.
+
+| Frame | Menu screen identical | Game screen identical | Both |
+| --- | --- | --- | --- |
+| 700: the menu, the attract mode | 55 of 56 | 51 | 51 |
+| 860: time bought, the game held and masked | 56 | 56 (black on both) | 56 |
+| 1100: the instructions, the game released | 56 | 52 | 52 |
+| 1400: the game after Start | 56 | 54 | 54 |
+
+**48 of 56 images identical on both screens at all four frames.** The menu screen
+is MAME's in 223 of 224 pictures: every game's name in the channel list and every
+game's first page of instructions, which the BIOS draws from that game's INST ROM.
+The one is *Captain Skyhawk* at 700, a prompt that blinks on the Z80's interrupt
+count, when both screens had to match at one sixtieth; with each screen matched on
+its own (as the script now does, run again for that image) the menu screen is
+identical too: 224 of 224. The game-screen differences are
+eight images: *Super Mario Bros. 3* (2,304 pixels at three frames), *Double Dribble*
+(12,068 at 700), *Rad Racer* (1,328 at 1100), and *Tecmo Bowl*, *Mario's Open Golf*,
+*Golf*, *Ninja Gaiden III* and *Captain Skyhawk* (5 to 84 pixels at one or two
+frames); all eight are identical to Mesen2 on the game board alone, above, so the
+board is not shown wrong by them, and MAME 0.285's PPU is not a dot-level one. Every
+one of the 56 images matches at least one detector on a picture that is not blank,
+and 45 match both at every frame. MAME draws nothing in the menu screen's rows 0 and
+1 at any of the 224 pictures (C83).
+
+**The security PROM.** Nothing in the board knows the check: the BIOS clocks the
+RP5H01 through `$E000`, compares it with the INST ROM and lists the game or does
+not. **It lists and releases all 56 games** (at frame 700
+of the MAME run every image's 2A03 is out of reset and its attract mode on screen),
+the three with MAME's PROM among them. With one bit of *Super Mario Bros.*' PROM flipped the BIOS
+lists nothing, never releases /GAME RES, and the 2A03 executes no instruction
+(`tests/test_playchoice.py`, slow). So the PROM's polarity and bit order as the image
+holds them, the inverting buffers, and the chip's reset and counter (C86) are judged
+by Nintendo's code on every game.
+
+**Time.** With the timer's switches at 60 units a second (SW2 = `$05`), a coin and
+Enter: the game runs for five seconds, then the BIOS masks Start and Game Select,
+drops /GAME STOP (the 2A03 stops at its next NMI: C85), cuts the sound and shows
+"SORRY! THE TIME IS UP!" with a countdown for another coin; the game's picture stays,
+frozen. Against MAME (`pc10_mame.py --script time`, eight
+images): at frame 1100 the time is running and both screens are MAME's on seven
+(*Gradius*: 49 pixels of the menu screen); at 1500 both have taken the game away and
+show the same notice, and three images are identical on both screens (*Mega Man III*,
+*Metroid*, *Teenage Mutant Ninja Turtles*). The other five differ in the countdown's
+digit or the blinking line (four) and in which frame of the game is left frozen
+(five): the board counts 60.21 blanks a second to MAME's 60 and stops the 2A03 at
+its NMI where MAME halts it at once (C83, C85), so the two freeze a moving game a
+frame or more apart. Nothing here says which frame the hardware leaves.
+
+**The tests** (`tests/test_playchoice.py`: 24 quick cases, 23 of them on a BIOS of a
+few bytes of Z80 code and one on the real BIOS's first seconds; 2 slow with the real
+BIOS and a game, above; `tests/test_playchoice_window.py`, 3 quick): the row; the image's
+three areas; the panel's reports, player 2's missing buttons, /CNTRL MASK; the port
+bits a game reads; the gun beside player 2; the PROM's counter, edges, six and seven
+bits, counter output and reset; the Z80's memory map, the backup key, the screen
+RAM's gate; the PROM through `$E000` and an empty channel; port 0's coins (50 ms),
+buttons and INT DETECT; the watchdog's eight blanks; the interrupt's re-arming; 602
+blanks in ten seconds; a character through the colour PROMs and the two rows the
+blank hides; the game held in reset, stopped only at its NMI, reset without the PPU
+and the PPU without it; the two clocks within an instruction; a save state of the
+whole cabinet; the window with the menu above the game, with one monitor, and
+without a BIOS.
+
+**How the two processors are coupled.** An instruction at a time: the Z80 or the
+2A03, whichever is behind on the nominal clocks (a T-state is 945/176 master ticks),
+steps next. A latch write therefore reaches the game up to one instruction late
+(23 T-states at most, 5.75 µs), and z80-python does not say where inside an
+instruction a port is written. The three crystals (8 MHz, 20.160 MHz, 21.47727 MHz)
+are taken as exact and their phases as zero at power. Nothing the two sides share is
+faster than a latch bit, a serial PROM clocked by hand and a flip-flop the BIOS polls
+once a frame, and no source here measures any of it more finely.
+
+**Not done, plainly.** One game, in channel 1: the other nine sockets are empty, so
+choosing between games with Channel Select is not exercised (the BIOS's menu with
+one game is). The one-monitor BIOS (`--bios single`) boots, sells time (its four
+time digits are kept, not drawn) and starts the game, and its window goes over to
+the game when /DISP MASK falls, which is MAME's rule: that board (PCK1) has no
+schematic here, it was run once by hand on one game, and nothing compares it with
+anything. The RAM a capacitor keeps (8W: the BIOS's bookkeeping) is not saved
+by the window. `famicom-python` without `play`, `compat_sweep.py` and the lockstep
+run the game board alone. The coin counters' outputs, the service mode's screens,
+the BIOS's self-test and its other versions (`alt`, `singleb`, `dualb`) were not
+looked at. Sound: /SOUND MASK silences the samples; nothing compares the audio, or
+the amplifier's filter, with anything. The gun in a game: unit-tested, held off the
+screen in both sweeps. Hardware: none of this has met a PlayChoice-10; the schematic
+readings are one person's eyes on a scan, and C82 to C87 are where they, MAME, Mesen2
+and nes20db disagree.
+
+**The home consoles after the change** (PyPy; the tree of the supervisor's commit,
+after which only the window, the cabinet's part of `state.py` and the one-monitor
+toggle changed): AccuracyCoin **147 of 147** (`scripts/accuracycoin.py`, 126,984,584
+CPU cycles, the same count as before), `pytest -m slow tests/test_ppu_test_roms.py`
+**42 of 42**, the quick suite green (340 cases; the PPU still has 79 attributes).
+
 ## The Sunsoft 5B's sound (2026-11-11)
 
 Mapper 69 now carries the 5B's YM2149F: ay8910-python's `SUNSOFT_5B` variant
@@ -2496,4 +2651,3 @@ Not modelled: the 5B amplifier's compression above one channel at volume 14 and
 its filtering (the wiki calls the investigation ongoing; `clip_5b` has no
 published answer). Every mapper 69 cartridge gets the chip, since nothing in a
 header or nes20db tells a 5B from an FME-7 or 5A.
-
