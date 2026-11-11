@@ -864,6 +864,27 @@ before the board takes a side.
   of the DIP switches to support multiple different PPUs" (`PPU_palettes.wiki`), so
   both may be right for different switch settings. *Board*: nes20db's, the -0003,
   with the switches off.
+- **C80. A DualSystem's attract mode on Mesen2.** *Vs. Balloon Fight*, no input, both
+  with all DIP switches off: Mesen2's screen (the primary side's) is the board's at
+  frame 200 and differs at frames 700 and 1,200 (7,278 and 9,840 pixels, the board on
+  Mesen2's power-on; much the same on its own), while MAME's two screens are the
+  board's at frames 180, 200, 420 and 900, and within 112 and 14 pixels of 122,880
+  (flying figures) at 700 and 1,200. Two detectors, two
+  answers, and no higher tier to ask: the board is unchanged. Whether the cause is
+  how each couples the two CPUs (the board and MAME by instruction; Mesen2's is not
+  known here) or something else is not found.
+- **C81. Which unit is which in a DualSystem image, and who holds the RAM.**
+  `NES_2.0.wiki`: "the first half block ... belongs to the first unit", and for *Raid
+  on Bungeling Bay* "first 32 KiB represent the first unit's PRG-ROM ... second 8 KiB
+  the second unit's ... [which] only executes a dummy program". It does not say which
+  socket a unit is. MAME's sets do, by EPROM position: the first half of every other
+  DualSystem image is MAME's main CPU (sockets 1A-1D), but *Raid on Bungeling Bay*'s
+  32 KiB carry the 6A-6D labels of the secondary side and its 8 KiB the 1A label, and
+  the game wants `$4016` D7 = 1. *Board*: the first unit is the primary side except
+  for hardware type 6, where it is the secondary (`dual.split`); the game then boots
+  with nothing faked. MAME shares the RAM between its two CPUs without OUT1's gate
+  (`vsnes_cpu1_map`, `vsnes_cpu2_map`); the board follows the wiki: one owner at a
+  time, the other side reading open bus.
 
 ## Open items
 
@@ -1008,7 +1029,10 @@ before the board takes a side.
 25. **Deferred after the peripherals (Aubrey, 2026-11-07).** *The Vs. UniSystem:
     done 2026-11-11* (machine rows per RGB PPU, the mainboard's ports, coins and DIP
     switches, mapper 99, the protection chips, the Vs. Zapper and sticks:
-    validation.md "The Vs. System"; C75-C79). Still open: the PlayChoice-10 (a Z80
+    validation.md "The Vs. System"; C75-C79). *The Vs. DualSystem: a first pass the
+    same day* (`dual.py`: two sides coupled by instruction, judged in attract mode
+    against MAME; validation.md "The Vs. DualSystem"; C80, C81), with the sweep,
+    lockstep, save states and cycle-exact coupling not done. Still open: the PlayChoice-10 (a Z80
     and its own screen), and what the Vs. rows leave unmodelled: the watchdog, the
     service button's debounce, the letterless 2A03's M2 duty, unreadable `$2004` and
     palette on the early cores (C76), the 2A04 jumper's /IRQ (C75), saving the

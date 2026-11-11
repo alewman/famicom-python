@@ -30,6 +30,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .cartridge.fds import FDS
+from .dual import VsDualSystem, is_dual
 from .fds_auto import AutoDisk
 from .joypad import DOWN, LEFT, RIGHT, SELECT, START, UP, A, B, StandardController
 from .machine import MACHINES
@@ -87,7 +88,9 @@ F6          the reset button too (when Backspace is the keyboard's DEL)
 Vs. System: 5 and 6 drop a coin in acceptor 1 and 2, 9 (hold) is the service
             button; Right Shift and Enter are panel buttons 1 and 3 (player
             2's: 2 and 4); --dip sets the eight DIP switches; the light gun
-            is the mouse
+            is the mouse. A DualSystem game opens both screens: 7 and 8 are
+            the second side's coins, gamepads 3 and 4 its sticks, and the
+            sound is the first side's
 Gamepads: the first two are players 1 and 2; on a Famicom a third and fourth
 are players 3 and 4 through the expansion port (a four-player adapter), and
 with a Four Score (--device four-score) on the NES as well.
@@ -295,12 +298,13 @@ class Frontend:
         presents it at the display's refresh where it can (vsync)."""
         pg = self.pg
         flags = pg.SCALED | pg.RESIZABLE | (pg.FULLSCREEN if self.fullscreen else 0)
+        width = WIDTH * (2 if self.dual is not None else 1)  # a DualSystem's two screens
         try:
-            surface = pg.display.set_mode((WIDTH, HEIGHT), flags, vsync=1)
+            surface = pg.display.set_mode((width, HEIGHT), flags, vsync=1)
         except pg.error:
-            surface = pg.display.set_mode((WIDTH, HEIGHT), flags)
+            surface = pg.display.set_mode((width, HEIGHT), flags)
         if not self.fullscreen:
-            pg.Window.from_display_module().size = (WIDTH * self.scale, HEIGHT * self.scale)
+            pg.Window.from_display_module().size = (width * self.scale, HEIGHT * self.scale)
         return surface
 
     # -- console --------------------------------------------------------------------
@@ -310,7 +314,16 @@ class Frontend:
             machine = System.machine_for(self.rom)
             self.machine_name = next(k for k, m in MACHINES.items() if m is machine)
             print(f"machine: {self.machine_name} ({machine.name})", file=sys.stderr)
-        system = System.from_rom(self.rom, MACHINES[self.machine_name])
+        # A Vs. DualSystem game runs both sides of the mainboard (dual.py); the
+        # window's own console is its primary side.
+        self.dual: VsDualSystem | None = None
+        if MACHINES[self.machine_name].vs_side is not None and is_dual(self.rom):
+            self.dual = VsDualSystem.from_rom(self.rom)
+            system = self.dual.primary
+            self.dual.secondary.board.vs.dip = self.dip
+            print("machine: both sides of a Vs. DualSystem", file=sys.stderr)
+        else:
+            system = System.from_rom(self.rom, MACHINES[self.machine_name])
         system.board.set_sample_rate(SAMPLE_RATE)
         path = save_path(self.rom)
         if path.exists() and not system.cartridge.restore_battery(path.read_bytes()):
@@ -399,7 +412,7 @@ class Frontend:
 
     def run_frame(self) -> None:
         self._apply_inputs()
-        self.system.run_frames(1)
+        (self.dual or self.system).run_frames(1)
         for device in self._devices():
             if isinstance(device, Rob):
                 command = device.see(self.system.board.ppu.picture)
@@ -477,6 +490,8 @@ class Frontend:
         if board.vs is not None:
             panel(board.pads, pads, self.first_on_4017)
             board.vs.service = bool(pg.key.get_pressed()[pg.K_9])
+            if self.dual is not None:
+                panel(self.dual.secondary.board.pads, pads[2:], self.first_on_4017)
         else:
             for pad, buttons in zip(self._players(), pads, strict=False):
                 pad.buttons = buttons
@@ -634,6 +649,8 @@ class Frontend:
                 self.sound.clear()
             elif event.key in (pg.K_5, pg.K_6) and self.system.board.vs is not None:
                 self.system.insert_coin(event.key == pg.K_6)
+            elif event.key in (pg.K_7, pg.K_8) and self.dual is not None:
+                self.dual.insert_coin(1, event.key == pg.K_8)
         elif event.type == pg.KEYUP and event.key == pg.K_TAB:
             self.fast = False
         return True
@@ -651,6 +668,9 @@ class Frontend:
         pg = self.pg
         image = frame_bytes(self.system.board.ppu.picture, self.words)
         self.window.blit(pg.image.frombuffer(image, (WIDTH, HEIGHT), "BGRA"), (0, 0))
+        if self.dual is not None:
+            image = frame_bytes(self.dual.secondary.board.ppu.picture, self.words)
+            self.window.blit(pg.image.frombuffer(image, (WIDTH, HEIGHT), "BGRA"), (WIDTH, 0))
         pg.display.flip()
         now = time.perf_counter()
         if now - self._fps_since >= 1.0:
