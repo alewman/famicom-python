@@ -23,7 +23,7 @@ htmlcov/
 
 # MAME oracle runs (scripts/mame_trace.py): traces, error.log, cfg, nvram.
 # Never commit ROMs or traces.
-tests/mame_traces/
+/tests/mame_traces
 *.trace
 error.log
 
