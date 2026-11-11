@@ -61,17 +61,19 @@ def sha1(data: bytes) -> str:
 # -- nes20db ---------------------------------------------------------------
 
 
-def vs_entries(path: Path = NES20DB) -> list[dict]:
-    """nes20db's Vs. System games (console type 1), with their names."""
+def vs_entries(path: Path = NES20DB, console: str = "1") -> list[dict]:
+    """nes20db's Vs. System games (console type 1), with their names; or
+    another console type's (2: the PlayChoice-10, scripts/pc10_images.py)."""
     xml = subprocess.run(
         ["7z", "x", "-so", str(path), "nes20db.xml"], capture_output=True, check=True
     ).stdout.decode("utf-8")
     entries = []
+    console_type = console
     for name, body in re.findall(r"<game><!--\s*(.*?)\s*-->(.*?)</game>", xml, re.DOTALL):
         game = ET.fromstring(f"<game>{body}</game>")
         name = html.unescape(name).replace("\\", "/")
         console = game.find("console")
-        if console is None or console.get("type") != "1":
+        if console is None or console.get("type") != console_type:
             continue
 
         def attribute(tag: str, key: str, game: ET.Element = game) -> str:
@@ -86,6 +88,11 @@ def vs_entries(path: Path = NES20DB) -> list[dict]:
                 "prg_size": int(attribute("prgrom", "size") or 0),
                 "chr_sha1": attribute("chrrom", "sha1"),
                 "chr_size": int(attribute("chrrom", "size") or 0),
+                "misc_sha1": attribute("miscrom", "sha1"),
+                "misc_size": int(attribute("miscrom", "size") or 0),
+                "misc_number": int(attribute("miscrom", "number") or 0),
+                "rom_sha1": attribute("rom", "sha1"),
+                "console": int(console_type),
                 "prg_ram": int(attribute("prgram", "size") or 0),
                 "prg_nvram": int(attribute("prgnvram", "size") or 0),
                 "chr_ram": int(attribute("chrram", "size") or 0),
@@ -140,14 +147,14 @@ def header(entry: dict) -> bytes:
             prg_low,
             chr_low,
             flags6,
-            (mapper & 0xF0) | 0x08 | 0x01,  # NES 2.0, console type 1
+            (mapper & 0xF0) | 0x08 | entry["console"],  # NES 2.0, the console type
             entry["submapper"] << 4 | mapper >> 8,
             chr_high << 4 | prg_high,
             _ram_shift(entry["prg_nvram"]) << 4 | _ram_shift(entry["prg_ram"]),
             _ram_shift(entry["chr_nvram"]) << 4 | _ram_shift(entry["chr_ram"]),
             entry["region"],
             entry["vs_hardware"] << 4 | entry["vs_ppu"],
-            0,
+            entry["misc_number"],
             entry["expansion"],
         ]
     )
@@ -156,10 +163,10 @@ def header(entry: dict) -> bytes:
 # -- MAME's sets -----------------------------------------------------------
 
 
-def vs_sets() -> list[str]:
-    """The machines of MAME's vsnes driver."""
+def vs_sets(source: str = SOURCE) -> list[str]:
+    """The machines of MAME's vsnes driver (or of the driver ``source``)."""
     listing = subprocess.run(["mame", "-listsource"], capture_output=True, text=True, check=True)
-    return [line.split()[0] for line in listing.stdout.splitlines() if line.endswith(SOURCE)]
+    return [line.split()[0] for line in listing.stdout.splitlines() if line.endswith(source)]
 
 
 def read_set(name: str, roms: Path) -> dict | None:

@@ -254,9 +254,12 @@ def mesen_level_frames(
     ppu_reset_at_power: bool = True,
     side: int = 0,
     seconds: float = 900,
+    ports: str | None = None,
 ) -> dict[int, list[int]]:
-    """Mesen2's frames ``frames`` of ``rom`` under ``script``, as DAC levels."""
-    text = lua(script, held, side) + LEVEL_FRAMES_LUA % (
+    """Mesen2's frames ``frames`` of ``rom`` under ``script``, as DAC levels.
+    ``ports``: the Lua for the ports instead of the Vs. mainboard's
+    (scripts/pc10_judge.py)."""
+    text = (lua(script, held, side) if ports is None else ports) + LEVEL_FRAMES_LUA % (
         ", ".join(f"[{f}]=true" for f in frames),
         max(frames),
     )
