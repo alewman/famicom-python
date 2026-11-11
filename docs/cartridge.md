@@ -156,6 +156,12 @@ plus a 4-bit **submapper**; ROM sizes with an exponent-multiplier form; PRG-RAM,
 PRG-NVRAM, CHR-RAM and CHR-NVRAM as shift counts (64 << n); timing (NTSC, PAL,
 multi, Dendy); console type; Vs. PPU type; default expansion device. "An
 emulator must not assume that … no CHR-ROM [means] 8 KiB of CHR-RAM".
+A PlayChoice-10 image (console type 2) carries a miscellaneous-ROM area after
+the CHR: the 8 KiB INST ROM, 16 bytes of the security PROM's data and 16 of its
+counter output (`PC10_ROM-Images.wiki`; `playchoice.game_roms`; older dumps
+stop after the INST ROM). Several such games are their home cartridges' PRG and
+CHR exactly, so the header's console type is believed even where nes20db,
+asked by those two hashes, answers with the cartridge (`playchoice.is_playchoice`).
 Submappers that matter for licensed games (`NES_2.0_submappers.wiki`):
 
 - 1.5: SEROM/SHROM fixed 32K PRG (29 licensed dumps).

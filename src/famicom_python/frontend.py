@@ -67,6 +67,7 @@ from .peripherals import (
     Zapper,
 )
 from .ppu import DOTS, HEIGHT, WIDTH
+from .supervisor import BIOS_PROGRAMS, CHANNEL, ENTER, RESET, SERVICE, PlayChoice, load_bios
 from .system import System
 from .video import machine_palette, to_rgb, write_png
 from .vs import VS_1P_4017, panel
@@ -91,6 +92,13 @@ Vs. System: 5 and 6 drop a coin in acceptor 1 and 2, 9 (hold) is the service
             is the mouse. A DualSystem game opens both screens: 7 and 8 are
             the second side's coins, gamepads 3 and 4 its sticks, and the
             sound is the first side's
+PlayChoice-10 (with its BIOS: FAMICOM_PC10_BIOS names MAME's playch10.zip):
+            the menu screen is above the game's (--bios single: one monitor,
+            which the supervisor switches); 5 and 6 are the coin slots, 0
+            (hold) Channel Select, - Enter, = the cabinet's Reset, 9 Service;
+            Right Shift and Enter are the panel's Game Select and Start;
+            --dip takes sixteen digits, switches A to P. Without the BIOS the
+            game board runs alone, as a console
 Gamepads: the first two are players 1 and 2; on a Famicom a third and fourth
 are players 3 and 4 through the expansion port (a four-player adapter), and
 with a Four Score (--device four-score) on the NES as well.
@@ -195,6 +203,10 @@ KEYS = (  # (button, pygame key names)
 # -- conversions (pure, tested without pygame) --------------------------------------
 
 
+#: The cabinet's buttons (MAME's keys for the first three).
+CABINET_KEYS = ((CHANNEL, "K_0"), (ENTER, "K_MINUS"), (RESET, "K_EQUALS"), (SERVICE, "K_9"))
+
+
 def palette_words(palette: list[bytes]) -> list[int]:
     """Each 9-bit pixel value as an opaque little-endian BGRA word (0xFFRRGGBB)."""
     return [0xFF000000 | rgb[0] << 16 | rgb[1] << 8 | rgb[2] for rgb in palette]
@@ -270,9 +282,10 @@ class Frontend:
     def __init__(self, pygame, rom: Path, machine: str, palette: Path | None, scale: int,
                  audio: bool, fullscreen: bool, auto_disk: bool = True,
                  device: int | None = None, vaus_low: int = 0x62,
-                 dip: int = 0) -> None:  # fmt: skip
+                 dip: int = 0, bios: str = "dual") -> None:  # fmt: skip
         self.pg = pygame
         self.dip = dip
+        self.bios_name = bios
         self.rom, self.machine_name = rom, machine
         self.device_choice, self.vaus_low = device, vaus_low
         self.peripheral: object | None = None
@@ -299,12 +312,15 @@ class Frontend:
         pg = self.pg
         flags = pg.SCALED | pg.RESIZABLE | (pg.FULLSCREEN if self.fullscreen else 0)
         width = WIDTH * (2 if self.dual is not None else 1)  # a DualSystem's two screens
+        # A two-monitor PlayChoice-10: the menu's above the game's, as in the cabinet.
+        stacked = self.cabinet is not None and not self.cabinet.bios.single_monitor
+        height = HEIGHT * (2 if stacked else 1)
         try:
-            surface = pg.display.set_mode((width, HEIGHT), flags, vsync=1)
+            surface = pg.display.set_mode((width, height), flags, vsync=1)
         except pg.error:
-            surface = pg.display.set_mode((width, HEIGHT), flags)
+            surface = pg.display.set_mode((width, height), flags)
         if not self.fullscreen:
-            pg.Window.from_display_module().size = (width * self.scale, HEIGHT * self.scale)
+            pg.Window.from_display_module().size = (width * self.scale, height * self.scale)
         return surface
 
     # -- console --------------------------------------------------------------------
@@ -317,7 +333,19 @@ class Frontend:
         # A Vs. DualSystem game runs both sides of the mainboard (dual.py); the
         # window's own console is its primary side.
         self.dual: VsDualSystem | None = None
-        if MACHINES[self.machine_name].vs_side is not None and is_dual(self.rom):
+        # A PlayChoice-10 game runs under its supervisor (supervisor.py) when
+        # the BIOS is to hand; the window's console is the game board.
+        self.cabinet: PlayChoice | None = None
+        if MACHINES[self.machine_name].playchoice:
+            try:
+                self.cabinet = PlayChoice.from_rom(self.rom, load_bios(self.bios_name))
+            except FileNotFoundError as error:
+                print(f"{error}; the game board runs alone", file=sys.stderr)
+        if self.cabinet is not None:
+            system = self.cabinet.game
+            self.cabinet.supervisor.dip = [self.dip & 0xFF, self.dip >> 8 & 0xFF]
+            print(f"machine: a PlayChoice-10 cabinet, the {self.bios_name} BIOS", file=sys.stderr)
+        elif MACHINES[self.machine_name].vs_side is not None and is_dual(self.rom):
             self.dual = VsDualSystem.from_rom(self.rom)
             system = self.dual.primary
             self.dual.secondary.board.vs.dip = self.dip
@@ -334,7 +362,11 @@ class Frontend:
             device = system.loaded.image.board.expansion
         if device == VAUS_NES and machine.famicom_expansion_port:
             device = VAUS_FAMICOM
-        self.peripheral = system.plug(device)
+        if self.cabinet is not None:  # plugged already: a gun game's gun, or nothing
+            gun = system.board.pads[1]
+            self.peripheral = gun if isinstance(gun, Zapper) else None
+        else:
+            self.peripheral = system.plug(device)
         if self.peripheral is not None:
             print(f"device: {DEVICE_NAMES.get(device, 'Vs. Zapper')}", file=sys.stderr)
         if system.board.vs is not None:
@@ -412,13 +444,13 @@ class Frontend:
 
     def run_frame(self) -> None:
         self._apply_inputs()
-        (self.dual or self.system).run_frames(1)
+        (self.cabinet or self.dual or self.system).run_frames(1)
         for device in self._devices():
             if isinstance(device, Rob):
                 command = device.see(self.system.board.ppu.picture)
                 if command is not None:
                     print(f"R.O.B.: {command}")
-        samples = self.system.take_samples()
+        samples = (self.cabinet or self.system).take_samples()
         if self.device is not None and not self.fast:
             self.sound.push(samples_s16(samples))
         self._frames += 1
@@ -495,6 +527,11 @@ class Frontend:
         else:
             for pad, buttons in zip(self._players(), pads, strict=False):
                 pad.buttons = buttons
+        if self.cabinet is not None:
+            keys = pg.key.get_pressed()
+            self.cabinet.supervisor.buttons = sum(
+                button for button, key in CABINET_KEYS if keys[getattr(pg, key)]
+            )
         board.microphone = not typing and bool(pg.key.get_pressed()[pg.K_m])
         if not devices:
             return
@@ -628,7 +665,8 @@ class Frontend:
             if event.key == pg.K_F6 or (
                 event.key == pg.K_BACKSPACE and not isinstance(self.peripheral, FamilyBasicKeyboard)
             ):
-                self.system.reset()
+                if self.cabinet is None:  # a cabinet's Reset is the supervisor's (the = key)
+                    self.system.reset()
             elif event.key == pg.K_F3:
                 self.paused = not self.paused
                 self.sound.clear()
@@ -649,6 +687,8 @@ class Frontend:
                 self.sound.clear()
             elif event.key in (pg.K_5, pg.K_6) and self.system.board.vs is not None:
                 self.system.insert_coin(event.key == pg.K_6)
+            elif event.key in (pg.K_5, pg.K_6) and self.cabinet is not None:
+                self.cabinet.insert_coin(event.key == pg.K_6)
             elif event.key in (pg.K_7, pg.K_8) and self.dual is not None:
                 self.dual.insert_coin(1, event.key == pg.K_8)
         elif event.type == pg.KEYUP and event.key == pg.K_TAB:
@@ -666,8 +706,25 @@ class Frontend:
 
     def draw(self) -> None:
         pg = self.pg
-        image = frame_bytes(self.system.board.ppu.picture, self.words)
-        self.window.blit(pg.image.frombuffer(image, (WIDTH, HEIGHT), "BGRA"), (0, 0))
+        cabinet = self.cabinet
+        size = (WIDTH, HEIGHT)
+        if cabinet is None:
+            image = frame_bytes(self.system.board.ppu.picture, self.words)
+            self.window.blit(pg.image.frombuffer(image, size, "BGRA"), (0, 0))
+        elif cabinet.bios.single_monitor:
+            # One monitor, which the supervisor switches (PlayChoice.monitor_on_game:
+            # MAME's account; the PCK1 board has no schematic here: UNVERIFIED).
+            if cabinet.monitor_on_game:
+                image = frame_bytes(cabinet.game_picture(), self.words)
+                self.window.blit(pg.image.frombuffer(image, size, "BGRA"), (0, 0))
+            else:
+                menu = cabinet.supervisor.picture()
+                self.window.blit(pg.image.frombuffer(menu, size, "RGB"), (0, 0))
+        else:
+            menu = cabinet.supervisor.picture()
+            self.window.blit(pg.image.frombuffer(menu, size, "RGB"), (0, 0))
+            image = frame_bytes(cabinet.game_picture(), self.words)
+            self.window.blit(pg.image.frombuffer(image, size, "BGRA"), (0, HEIGHT))
         if self.dual is not None:
             image = frame_bytes(self.dual.secondary.board.ppu.picture, self.words)
             self.window.blit(pg.image.frombuffer(image, (WIDTH, HEIGHT), "BGRA"), (WIDTH, 0))
@@ -709,9 +766,10 @@ class Frontend:
 
 
 def dip_switches(text: str) -> int:
-    """``--dip``: eight digits, switch 1 first, as vs.VsMainboard.dip (switch 1 = bit 0)."""
-    if len(text) != 8 or set(text) - {"0", "1"}:
-        raise argparse.ArgumentTypeError("eight digits, each 0 or 1, switch 1 first")
+    """``--dip``: eight digits, switch 1 first, as vs.VsMainboard.dip (switch 1 = bit 0);
+    or a PlayChoice-10's sixteen, switches A to P (A = bit 0, I = bit 8)."""
+    if len(text) not in (8, 16) or set(text) - {"0", "1"}:
+        raise argparse.ArgumentTypeError("eight (or sixteen) digits, each 0 or 1, switch 1 first")
     return int(text[::-1], 2)
 
 
@@ -761,7 +819,13 @@ def main(argv: list[str] | None = None) -> int:
         default=0,
         metavar="SWITCHES",
         help="a Vs. System's DIP switches 1 to 8, as eight digits, 1 = on, switch 1"
-        " first (default 00000000)",
+        " first (default 00000000); a PlayChoice-10's A to P, as sixteen",
+    )
+    parser.add_argument(
+        "--bios",
+        choices=sorted(BIOS_PROGRAMS),
+        default="dual",
+        help="a PlayChoice-10's BIOS: the two-monitor cabinet's or the one-monitor's",
     )
     args = parser.parse_args(argv)
     try:
@@ -778,7 +842,7 @@ def main(argv: list[str] | None = None) -> int:
     frontend = Frontend(
         pygame, args.rom, args.machine, args.palette, max(1, args.scale),
         not args.no_audio, args.fullscreen, not args.manual_disk,
-        DEVICES[args.device], args.vaus_low, args.dip,
+        DEVICES[args.device], args.vaus_low, args.dip, args.bios,
     )  # fmt: skip
     try:
         frontend.run()
