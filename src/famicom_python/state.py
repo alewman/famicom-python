@@ -157,7 +157,7 @@ def _save_cabinet(cabinet: Any) -> bytes:
     body["supervisor"] = {
         "cpu": dataclasses.asdict(supervisor.cpu.capture_state()),
         "state": encoder.value(supervisor, "supervisor"),
-        "lines": [cabinet.in_reset, cabinet.stopped, cabinet._nmi],
+        "lines": [cabinet.in_reset, cabinet.stopped, cabinet._nmi, cabinet.monitor_on_game],
     }
     return zlib.compress(json.dumps(body, separators=(",", ":")).encode(), 6)
 
@@ -334,4 +334,4 @@ def load_state(system: System, data: bytes) -> None:
         _Decoder(system).into(supervisor, saved["state"], "supervisor")
         z80 = supervisor.cpu
         z80.restore_state(type(z80.capture_state())(**saved["cpu"]))
-        cabinet.in_reset, cabinet.stopped, cabinet._nmi = saved["lines"]
+        cabinet.in_reset, cabinet.stopped, cabinet._nmi, cabinet.monitor_on_game = saved["lines"]

@@ -497,6 +497,8 @@ class PlayChoice:
         self.in_reset = True
         self.stopped = False
         self._nmi = False
+        #: A one-monitor cabinet's monitor is on the game (see ``_line``).
+        self.monitor_on_game = False
         self.supervisor = Supervisor(bios, game_roms(loaded.image), self._line)
         self._mask_controls(True)
         board.ppu.reset()  # /PPU RES is low out of the Z80's reset
@@ -539,6 +541,12 @@ class PlayChoice:
             board.ppu.reset()  # held while low; the power-on window from its release
         elif number == CNTRL_MASK:
             self._mask_controls(not level)
+        elif number == DISP_MASK and not level and self.supervisor.latch[SDCS]:
+            # The one-monitor board (PCK1; no schematic here): MAME's driver
+            # flips its single screen between the supervisor's picture and
+            # the game's each time /DISP MASK falls. Emulator-derived, and
+            # kept out of the Z80's reset (which clears the latch with SDCS).
+            self.monitor_on_game = not self.monitor_on_game
 
     # -- running ---------------------------------------------------------
 

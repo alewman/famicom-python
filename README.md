@@ -22,8 +22,13 @@ mean verified: most boards have no judge ROM, and some Mesen2 cannot load, so
 their titles were only looked at. [docs/mappers.md](docs/mappers.md) has every
 mapper's source and evidence, what is left, and how to pick it up.
 
-Not built, by choice for now: the Vs. System and PlayChoice-10, and the speed
-work (reference boards aim to be correct; `*-fast` projects are for speed).
+The two arcade machines are built as first passes, uncertified: the Vs. System
+(UniSystem and DualSystem) and the PlayChoice-10, whose Z80 supervisor
+(z80-python) boots Nintendo's BIOS (yours: `FAMICOM_PC10_BIOS` names MAME's
+`playch10.zip`), checks each game's security PROM, shows its menu on a second
+screen and sells time ([docs/validation.md](docs/validation.md), "The
+PlayChoice-10"). Not built, by choice: the speed work (reference boards aim to
+be correct; `*-fast` projects are for speed).
 Open questions with no hardware answer are in
 [docs/undocumented-behavior.md](docs/undocumented-behavior.md).
 
@@ -124,7 +129,8 @@ frame it makes. Battery saves (and UNROM 512's flash) go to `ROM.sav`.
 | NES-001 (RP2A03G + RP2C02G): the reference model | 1 |
 | Famicom (RF), AV Famicom, NES-101: as fields on the same board | 1 |
 | PAL NES (2A07 + 2C07), Dendy | later, as machine data |
-| Famicom Disk System, Vs. System, PlayChoice-10 | later |
+| Famicom Disk System | built |
+| Vs. UniSystem and DualSystem, PlayChoice-10 | first passes, uncertified |
 
 Mappers live in this repository behind a signal-level cartridge connector
 ([docs/cartridge.md](docs/cartridge.md)); the first six (0, 1, 2, 3, 4, 7)
