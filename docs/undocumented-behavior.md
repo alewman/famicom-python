@@ -854,8 +854,8 @@ before the board takes a side.
 - **C78. The sticks' reports after eight bits.** A controller's 4021 has its serial
   input tied so that a ninth read returns 1 (`Standard_controller.wiki`); the Vs.
   mainboard has its own 4021s and nothing pinned says what their serial inputs see.
-  MAME shifts in 0. *Board*: 1, as a controller (`vs.VsStick`); no Vs. game in the
-  sweep reads a ninth bit differently on the two. Unverified likewise: whether a run
+  MAME shifts in 0. *Board*: 1, as a controller (`vs.VsStick`); the judge's script
+  gives Mesen2 the same, so no detector run here tells. Unverified likewise: whether a run
   of back-to-back reads clocks the register once (the NES-001's 2A03G, which the
   board assumes) or on every cycle (the RF Famicom, whose CPU is also early).
 - **C79. *Vs. T.K.O. Boxing*'s PPU.** MAME's notes: "Manual states this is an

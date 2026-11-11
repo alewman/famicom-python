@@ -390,6 +390,26 @@ def test_every_vs_mapper_has_four_screens() -> None:
         assert [cartridge.ppu_read(0x2000 + t * 0x400, 0) for t in range(4)] == [1, 2, 3, 4]
 
 
+def test_a_save_state_keeps_the_mainboard() -> None:
+    from famicom_python.state import load_state, save_state
+
+    # LDA $4016; STA $6000; INC $6001; JMP $F000
+    image = vs_image(bytes.fromhex("ad 16 40 8d 00 60 ee 01 60 4c 00 f0"), ppu=5)
+    first = System.from_rom(image, vs_machine(5))
+    first.run_cycles(5000)
+    first.insert_coin()
+    first.board.vs.dip = 0x41
+    first.run_cycles(100)
+    second = System.from_rom(image, vs_machine(5))
+    load_state(second, save_state(first))
+    for system in (first, second):
+        system.run_cycles(200_000)  # past the coin's 50 ms
+    one, two = first.board.vs, second.board.vs
+    assert first.board.t == second.board.t and one.ram.data == two.ram.data
+    assert (one.dip, one.coins, one.coin_counter) == (two.dip, two.coins, two.coin_counter)
+    assert one.ram.data[1] != 0
+
+
 # -- mapper 99 ---------------------------------------------------------------
 
 
