@@ -2497,8 +2497,9 @@ copies of the homebrew *Magic Floor*, and five dumps nes20db itself files under 
 dumps, missing PROM". Images and manifest live outside the repository.
 
 **The game board against Mesen2** (`scripts/compat_sweep.py --pc10 DIR --frames
-200,700,1200,1800`). Mesen2 runs a PlayChoice-10 image as its game board alone, with
-no skipped dot, and colours it through whatever palette it is given (the identity
+200,700,1200,1800`). Mesen2 runs a PlayChoice-10 image as its game board alone (whether
+it skips the odd frames' dot was not probed: the runs that match do so against the
+board's row, which does not), and colours it through whatever palette it is given (the identity
 palette comes back, so pictures are compared as pixel values, as a console's; the
 RP2C03's colours are judged by MAME, below). Both sides get one script of buttons on
 the CPU's cycle count (`scripts/pc10_judge.py`: Start at frames 300 and 420, A at
