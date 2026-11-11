@@ -286,6 +286,10 @@ class Machine:
     # OUT2 reaches the ROM sockets. "primary" or "secondary" is the side of
     # the board the CPU sits on ($4016 D7; C75), None any other console.
     vs_side: str | None = None
+    # A PlayChoice-10's game board (playchoice.py): the control panel's two
+    # 74LS165 shift registers stand where the controller ports are, and a Z80
+    # supervisor (supervisor.py) holds the reset, stop and mask lines.
+    playchoice: bool = False
     certified: bool = True
 
 
@@ -418,6 +422,36 @@ VS_MACHINES: dict[int, Machine] = {
 }
 
 
+# The PlayChoice-10's game side (Nintendo's PCH1-CPU schematic, 1986, sheets 5
+# and 6, pinned as reference/docs/Playchoice.pdf: manufacturer's documentation;
+# MAME's playch10.cpp, BSD-3, emulator-derived).
+# - The CPU is an RP2A03E (the schematic's 1H; CPU_variants.wiki: "pin 30 is
+#   /RDY", which the supervisor uses to stop the game), on the 21.47727 MHz
+#   crystal it shares with the PPU. Nothing pinned tells an E's APU from a G's:
+#   the tonal noise and the tables are taken as the G's.
+# - The PPU is an RP2C03B (3H), "used in ... all PlayChoice games"
+#   (PPU_palettes.wiki): the Vs. row's RGB timing, no skipped dot, the 2C03's
+#   colours (C76 for what its core is).
+# - /PPU RES and /GAME RES are two outputs of the supervisor's latch, so the
+#   PPU has a reset of its own and the NES-001's power-on window after it.
+# - UNVERIFIED, taken as the NES-001's: whether a run of back-to-back reads
+#   clocks the shift registers once (their clocks are the 2A03E's /INP0 and
+#   /INP1), and the audio amplifier's filter (sheet 4, not analysed).
+PLAYCHOICE = Machine(
+    name="PlayChoice-10",
+    timing=RGB,
+    cpu_variant="RP2A03E",
+    ppu_variant="RP2C03B",
+    reset_resets_ppu=True,
+    ppu_reset_at_power=True,
+    joypad_oe_per_cycle=False,
+    famicom_audio_through_cart=False,
+    dmc_unexpected_reload_bug=False,
+    playchoice=True,
+    certified=False,
+)
+
+
 def vs_machine(ppu: int) -> Machine:
     """The Vs. UniSystem with the PPU of NES 2.0 "Vs. PPU type" ``ppu``; a
     reserved number gets the RP2C03B, whose colours are the home consoles'."""
@@ -432,6 +466,7 @@ MACHINES = {
     "pal": PAL_NES,
     "dendy": DENDY_CLONE,
     "vs": VS_UNISYSTEM,
+    "playchoice": PLAYCHOICE,
     **{
         "vs-" + machine.ppu_variant.lower(): machine
         for number, machine in VS_MACHINES.items()

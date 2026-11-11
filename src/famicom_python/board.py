@@ -29,6 +29,7 @@ from .apu import APU, AnalogueStage
 from .cartridge.connector import Cartridge
 from .joypad import StandardController
 from .machine import Machine
+from .playchoice import PlayChoicePad
 from .ppu import PPU
 from .vs import VsMainboard, VsStick
 
@@ -84,6 +85,10 @@ class Board:
             )
             self.pads = [VsStick(), VsStick()]
             self._open_lines = (0, 0)
+        if machine.playchoice:
+            # The panel's two shift registers (playchoice.py): player 2 has no
+            # Select or Start.
+            self.pads = [PlayChoicePad(), PlayChoicePad(select_start=False)]
         self.t = 0  # master ticks at the end of the last CPU cycle
         self.data_bus = 0
         self.internal_bus = 0
@@ -178,6 +183,14 @@ class Board:
                 self.expansion.clock(oe)
             self._pad_oe = -1
         return t
+
+    def idle_cycle(self) -> None:
+        """A cycle's worth of the clock with the 2A03 held in reset: nothing is
+        on the bus, the PPU and the APU's clock run on (a PlayChoice-10's game
+        under /GAME RES, supervisor.py)."""
+        self.t = t = self.t + self.cycle_ticks
+        self.apu.clock()
+        self.ppu.run_to(t)
 
     def _end_cycle(self) -> None:
         """M2 falls: the cartridge's cycle count, then /IRQ and /NMI as the CPU samples them."""
