@@ -29,7 +29,9 @@ start, so that adding them later is data, not a refactor.
 | NES-101 (top loader) | RP2A03G/H | 2C02G/H | CPU only | detachable | none | 1 |
 | PAL NES | RP2A07 | 2C07 | CPU and PPU | as NES | none | later |
 | Dendy (UMC clones) | UA6527P | UA6538 | — | Famicom-style | — | later |
-| Vs. System, PlayChoice-10 | RP2A03 / G | 2C03/2C04/2C05 (RGB) | | | | later (PlayChoice adds a Z80: z80-python) |
+| Vs. UniSystem | RP2A03 (letterless: no tonal noise) | RP2C03B, RP2C04-0001 to -0004 or RC2C05-01 to -04, as the game's ROMs need (RGB) | CPU and PPU (the watchdog's reset) | two sticks on the mainboard's shift registers, coins, a service button, 8 DIP switches | none | **built** (2026-11-11; "The Vs. System" below) |
+| Vs. DualSystem | two of each | two | both sides | four sticks | none | see "The Vs. System" |
+| PlayChoice-10 | RP2A03G | 2C03 (RGB) | | | | later (adds a Z80: z80-python) |
 
 Sources: `Family_Computer.wiki`, `PPU_power_up_state.wiki` l.49/76,
 `Controller_reading.wiki`, `DMA.wiki` "Register conflicts", `Expansion_port.wiki`,
@@ -152,8 +154,9 @@ AccuracyCoin "Open Bus", README l.93–102).
   Jissen Mahjong panel, the Oeka Kids tablet (its page calls itself possibly
   wrong; the MCU's handshake delay is not modelled), the Famicom 3D System's
   eye signal, the port test controller, and R.O.B., which reads the picture the
-  board draws (its hands on pad 2 are the player's). Not built: the Vs.
-  System's devices (the board has no Vs. System), the IGS Battle Box (its
+  board draws (its hands on pad 2 are the player's). The Vs. System's sticks
+  and light gun are its mainboard's (`vs.py`, "The Vs. System" below). Not
+  built: the IGS Battle Box (its
   EEPROM's commands are not on its page), the other Chinese keyboards (no
   description anywhere), the Miracle Piano (MIDI), Doremikko, the Barcode
   Battler, Top Rider and the *Arkanoid II* prototype controller.
@@ -171,6 +174,37 @@ AccuracyCoin "Open Bus", README l.93–102).
 - APU: $4015 = 0 at power and reset; $4017 = $00 at power, rewritten with its
   last value at reset (blargg `apu_reset`; Brad Taylor disagrees). See
   undocumented-behavior.md.
+
+### The Vs. System
+
+`Vs._System.wiki` (specification tier), MAME's `vsnes.cpp` (BSD-3,
+emulator-derived; pinned as `mame-nes/vsnes.cpp`), `NES_2.0.wiki` "Vs. System
+Type". An arcade mainboard with two consoles side by side; a UniSystem cabinet
+uses one side. It is a row of `machine.py` per PPU (`System.machine_for` picks
+it from NES 2.0 byte 13 or nes20db's `<vs ppu=>` when the console type is 1)
+and one object, `vs.VsMainboard`, standing where a Famicom's expansion-port
+device does:
+
+| | Famicom | Vs. System |
+| --- | --- | --- |
+| CPU | RP2A03G | RP2A03, letterless: `$400E` bit 7 does nothing, noise period 15 is 2046, reset leaves the frame counter alone |
+| PPU | RP2C02G, composite | RGB: a 3-bit-per-channel colour ROM (`video.RGB_DAC`, five tables), emphasis drives a channel to full, no skipped dot on odd frames, no OAM corruption; the RC2C05s swap `$2000`/`$2001` and return an identifier in `$2002` D4-D0 |
+| `$4016` read | D0 pad I, D1 expansion, D2 microphone, D5-D7 open bus | D0 right stick, D1 0, D2 service button, D3-D4 DIP switches 1-2, D5-D6 coin acceptors 1-2, D7 the side (0 primary, 1 secondary) |
+| `$4017` read | D0 pad II, D1-D4 expansion | D0 left stick, D1 0, D2-D7 DIP switches 3-8 |
+| `$4016` write | OUT0-2 to the pads and the expansion port | OUT0 strobes the sticks; OUT1 is the other side's /IRQ and the RAM's owner (DualSystem); OUT2 chooses the CHR socket (mapper 99; Gumshoe's PRG bank too) |
+| `$4020-$5FFF` | cartridge | the coin counter's latch (D0; a read writes open bus to it); a daughterboard's protection chip may answer reads |
+| `$6000-$7FFF` | cartridge | 2 KiB of mainboard RAM, mirrored, battery-backed, shared by the two sides |
+| Nametables | 2 KiB, the cartridge wires A10 | 4 KiB, always four screens |
+| Program | a cartridge | six EPROM sockets (mapper 99) or a daughterboard: MMC1, UxROM, Sunsoft-3, VRC1, Namco 108 (mappers 1, 2, 67, 75, 206) |
+
+A coin is a contact closed for about 50 ms on the board's clock
+(`System.insert_coin`); the sticks report as controllers do, with the panel's
+buttons 1-4 where Select and Start sit (`vs.panel` puts player 1 on the stick
+the game reads: NES 2.0 devices $04 and $05); the light gun reports through
+`$4016`'s shift register (`vs.VsZapper`, device $07). What is not modelled, and
+the contradictions between the wiki and the two emulators, are in
+[undocumented-behavior.md](undocumented-behavior.md) (C75 on) and
+[validation.md](validation.md) "The Vs. System".
 
 ## The PPU side
 
@@ -229,7 +263,9 @@ frontend default should be the pally-generated `2C02G_U_wiki.pal` (made from
 lidnariq's measured voltages; MIT-0), with FirebrandX's "Composite Direct"
 capture as the hardware comparison (open item: the site refused our fetcher).
 RGB PPUs (2C03/04/05) use a 3-bit-per-channel DAC table and, for 2C04, a
-scrambled palette per chip (`PPU_palettes.wiki`).
+scrambled palette per chip (`PPU_palettes.wiki`): the picture format is the
+same, and `video.rgb_palette` turns it into the chip's colours
+(`video.machine_palette` chooses by machine).
 
 ## The APU
 

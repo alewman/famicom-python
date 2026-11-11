@@ -30,6 +30,7 @@ from .cartridge.connector import Cartridge
 from .joypad import StandardController
 from .machine import Machine
 from .ppu import PPU
+from .vs import VsMainboard, VsStick
 
 # When the PPU sees a register read or write: two dots (8 master ticks) into
 # its CPU cycle, inside M2's high phase. The cycle's other effects (the
@@ -73,6 +74,16 @@ class Board:
         self.microphone = False
         self._has_microphone = machine.microphone
         self._open_lines = (0xE0 | machine.pad_open_bus[0], 0xE0 | machine.pad_open_bus[1])
+        # A Vs. System mainboard (vs.py): it stands where the expansion-port
+        # device does, drives every line of $4016/$4017, and answers
+        # $4020-$7FFF before the ROM sockets do. None on any other console.
+        self.vs: VsMainboard | None = None
+        if machine.vs_side is not None:
+            self.vs = self.expansion = VsMainboard(
+                machine.vs_side, lambda: self.t, timing.master_hz, cartridge.out
+            )
+            self.pads = [VsStick(), VsStick()]
+            self._open_lines = (0, 0)
         self.t = 0  # master ticks at the end of the last CPU cycle
         self.data_bus = 0
         self.internal_bus = 0
@@ -95,6 +106,9 @@ class Board:
         self.request_nmi: Callable[[], None] = lambda: None
         self._irq = False
         self._nmi = False
+        # One more source on the wired-OR /IRQ line: the other side's OUT1 on
+        # a Vs. DualSystem (dual.py). False on every other machine.
+        self.external_irq = False
         self._ppu_access = timing.ppu_access_ticks - self.cycle_ticks  # relative to the cycle's end
         self._snoop_reads = cartridge.snoops_cpu_reads
         self._latches_reads = cartridge.latches_reads
@@ -120,7 +134,14 @@ class Board:
         self.apu.reset()
         if self.machine.reset_resets_ppu:
             self.ppu.reset()
+        if self.vs is not None:
+            self.vs.reset()
         self.cartridge.m2_gap(self.t)
+
+    def set_external_irq(self, asserted: bool) -> None:
+        """The mainboard pulls /IRQ low, or lets go (the CPU sees it at the
+        next cycle's end)."""
+        self.external_irq = asserted
 
     def set_sample_rate(self, rate: int) -> None:
         """The host rate for :meth:`take_samples` (44,100 Hz by default)."""
@@ -162,7 +183,7 @@ class Board:
         """M2 falls: the cartridge's cycle count, then /IRQ and /NMI as the CPU samples them."""
         if self._counts_m2:
             self.cartridge.m2(self.t)
-        irq = self.apu.irq or self.cartridge.irq
+        irq = self.apu.irq or self.cartridge.irq or self.external_irq
         if irq != self._irq:
             self._irq = irq
             if irq:
@@ -220,6 +241,11 @@ class Board:
             self.ram[address & 0x7FF] = value
         elif 0x4000 <= address < 0x4020:
             self._write_io(address, value)
+        elif address < 0x8000 and address >= 0x4020 and self.vs is not None:
+            if address < 0x6000:
+                self.vs.write_coin_counter(value)
+            else:
+                self.vs.write_ram(address, value)
         self.cartridge.cpu_write(address, value, t)
         self._end_cycle()
         if self.bus_observers:
@@ -244,7 +270,17 @@ class Board:
             return value
         ppu.run_to(t)
         if address >= 0x4020:
-            value = self.cartridge.cpu_read(address, t)
+            if address < 0x8000 and self.vs is not None:
+                # The Vs. mainboard: its RAM at $6000 (open bus when the other
+                # side holds it); below, a read clocks the coin counter with
+                # whatever the bus holds, and a daughterboard's chip may answer.
+                if address >= 0x6000:
+                    value = self.vs.read_ram(address)
+                else:
+                    self.vs.write_coin_counter(self.data_bus)
+                    value = self.cartridge.cpu_read(address, t)
+            else:
+                value = self.cartridge.cpu_read(address, t)
             if value is None:
                 self._undriven = True
                 value = self.data_bus

@@ -36,6 +36,13 @@ class BoardInfo:
     # The Default Expansion Device (NES_2.0.wiki byte 15; peripherals.py): 0
     # unspecified, 1 standard pads, 8 the Zapper, ...
     expansion: int = 0
+    # A Vs. System game's (console 1) NES 2.0 byte 13, or nes20db's ``<vs>``:
+    # the RGB PPU its colours and checks expect (0 RP2C03, 2-5 RP2C04-0001 to
+    # -0004, 8-11 RC2C05-01 to -04) and its hardware type (0 UniSystem, 1-4 a
+    # UniSystem with a protection, 5 DualSystem, 6 DualSystem with Raid on
+    # Bungeling Bay's protection) (NES_2.0.wiki "Vs. System Type").
+    vs_ppu: int = 0
+    vs_hardware: int = 0
 
 
 @dataclass(frozen=True)
@@ -88,6 +95,8 @@ def parse(data: bytes) -> RomImage:
             timing=h[12] & 0x03,
             console=h[7] & 0x03,
             expansion=h[15] & 0x3F,
+            vs_ppu=h[13] & 0x0F if h[7] & 0x03 == 1 else 0,
+            vs_hardware=h[13] >> 4 if h[7] & 0x03 == 1 else 0,
         )
         prg_size = _nes2_rom_size(h[4], h[9] & 0x0F, 0x4000)
         chr_size = _nes2_rom_size(h[5], h[9] >> 4, 0x2000)

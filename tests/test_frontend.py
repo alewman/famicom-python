@@ -67,3 +67,38 @@ def test_the_window_runs_frames_and_keeps_the_save(tmp_path: Path) -> None:
         assert again.system.cartridge.battery_ram()[0] == count
     finally:
         pygame.quit()
+
+
+def test_dip_switches_are_eight_digits_switch_one_first() -> None:
+    import argparse
+
+    from famicom_python.frontend import dip_switches
+
+    assert dip_switches("10000000") == 0x01 and dip_switches("00000011") == 0xC0
+    for bad in ("1", "100000002", "1000000x"):
+        with pytest.raises(argparse.ArgumentTypeError):
+            dip_switches(bad)
+
+
+def test_a_vs_cabinet_in_the_window(tmp_path: Path) -> None:
+    pygame = pytest.importorskip("pygame")
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+    from test_vs_system import vs_image
+
+    from famicom_python.frontend import Frontend
+
+    rom = tmp_path / "vs.nes"
+    rom.write_bytes(vs_image(ppu=5, expansion=5))
+    pygame.display.init()
+    try:
+        frontend = Frontend(pygame, rom, "auto", None, 2, False, False, dip=0x81)
+        system = frontend.system
+        assert frontend.machine_name == "vs-rp2c04-0004" and frontend.first_on_4017
+        assert system.board.vs.dip == 0x81
+        assert frontend.palette[0x00] == bytes((146, 109, 0))  # the RP2C04-0004's $00: 430
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_5))
+        frontend.run(max_frames=1)
+        assert system.board.vs.coins[0]
+    finally:
+        pygame.quit()

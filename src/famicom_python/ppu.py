@@ -1177,6 +1177,9 @@ class PPU:
     def read_register(self, register: int) -> int:
         if register == 2:
             value = (self.status & 0xE0) | (self._decayed_latch() & 0x1F)
+            mask = self.timing.identifier_mask
+            if mask:  # an RC2C05's identifier in place of the latch (machine.Timing)
+                value = (value & ~mask) | self.timing.identifier
             if self.line == self.timing.vblank_line and self.dot == 0:
                 # One dot before the set: reads clear and the flag never sets
                 # this frame (NMI.wiki "Race condition").
@@ -1248,7 +1251,10 @@ class PPU:
         until M2 falls (AccuracyCoin "$2002 Flag Timing", whose notes give the
         RP2A03G's M2 duty of 15/24; C3)."""
         if register == 2:
-            return (value & 0x9F) | (self.status & 0x60)
+            value = (value & 0x9F) | (self.status & 0x60)
+            mask = self.timing.identifier_mask & 0x60
+            if mask:  # the RC2C05-02's identifier covers the overflow bit
+                value = (value & ~mask) | (self.timing.identifier & mask)
         return value
 
     def _read_2007_ale(self) -> None:
@@ -1316,6 +1322,8 @@ class PPU:
         master ticks from the access to the start of the dot the PPU is in,
         always 0 on NTSC (3 dots a CPU cycle), any of 0-4 on PAL (3.2)."""
         self._drive(value)
+        if register < 2 and self.timing.swapped_control:
+            register ^= 1  # the RC2C05: $2000 is PPUMASK, $2001 PPUCTRL
         if register == 0:
             if self.resetting:
                 return
@@ -1330,7 +1338,8 @@ class PPU:
                     # Rendering turned off mid-line freezes the secondary OAM
                     # address; if it is still frozen when rendering begins at
                     # the pre-render line, OAM's row there is overwritten.
-                    self._oam_corrupt = self._oam2_row()
+                    if self.timing.oam_corruption:
+                        self._oam_corrupt = self._oam2_row()
                 elif value & 0x18 and self.line < HEIGHT:
                     # Back on during a visible line, the address counts again
                     # and is 0 by the line's end: nothing to corrupt.

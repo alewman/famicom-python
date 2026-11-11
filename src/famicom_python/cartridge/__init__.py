@@ -202,7 +202,7 @@ from .multicart import (
     RetroUSB400,
     Super700,
 )
-from .namco import Namco108, Namco163, Namco175, Namco3425, Namco3433, Namco3446
+from .namco import Namco163, Namco175, Namco3425, Namco3433, Namco3446, namco108_for
 from .nanjing import FC001, FS304, YC0309, Dongda164
 from .pic16c54 import Block355
 from .sachen import (
@@ -234,6 +234,7 @@ from .unlicensed import (
     Subor167,
 )
 from .vrc5 import QTa
+from .vs import VsSockets
 from .waixing import FK23C, FS309, T9552, Jncota523, MixedCHR, WaixingVRC4, Xiangfeng198
 
 #: Each implemented iNES mapper's board, built from the image and the CPU cycle
@@ -325,6 +326,7 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     95: Namco3425,
     96: OekaKids,
     97: TAMS1,
+    99: VsSockets,
     103: DokiDoki103,
     104: Pegasus104,
     105: NESEvent,
@@ -402,7 +404,7 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     198: Xiangfeng198,
     199: FS309,
     205: JC016,
-    206: Namco108,
+    206: namco108_for,
     207: X1005,
     208: Gouder208,
     209: JYCompany,

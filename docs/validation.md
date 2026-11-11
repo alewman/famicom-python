@@ -2344,3 +2344,83 @@ not on its page), the other Chinese keyboards (no description anywhere), the
 Miracle Piano, Doremikko, the Barcode Battler, Top Rider and the *Arkanoid II*
 prototype controller.
 
+### The Vs. System (2026-11-11)
+
+Open item 25's first half: the Vs. UniSystem as rows of `machine.py` (one per RGB
+PPU), a mainboard object (`vs.py`), mapper 99 and the protection daughterboards
+(start-here.md "The Vs. System"). No hardware-captured or hardware-corrected judge
+exists here for any of it: no test ROM pinned was run on a Vs. board, and the wiki's
+own identifier and palette tables are "what the games expect" and chip dumps. What
+follows are two detectors that share no code, and the games.
+
+**The dumps.** `scripts/vs_images.py` assembles NES 2.0 images from MAME's sets by
+nes20db's PRG and CHR SHA-1s (the proof of each arrangement is the hash): **65 of
+nes20db's 74 Vs. images**, from 53 of MAME 0.285's 55 `vsnes` sets (the two left over
+are the Z80 bootlegs of *Super Mario Bros.*). The nine without a set: *The Quest of
+Ki*, *Urban Champion* and *Valkyrie no Bouken* (no MAME set), three homebrew, a hack
+of *Super Xevious*, and two bad dumps of *Battle City*. Of the 65, 43 are UniSystem
+images and 22 DualSystem. Images and manifest live outside the repository.
+
+**Mesen2** (`scripts/compat_sweep.py --vs DIR --frames 200,700,1200,1800`). Both
+sides get one input script on the CPU's cycle count (`scripts/vs_judge.py`): two
+coins at frames 240 and 270, panel button 1 at 400 and 520, button A at 640. The
+board takes it through its own mainboard; Mesen2's `$4016`/`$4017` are replaced,
+read for read, by a Lua model of the wiki's port layout, so Mesen2 judges the CPU,
+the PPU, the banking and the protection chips, not the port bits. A read of `$4016`
+falls on the same CPU cycle on both (119,801 for the first, in *Vs. Super Mario
+Bros.*). Mesen2 colours a Vs. game itself, so pictures are compared as DAC levels,
+three bits a channel: its palette tables against `video.RGB_DAC`. Mesen2 ran with the
+power-on window (the row's `ppu_reset_at_power`) and without OAM row corruption (C76).
+
+| | Images | Identical at all four frames | Not |
+| --- | --- | --- | --- |
+| All UniSystem | 43 | **41** | 2: Mesen2 shows one grey screen |
+| mapper 99 | 31 | 30 | *Vs. Tetris* (24 KiB) |
+| 206 (Namco 108) | 6 | 5 | *Super Xevious* |
+| 1, 2, 67, 75 | 6 | 6 | |
+| RP2C03B / RP2C04-0001 / -0002 / -0003 / -0004 | 4 / 13 / 8 / 6 / 7 | 4 / 11 / 8 / 6 / 7 | |
+| RC2C05-01 / -02 / -03 / -04 | 1 / 1 / 2 / 1 | all | |
+| protections: R.B.I. Baseball (1), T.K.O. Boxing (2), Ice Climber Japan (4) | 2 / 1 / 1 | all | |
+
+The two: Mesen2 does not start the 24 KiB *Vs. Tetris* image (one grey screen at
+every frame; the image nes20db calls "[padded]", the same EPROMs under 8 KiB of
+`$FF`, is identical on both, and on the board the two images run the same); and it
+does not start *Super Xevious* either, input script or none (grey, and no read of
+`$4020-$5FFF` ever reaches a Lua callback). MAME settles both, below.
+
+In lockstep (`scripts/mesen_lockstep.py --machine vs`), *Vs. Super Mario Bros.*
+through the coin, the start button and into World 1-1: identical for all 8,689,120
+instructions of 900 frames, the dot offset constant, so no dot is skipped. (That run
+had `$4016` D7 = 0 on both sides, the sweep D7 = 1: C75.)
+
+**MAME 0.285's `vsnes`** (`scripts/vs_mame.py`), attract mode, each set with MAME's
+default DIP switches, frames 180, 420 and 900 against the board's closest frame within
+6, as DAC levels (MAME colours from a dump of the chips' palette ROM): **37 of 43
+identical at all three frames**, *Vs. Tetris* (24 KiB) and *Super Xevious* among them.
+The other six: *Castlevania*, *Gradius*, *The Goonies* and *Top Gun* differ only at
+frame 180, where MAME's screen is one colour and the board's another (two blank
+screens while the game checks memory; identical at 420 and 900); *Star Luster* by 93
+pixels and *T.K.O. Boxing* by 9 at frame 900, moving objects a frame or two apart.
+So every UniSystem image matches at least one detector on a picture that is not
+blank, and 35 match both.
+
+**The tests** (`tests/test_vs_system.py`, 29 quick cases on synthetic images, 2 with
+the games): the header's byte 13 and the rows; the colour tables against the pinned
+wiki page and `2C03_wiki.pal`, and the four RP2C04s as permutations of one palette;
+emphasis; the RC2C05's swap and identifiers; a frame's length with rendering on (the
+same every frame on a Vs. row, alternating on the NES); the letterless 2A03's noise
+and reset; every port bit, the coin pulse's length, the coin counter and its mirror
+and its read, the RAM's mirrors under each of the six mappers, four screens under
+each; mapper 99's CHR select, empty sockets, the 24 KiB layout, Gumshoe's fifth bank;
+the three protection chips' answers; the Vs. Zapper's report; the panel's wiring.
+*Vs. Super Mario Bros.* takes a coin (and pulses the coin counter once), starts on
+button 1 and reaches the game.
+
+**Not verified, plainly.** Sound: nothing compares the letterless 2A03's audio with
+anything. The DIP switches against Mesen2, where they were all off (against MAME
+28 of the 43 sets ran with switches on, MAME's defaults, and the board with the same:
+the switch bits are judged there). The Vs. Zapper in a game (its report is unit-tested; the sweep
+holds it off the screen). Hardware: none of this has met a Vs. board; C75 to C79 are
+the open disagreements. The home consoles after the change: AccuracyCoin and the PPU
+test ROMs, at the end of this section's work (below).
+

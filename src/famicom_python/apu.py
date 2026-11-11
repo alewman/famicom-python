@@ -133,11 +133,22 @@ class APUTables:
     dmc_rates: tuple[int, ...]
     steps_4: dict[int, int]
     steps_5: dict[int, int]
+    # $400E's bit 7, the 93-step "tonal" noise, exists (not on the letterless
+    # RP2A03: its shift register always feeds back from bits 0 and 1).
+    tonal_noise: bool = True
+    # The reset button rewrites $4017 and so restarts the frame counter (not
+    # on the letterless RP2A03: CPU_variants.wiki).
+    frame_reset: bool = True
 
 
 TABLES = {
     "NTSC": APUTables(NOISE_PERIODS, DMC_RATES, STEPS_4, STEPS_5),
     "PAL": APUTables(PAL_NOISE_PERIODS, PAL_DMC_RATES, PAL_STEPS_4, PAL_STEPS_5),
+    # The letterless RP2A03 of the first Famicoms and every Vs. System board:
+    # "Lacks tonal noise mode. Lowest noise period is 2046 instead of 4068.
+    # APU Frame Counter not restarted on reset" (CPU_variants.wiki;
+    # APU_Noise.wiki l.94). Specification tier: no test ROM here runs on one.
+    "RP2A03": APUTables((*NOISE_PERIODS[:15], 2046), DMC_RATES, STEPS_4, STEPS_5, False, False),
 }
 
 
@@ -352,8 +363,9 @@ class Triangle:
 class Noise:
     """APU_Noise.wiki: a 15-bit LFSR clocked by a timer counting APU cycles."""
 
-    def __init__(self, periods: tuple[int, ...] = NOISE_PERIODS) -> None:
+    def __init__(self, periods: tuple[int, ...] = NOISE_PERIODS, tonal: bool = True) -> None:
         self.periods = periods
+        self.tonal = tonal
         self.envelope = Envelope()
         self.length = LengthCounter()
         self.mode_bit = 1  # the feedback tap: 1, or 6 in periodic mode
@@ -367,7 +379,7 @@ class Noise:
             self.envelope.set(value)
             self.length.write_halt(bool(value & 0x20))
         elif register == 2:
-            self.mode_bit = 6 if value & 0x80 else 1
+            self.mode_bit = 6 if value & 0x80 and self.tonal else 1
             self.period = self.periods[value & 0x0F] // 2 - 1
         elif register == 3:
             self.length.write_load(value >> 3)
@@ -481,7 +493,7 @@ class APU:
         self.pulse1 = Pulse(ones_complement=True)
         self.pulse2 = Pulse(ones_complement=False)
         self.triangle = Triangle()
-        self.noise = Noise(self.tables.noise_periods)
+        self.noise = Noise(self.tables.noise_periods, self.tables.tonal_noise)
         self.dmc = DMC(self.tables.dmc_rates)
         self.channels = (self.pulse1, self.pulse2, self.triangle, self.noise)
         self.lengths = tuple(channel.length for channel in self.channels)
@@ -572,7 +584,8 @@ class APU:
         ``4017_written``). The triangle is untouched (``len_ctrs_enabled``)."""
         self.write(0x4015, 0)
         self.frame_irq = False
-        self.write(0x4017, self.last_frame_write)
+        if self.tables.frame_reset:
+            self.write(0x4017, self.last_frame_write)
 
     # -- the clock -------------------------------------------------------
 

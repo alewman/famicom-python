@@ -1,6 +1,7 @@
 # Mappers: where they stand
 
-**Closed as an active effort on 2026-10-30.** 294 mappers are implemented.
+**Closed as an active effort on 2026-10-30.** 294 mappers were implemented then;
+mapper 99, the Vs. System's own sockets, makes 295 (2026-11-11).
 That is feature complete, with the gaps listed below; it is not a claim that
 each is verified. This file is the place to start if you want to reopen the
 work: the [registry](#registry) is generated, the rest is written by hand.
@@ -142,7 +143,11 @@ itself.
 
 Generated: `NO_INTRO_DIR=... python scripts/mapper_registry.py --results
 tests/mame_traces/sweep-final --mame tests/mame_traces/sweep-m2 --mame
-tests/mame_traces/sweep-m3`. Do not edit by hand. The non-identical dumps are
+tests/mame_traces/sweep-m3`. Do not edit by hand. (Two rows were, on 2026-11-11:
+mapper 99's, whose dumps are the Vs. System's and in no No-Intro set, and 206's
+class. A regeneration would restate every count from results directories that
+have moved on since the final sweep. Mapper 99's counts are the Vs. sweep's,
+validation.md "The Vs. System".) The non-identical dumps are
 in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 
 <!-- registry begin -->
@@ -235,6 +240,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 95 | Namco3425 | namco | 3 | 0 | 0 | 3 / 0 / 0 | wiki | matches Mesen2 |
 | 96 | OekaKids | bandai | 2 | 0 | 0 | 2 / 0 / 0 | wiki | matches Mesen2 |
 | 97 | TAMS1 | irem | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
+| 99 | VsSockets | vs | 0 | 0 | 0 | Vs. images: 30 / 1 / 0 | wiki | matches Mesen2 and MAME |
 | 103 | DokiDoki103 | kaiser | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 104 | Pegasus104 | unlicensed | 1 | 0 | 0 | 1 / 0 / 0 | wiki, the game | matches Mesen2 |
 | 105 | NESEvent | mmc1 | 1 | 0 | 1 | 2 / 0 / 0 | wiki | matches Mesen2 |
@@ -315,7 +321,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 198 | Xiangfeng198 | waixing | 3 | 0 | 0 | 3 / 0 / 0 | wiki | matches Mesen2 |
 | 199 | FS309 | waixing | 1 | 5 | 0 | 0 / 7 / 0 | wiki | matches mame_nes |
 | 205 | JC016 | mmc3_clones | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
-| 206 | Namco108 | namco | 76 | 0 | 0 | 74 / 3 / 0 | wiki | matches Mesen2 |
+| 206 | namco108_for | namco | 76 | 0 | 0 | 74 / 3 / 0 | wiki | matches Mesen2 |
 | 207 | X1005 | taito | 1 | 0 | 0 | 1 / 0 / 0 | wiki | matches Mesen2 |
 | 208 | Gouder208 | mmc3_clones | 2 | 0 | 0 | 1 / 1 / 0 | wiki | matches Mesen2 |
 | 209 | JYCompany | jycompany | 4 | 0 | 0 | 3 / 1 / 0 | wiki | matches Mesen2 |

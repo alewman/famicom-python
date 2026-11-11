@@ -18,7 +18,9 @@ from . import peripherals
 from .board import Board
 from .cartridge import BoardInfo, Loaded, load
 from .cartridge.connector import Cartridge
-from .machine import MACHINES, NES_001, Machine
+from .joypad import START
+from .machine import MACHINES, NES_001, Machine, vs_machine
+from .vs import VS_DEVICES, VS_ZAPPER, VsStick, VsZapper
 
 
 class System:
@@ -53,13 +55,17 @@ class System:
 
     @staticmethod
     def machine_for(rom: str | Path | bytes) -> Machine:
-        """The console a cartridge asks for: the NES 2.0 header's or nes20db's
-        timing (1 PAL, 3 Dendy), else a Famicom. Neither source tells a Famicom
+        """The console a cartridge asks for: a Vs. UniSystem with the game's PPU
+        if the NES 2.0 header or nes20db says console type 1 (and which PPU:
+        machine.VS_PPUS); else by their timing (1 PAL, 3 Dendy), else a
+        Famicom. Neither source tells a Famicom
         cartridge from an NES one, and the Famicom runs both: a sound chip or a
         disk reaches the mix only through its cartridge pins 45 and 46, and
         games that write the PPU too early hang on the NES-001
         (Machine.ppu_reset_at_power)."""
         loaded = load(rom)
+        if loaded.image.board.console == 1:
+            return vs_machine(loaded.image.board.vs_ppu)
         timing = loaded.image.board.timing
         if timing == 1:
             return MACHINES["pal"]
@@ -81,6 +87,12 @@ class System:
         loaded = load(rom, cpu_cycle_ticks=machine.timing.cpu_divider, override=override)
         system = cls(loaded.cartridge, machine)
         system.loaded = loaded
+        if system.board.vs is not None and loaded.image.board.vs_hardware in (4, 6):
+            # Vs. Ice Climber (Japan) and Vs. Raid on Bungeling Bay: the fourth
+            # bit of both sticks' reports is wired on (vs.VsStick).
+            for pad in system.board.pads:
+                if isinstance(pad, VsStick):
+                    pad.jumper = START
         return system
 
     def plug(self, device: int | None = None) -> object | None:
@@ -89,6 +101,16 @@ class System:
         :func:`.peripherals.plug` returns it."""
         if device is None:
             device = self.loaded.image.board.expansion if self.loaded is not None else 0
+        if self.board.vs is not None:
+            # A Vs. cabinet's controls are its own: the two sticks are on the
+            # mainboard already (vs.panel says whose is whose), and its light
+            # gun reports through $4016's shift register.
+            if device == VS_ZAPPER:
+                self.board.pads[0] = VsZapper(self.board.ppu, peripherals.palette_of(self.board))
+                return self.board.pads[0]
+            return None
+        if device in VS_DEVICES:
+            return None  # a Vs. game on a home console: standard pads
         return peripherals.plug(self.board, device, self.machine.famicom_expansion_port)
 
     # -- power and reset -------------------------------------------------
@@ -113,6 +135,12 @@ class System:
     def take_samples(self) -> list[float]:
         """Audio since the last call (Board.take_samples)."""
         return self.board.take_samples()
+
+    def insert_coin(self, acceptor: int = 0) -> None:
+        """Drop a coin into a Vs. System's coin acceptor 0 or 1 (vs.VsMainboard)."""
+        if self.board.vs is None:
+            raise ValueError(f"the {self.machine.name} takes no coins")
+        self.board.vs.insert_coin(acceptor)
 
     # -- running ---------------------------------------------------------
 

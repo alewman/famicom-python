@@ -45,6 +45,7 @@ def _board(game: ET.Element) -> BoardInfo:
     pcb = game.find("pcb")
     console = game.find("console")
     expansion = game.find("expansion")
+    vs = game.find("vs")
     assert pcb is not None and console is not None
     return BoardInfo(
         mapper=int(pcb.get("mapper", "0")),
@@ -58,6 +59,8 @@ def _board(game: ET.Element) -> BoardInfo:
         timing=int(console.get("region", "0")),
         console=int(console.get("type", "0")),
         expansion=0 if expansion is None else int(expansion.get("type", "0")),
+        vs_ppu=0 if vs is None else int(vs.get("ppu", "0")),
+        vs_hardware=0 if vs is None else int(vs.get("hardware", "0")),
     )
 
 

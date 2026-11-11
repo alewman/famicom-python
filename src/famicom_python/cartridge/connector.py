@@ -48,6 +48,10 @@ else of the board (``tests/test_cartridge_boundary.py`` enforces it).
   the APU mixer's units, each time its output moves. The level includes the
   board's mix resistors: :func:`expansion_gain`. Elsewhere (the NES-001) the
   sound goes nowhere, as on the console.
+- **The Vs. System** has no connector: its ROM sockets and daughterboards sit
+  on the mainboard, which also hands them the 2A03's OUT2
+  (:meth:`Cartridge.out`). The mainboard's own RAM at $6000-$7FFF and its coin
+  counter at $4020-$5FFF are the board's (``vs.py``), not the cartridge's.
 """
 
 from __future__ import annotations
@@ -102,6 +106,11 @@ class Cartridge:
 
     def m2(self, t: int) -> None:
         """One CPU cycle ended at ``t`` (only when :attr:`counts_m2` is set)."""
+
+    def out(self, value: int) -> None:
+        """The 2A03's OUT2-0 as they change: no cartridge connector carries
+        them; the Vs. System's mainboard wires OUT2 to its ROM sockets
+        (mapper 99's bank select)."""
 
     # -- the PPU side ----------------------------------------------------
 
