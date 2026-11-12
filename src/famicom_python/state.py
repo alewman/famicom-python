@@ -10,8 +10,8 @@ references between them. Loading writes the saved values into that system's
 objects, in place, so the references stay as they were built.
 
 **What is saved**, by walking the object graph from the system: every attribute of
-an object whose class belongs to ``famicom_python`` (or to ``ym2413_python``, the
-VRC7's sound chip), depth first in attribute order, as plain data. Not saved:
+an object whose class belongs to ``famicom_python``, depth first in attribute
+order, as plain data. Not saved:
 
 - callables (the board's interrupt inputs, bus observers, devices' clocks);
 - frozen dataclasses (the configuration: ``Machine``, ``Timing``, ``RomImage``,
@@ -51,7 +51,7 @@ if TYPE_CHECKING:
 FORMAT = "famicom-python state"
 VERSION = 1
 # Modules whose objects are part of the state.
-MODULES = ("famicom_python", "ym2413_python")
+MODULES = ("famicom_python",)
 # Attributes that are not state: the loader's record, observers of the bus.
 SKIPPED = {"loaded", "bus_observers"}
 
