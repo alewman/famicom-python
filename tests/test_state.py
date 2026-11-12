@@ -9,8 +9,9 @@ from __future__ import annotations
 import zlib
 
 import pytest
-from conftest import ROMS, rom
+from conftest import ROMS, nrom_image, rom
 
+from famicom_python.cartridge import load
 from famicom_python.machine import MACHINES
 from famicom_python.state import StateError, load_state, save_state
 from famicom_python.system import System
@@ -87,3 +88,36 @@ def test_a_state_holds_no_code() -> None:
     assert forged != state
     with pytest.raises(StateError):
         load_state(system, zlib.compress(forged.encode()))
+
+
+def test_the_vrc7s_custom_instrument_is_state() -> None:
+    """The OPLL's custom instrument is a frozen value the chip replaces on each
+    write of $00-$07: saved as a value, though frozen dataclasses are otherwise
+    configuration."""
+    data = bytearray(nrom_image(bytes((0x4C, 0x00, 0x80))))  # JMP *
+    data[6], data[7] = (85 & 0x0F) << 4, 85 & 0xF0
+
+    def system() -> System:
+        return System(load(bytes(data), use_database=False).cartridge, MACHINES["famicom"])
+
+    first = system()
+    first.run_frames(2)
+    for register, value in enumerate((0x21, 0x71, 0x1A, 0x07, 0xF3, 0xD2, 0x45, 0x17)):
+        first.cartridge.cpu_write(0x9010, register, 0)
+        first.run_cycles(100)  # the chip takes a write on its own clock
+        first.cartridge.cpu_write(0x9030, value, 0)
+        first.run_cycles(100)
+    for register, value in ((0x10, 0xAC), (0x30, 0x00), (0x20, 0x15)):  # channel 0, key on
+        first.cartridge.cpu_write(0x9010, register, 0)
+        first.run_cycles(100)  # the chip takes a write on its own clock
+        first.cartridge.cpu_write(0x9030, value, 0)
+        first.run_cycles(100)
+    first.run_frames(2)
+    state = save_state(first)
+    custom = first.cartridge.fm.custom
+    expected = _trace(first, 5)
+
+    second = system()
+    load_state(second, state)
+    assert second.cartridge.fm.custom == custom != system().cartridge.fm.custom
+    assert _trace(second, 5) == expected

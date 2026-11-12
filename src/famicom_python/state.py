@@ -17,6 +17,8 @@ attribute order, as plain data. Not saved:
 - callables (the board's interrupt inputs, bus observers, devices' clocks);
 - frozen dataclasses (the configuration: ``Machine``, ``Timing``, ``RomImage``,
   ``BoardInfo``, the APU tables), and the loader's record (``System.loaded``);
+  but a frozen value the running machine replaces is state (``VALUES``: the
+  VRC7's custom instrument, rebuilt by the chip on each write of $00-$07);
 - the CPU object (its ``capture_state`` is saved instead);
 - a second path to an object already saved (the APU's ``lengths`` names the
   channels' length counters; a sound chip names its cartridge): it is written as a
@@ -53,6 +55,9 @@ FORMAT = "famicom-python state"
 VERSION = 1
 # Modules whose objects are part of the state.
 MODULES = ("famicom_python", "ym2413_python", "ay8910_python")
+# Frozen dataclasses that are state, not configuration: values of plain data that
+# the running machine replaces whole.
+VALUES = ("ym2413_python.variants.Instrument",)
 # Attributes that are not state: the loader's record, observers of the bus.
 SKIPPED = {"loaded", "bus_observers", "_tiles", "_colours"}
 
@@ -74,7 +79,15 @@ def _ours(value: object) -> bool:
     return module.split(".", 1)[0] in MODULES
 
 
+def _is_value(value: object) -> bool:
+    cls = type(value)
+    return f"{cls.__module__}.{cls.__qualname__}" in VALUES
+
+
 def _frozen(value: object) -> bool:
+    """A frozen dataclass that is configuration (not one of ``VALUES``)."""
+    if _is_value(value):
+        return False
     params = getattr(type(value), "__dataclass_params__", None)
     return dataclasses.is_dataclass(value) and params is not None and params.frozen
 
@@ -114,6 +127,12 @@ class _Encoder:
                 [self.value(k, path), self.value(v, f"{path}[{k!r}]")] for k, v in value.items()
             ]
             return {"dict": pairs}
+        if _is_value(value):
+            fields = {
+                f.name: self.value(getattr(value, f.name), f"{path}.{f.name}")
+                for f in dataclasses.fields(value)  # type: ignore[arg-type]
+            }
+            return {"value": _qualified(value), "fields": fields}
         if _ours(value) and not _frozen(value):
             if id(value) in self.seen:
                 return {"ref": self.seen[id(value)]}
@@ -227,6 +246,11 @@ class _Decoder:
                 key = self.fresh(k, path)
                 out[key] = self.fresh(v, f"{path}[{key!r}]")
             return out
+        if "value" in encoded:
+            if encoded["value"] not in VALUES:
+                raise StateError(f"not a value a state may hold: {encoded['value']}")
+            fields = {k: self.fresh(v, f"{path}.{k}") for k, v in encoded["fields"].items()}
+            return _class(encoded["value"])(**fields)
         if "object" in encoded:
             cls = _class(encoded["object"])
             obj = cls.__new__(cls)
