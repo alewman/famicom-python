@@ -90,11 +90,9 @@ def test_a_state_holds_no_code() -> None:
         load_state(system, zlib.compress(forged.encode()))
 
 
-@pytest.mark.skip(reason="the VRC7's sound is switched off (Switch the VRC7's sound off for now)")
 def test_the_vrc7s_custom_instrument_is_state() -> None:
-    """The OPLL's custom instrument is a frozen value the chip replaces on each
-    write of $00-$07: saved as a value, though frozen dataclasses are otherwise
-    configuration."""
+    """The VRC7's custom instrument (registers $00-$07 and what the chip decodes
+    from them) comes back with a state, and the chip goes on as it would have."""
     data = bytearray(nrom_image(bytes((0x4C, 0x00, 0x80))))  # JMP *
     data[6], data[7] = (85 & 0x0F) << 4, 85 & 0xF0
 
@@ -115,10 +113,14 @@ def test_the_vrc7s_custom_instrument_is_state() -> None:
         first.run_cycles(100)
     first.run_frames(2)
     state = save_state(first)
-    custom = first.cartridge.fm.custom
+
+    def custom(chip) -> tuple:
+        return bytes(chip.registers[:8]), list(chip.multiplier), list(chip.attack_rate)
+
+    saved = custom(first.cartridge.fm)
     expected = _trace(first, 5)
 
     second = system()
     load_state(second, state)
-    assert second.cartridge.fm.custom == custom != system().cartridge.fm.custom
+    assert custom(second.cartridge.fm) == saved != custom(system().cartridge.fm)
     assert _trace(second, 5) == expected

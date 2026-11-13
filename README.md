@@ -13,7 +13,7 @@ Dendy as rows of the same table: the CPU on the board, the PPU dot by dot, the
 APU, DMA and interrupts on one master-clock timeline, AccuracyCoin 147 of
 147, lockstep with Mesen2 instruction by instruction, a window to play in
 (`famicom-python play`), expansion sound checked against NewRisingSun's
-recordings of thirteen carts (the VRC7's FM sound is switched off for now), and the Famicom
+recordings of thirteen carts and VRC7 FM from ym2413-python, and the Famicom
 Disk System with Nintendo's BIOS (yours: `FAMICOM_FDS_BIOS`).
 
 **Mappers are closed as an active effort**: 294 of them, 99.80 % of the main
