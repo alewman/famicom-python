@@ -1586,10 +1586,9 @@ passing, 299 games swept. Open: item 21.
 
 ### The VRC7 and its FM sound (2026-10-27)
 
-> **Switched off since 2026-11-12.** The sound described here came from
-> ym2413-python, which the board no longer uses while that core's licence is
-> settled. Mapper 85's banking and IRQ are unchanged; its sound ports take
-> writes and drop them. What follows is the record of the sound as it was.
+> **Superseded on 2026-11-13** ("The VRC7's sound on the restarted core" below).
+> The core described here was withdrawn as a translation of GPL code; its claim
+> of equality with Nuked-OPLL no longer applies to anything this board uses.
 
 **Pins.** ym2413-python @ 5a826ac (local; not yet on GitHub), its DS1001 judged there
 against Nuked-OPLL on every internal cycle (rungs 0-3, including three minutes of
@@ -1605,6 +1604,25 @@ CPU), and the expansion level is its MO words averaged over its last sample;
 VRC7 is emu2413, a different model, where the core's judge is the die's. *Lagrange
 Point* in game runs at 23.4 frames/s on PyPy (0.39x real time): the FM chip, run
 cycle by cycle, is most of it.
+
+### The VRC7's sound on the restarted core (2026-11-13)
+
+The VRC7's sound was switched off on 2026-11-12 (`4ef9d3d`) while the licence of
+the core it used was settled. It is back on, from the restarted ym2413-python,
+written from Yamaha's manual, the openMSX project's measurements of one real
+YM2413 and the NESdev wiki (that core's docs/claims.md says what each claim rests
+on). Installed from a local checkout until the core has a remote.
+
+- The board takes `take_outputs()`, which in the new core gives one (melody,
+  rhythm) pair per sample, each already the sum of the sample's 18 words; the
+  expansion level is the last sample's melody sum times the same gain.
+- rainwarrior's `db_vrc7`: +11.27 dB against his +11.3 (`scripts/expansion_levels.py`),
+  the gain fitted for the old core unchanged.
+- *Lagrange Point* (Japan) plays its FM music (60 s with the menu presses);
+  37.4 frames/s on PyPy, against 23.4 with the old core.
+- The save-state test checks the custom instrument's registers and decoded fields
+  round-trip and the chip continues identically; 342 unit tests pass.
+- Not re-run: the comparison with Mesen2's VRC7 (emu2413).
 
 ### Milestone 10, part 1: the RP2A07's APU tables (2026-10-27)
 

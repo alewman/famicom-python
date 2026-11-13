@@ -1,7 +1,8 @@
-"""Mapper 85, the VRC7: banking (VRC7.wiki); its sound is switched off for now.
+"""Mapper 85, the VRC7: banking (VRC7.wiki) and its sound wired to ym2413-python's DS1001.
 
 The banking is pinned on a synthetic image; *Lagrange Point* and *Tiny Toon
-Adventures 2* (J) give Mesen2's frames (docs/validation.md).
+Adventures 2* (J) give Mesen2's frames (docs/validation.md). The sound chip is
+judged in ym2413-python against Nuked-OPLL; here only its wiring.
 """
 
 from __future__ import annotations
@@ -9,7 +10,8 @@ from __future__ import annotations
 from test_mappers import TICKS
 
 from famicom_python.cartridge import BoardInfo, RomImage
-from famicom_python.cartridge.konami import VRC7
+from famicom_python.cartridge.connector import Unplugged
+from famicom_python.cartridge.konami import FM_CPU_CYCLES_PER_SAMPLE, VRC7
 
 
 def vrc7(submapper: int = 2) -> VRC7:
@@ -47,15 +49,35 @@ def test_mirroring_and_prg_ram_enable() -> None:
     assert cart.cpu_read(0x6000, 0) == 0x42
 
 
-def test_sound_ports_are_taken_and_the_cartridge_is_silent() -> None:
-    # The VRC7's sound is switched off for now (konami.VRC7): no chip behind the ports.
+def test_sound_writes_reach_the_chip_and_drive_the_level() -> None:
     cart = vrc7()
-    assert not cart.expansion_audio
-    before = cart.cpu_read(0xA000, 0)
-    for address, value in ((0x9010, 0x30), (0x9030, 0x10), (0x9010, 0x10), (0x9030, 0x81)):
-        cart.cpu_write(address, value, 0)
+    cart.audio_out = Unplugged()
+    for register, value in ((0x30, 0x10), (0x10, 0x81), (0x20, 0x19)):
+        cart.cpu_write(0x9010, register, 0)
+        for _ in range(6):
+            cart.m2(0)
+        cart.cpu_write(0x9030, value, 0)
         for _ in range(42):
             cart.m2(0)
-    assert cart.cpu_read(0xA000, 0) == before  # the PRG bank at $9000 was not touched
+    assert (
+        cart.fm.registers[0x30] >> 4 == 1 and cart.fm.key[3] == 1
+    )  # channel 0's carrier is slot 3
+    levels = set()
+    for _ in range(FM_CPU_CYCLES_PER_SAMPLE * 400):
+        cart.m2(0)
+        levels.add(round(cart.audio_out.expansion, 6))
+    assert len(levels) > 50  # a tone, not silence
+
+
+def test_e000_d6_holds_the_sound_in_reset() -> None:
+    cart = vrc7()
+    cart.audio_out = Unplugged()
+    cart.cpu_write(0x9010, 0x30, 0)
+    for _ in range(6):  # games wait between the address and the data (VRC7_audio.wiki)
+        cart.m2(0)
+    cart.cpu_write(0x9030, 0x50, 0)
+    for _ in range(80):
+        cart.m2(0)
+    assert cart.fm.registers[0x30] >> 4 == 5
     cart.cpu_write(0xE000, 0x40, 0)
-    assert cart.sound_silenced
+    assert cart.fm.registers[0x30] == 0 and cart.audio_out.expansion == 0.0
