@@ -1586,6 +1586,11 @@ passing, 299 games swept. Open: item 21.
 
 ### The VRC7 and its FM sound (2026-10-27)
 
+> **Switched off since 2026-11-12.** The sound described here came from
+> ym2413-python, which the board no longer uses while that core's licence is
+> settled. Mapper 85's banking and IRQ are unchanged; its sound ports take
+> writes and drop them. What follows is the record of the sound as it was.
+
 **Pins.** ym2413-python @ 5a826ac (local; not yet on GitHub), its DS1001 judged there
 against Nuked-OPLL on every internal cycle (rungs 0-3, including three minutes of
 *Lagrange Point*'s music recorded from this branch).
