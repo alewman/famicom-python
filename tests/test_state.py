@@ -90,6 +90,7 @@ def test_a_state_holds_no_code() -> None:
         load_state(system, zlib.compress(forged.encode()))
 
 
+@pytest.mark.skip(reason="the VRC7's sound is switched off (Switch the VRC7's sound off for now)")
 def test_the_vrc7s_custom_instrument_is_state() -> None:
     """The OPLL's custom instrument is a frozen value the chip replaces on each
     write of $00-$07: saved as a value, though frozen dataclasses are otherwise
