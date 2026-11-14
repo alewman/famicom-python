@@ -321,8 +321,9 @@ class TonyI43(Banked):
     through the page's table, from the two 32 KiB chips; $E000 an 8 KiB chip.
     $4122 (TONY-I) / $8122 (YS-612) D0 enables a 12-bit M2 counter (clear:
     acknowledges and resets it) that asserts /IRQ on overflowing. The file
-    holds the 64 KiB, then an 8 KiB block whose start is the 2 KiB chip,
-    then the 8 KiB chip (Mesen2's layout; the page gives none).
+    holds the two 32 KiB chips, then the 2 KiB chip four times, then the
+    8 KiB chip, 80 KiB in all (DOC: the page's opening paragraph); the
+    board reads the first of the four copies.
     """
 
     counts_m2 = True

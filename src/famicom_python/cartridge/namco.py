@@ -205,9 +205,13 @@ class Namco163(Banked):
       (D6-D0, D7 auto-increment), read and written through $4800.
     - $5000/$5800: the 15-bit IRQ counter itself, and $5800 D7 its enable,
       both readable; writing either acknowledges. The counter counts up each
-      CPU cycle and stops at $7FFF, asserting /IRQ. The wiki has it count
-      always; that it counts only while enabled is Mesen2's reading
-      (Mappers/Namco/Namco163.h), the only one there is.
+      CPU cycle and stops at $7FFF, asserting /IRQ. The wiki does not say
+      whether it counts while disabled. Here it counts only while enabled,
+      as MAME's BSD-3 namcot.cpp does (its timer counts under
+      ``m_irq_enable``) and as Mesen2 2.1.1 does, OBSERVED closed-box
+      (``scripts/provenance_probes.py n163-counter-disabled``: held for
+      1,280 cycles while disabled, held again once disabled after counting).
+      Two emulators, no hardware test.
 
     The sound (Namco_163_audio.wiki): the chip RAM's top 8 bytes per channel
     are its registers (channel 8 at $78-$7F; $7F D6-D4 the channels enabled

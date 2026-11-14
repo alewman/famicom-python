@@ -188,7 +188,11 @@ class CNROMProtected(NROM):
     unknown) is left unprotected. A disabled CHR-ROM leaves the PPU bus
     undriven: the address's low byte, with D0 pulled up (the wiki: Mighty
     Bomb Jack's 10k pull-up, which its first revision needs to boot). The
-    latch powers on enabled, as Mesen2 has it (Mappers/Nintendo/CnromProtect.h).
+    latch's power-on state is documented nowhere; enabled here, a choice no
+    game can see: all eleven licensed dumps draw the same 900 frames with it
+    powered on enabled or disabled (checked 2026-11-14). OBSERVED closed-box:
+    Mesen2 2.1.1 powers on enabled too (``scripts/provenance_probes.py
+    185-power-on``).
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:

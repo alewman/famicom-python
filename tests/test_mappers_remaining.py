@@ -649,3 +649,25 @@ def test_mmc3_clones_keep_the_irq_reload_value_through_their_own_latches() -> No
         cart.cpu_write(0x8000, 0x06, 0)
         cart.cpu_write(0xA000, 0x01, 0)
         assert cart.latch == 0x68, mapper
+
+
+#: Kuai Da Chuanshuo - Street Fighter IV's jumps through mapper 208's protection, read from
+#: the game running (2026-11-14): the index it writes to $5000, its writes to $5800-$5802,
+#: and what it then executes at $5800. The targets decode as the game's code.
+GAME_208_JUMPS = [
+    (0x8E, {0: 0x54}, {0: 0x4C}),  # the opcode: JMP
+    (0xB3, {1: 0x6D, 2: 0x98}, {1: 0x34, 2: 0xC1}),  # JMP $C134
+    (0x09, {1: 0x44, 2: 0xAD}, {1: 0x0D, 2: 0xE4}),  # JMP $E40D
+    (0x62, {1: 0x55, 2: 0xB4}, {1: 0x15, 2: 0xF4}),  # JMP $F415
+    (0x0D, {1: 0x62, 2: 0xAA}, {1: 0x2B, 2: 0xE3}),  # JMP $E32B
+]
+
+
+def test_mapper_208_protection_gives_the_games_jumps() -> None:
+    cart = build(208, prg_kib=128, chr_kib=128)
+    for index, written, expected in GAME_208_JUMPS:
+        cart.cpu_write(0x5000, index, 0)
+        for register, value in written.items():
+            cart.cpu_write(0x5800 + register, value, 0)
+        for register, value in expected.items():
+            assert cart.cpu_read(0x5800 + register, 0) == value

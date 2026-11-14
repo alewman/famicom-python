@@ -16,8 +16,12 @@ head's travel is modelled from the wiki's description of the Quick Disk:
 with the motor on and scanning it runs from the start of the side to its
 end, where the drive reports not-ready and the head returns, a whole cycle
 taking about 7 seconds. How long the drive takes to become ready after the
-scan starts is not measured: Mesen2's 50,000 CPU cycles (a detector's
-choice) here.
+scan starts has not been measured on hardware (FDS_Registers.wiki: "TODO:
+Ready flag behavior"). 50,000 CPU cycles here, a detector's figure,
+OBSERVED closed-box: on Mesen2 2.1.1 the BIOS booting *Zelda no Densetsu*
+(Japan) first reads $4032 with D1 clear 50,043 cycles after its
+scan-starting $4025 write, on the board 49,962, the rest being the BIOS's
+polling and the byte clock (``scripts/provenance_probes.py --fds-ready``).
 """
 
 from __future__ import annotations
@@ -29,7 +33,7 @@ from .ines import RomImage
 
 BYTE_TICKS = 1792  # master-clock ticks per disk byte (FDS_Registers.wiki)
 MASTER_HZ = 236_250_000 / 11  # NTSC: the RP2C33 is a Famicom part
-SPIN_UP_BYTES = round(50_000 * 12 / BYTE_TICKS)  # scan start to ready (unmeasured)
+SPIN_UP_BYTES = round(50_000 * 12 / BYTE_TICKS)  # scan start to ready (Mesen2's, closed-box)
 REVOLUTION_BYTES = round(7.0 * MASTER_HZ / BYTE_TICKS)  # "about 7 seconds" a side
 WATCHDOG_RELOAD = 3245  # CPU cycles the DRAM refresh watchdog allows (FDS_Registers.wiki)
 SAVE_MAGIC = b"FDSW"  # a save: the sides written since the image was made, each as a .fds side
