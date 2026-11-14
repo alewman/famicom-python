@@ -523,7 +523,8 @@ before the board takes a side.
   master ticks, FDS_Registers.wiki); nothing measured says how long the drive
   takes to be ready after the scan starts, or to bring the head back from the
   end of a side. *Board*: ready 50,000 CPU cycles after the scan starts
-  (Mesen2's figure), the head back at the start once a whole turn has taken
+  (Mesen2's figure, measured closed-box: `scripts/provenance_probes.py
+  --fds-ready`), the head back at the start once a whole turn has taken
   7 seconds (the wiki's "about 7 seconds"). Games' frames then follow Mesen2's
   4-6 frames apart. No judge. Open.
 - **C40. The scan reset is a level, not a sample.** The BIOS stops and

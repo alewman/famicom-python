@@ -153,8 +153,12 @@ class MMC5(Banked):
         elif address >= 0x5C00:
             if self.exram_mode != 3:
                 # Modes 0 and 1 take writes only while rendering; at other
-                # times "they may be ignored or cause a corruption": 0 here,
-                # as Mesen2 writes (Mappers/Nintendo/MMC5.h).
+                # times "they may be ignored or cause a corruption at that
+                # memory address" (DOC: MMC5.wiki, $5104 note 3). Which, no
+                # one has measured: 0 is stored here, as MAME's BSD-3
+                # mmc5.cpp writes ("write 0 otherwise"), and as Mesen2 2.1.1
+                # does, OBSERVED closed-box (provenance_probes.py
+                # mmc5-exram-blanking). Two emulators, not hardware.
                 self.exram[address - 0x5C00] = value if self.exram_mode == 2 or self.in_frame else 0
         elif address <= 0x5015:
             self.sound.write(address, value)

@@ -25,11 +25,21 @@ class GA23C(MMC3):
     $6001 unlocks them and restarts the sequence. The registers take writes
     whatever the MMC3's RAM enable says; locked, $6000 is the WRAM's. The CHR
     masking applies to CHR-ROM only: a CHR-RAM board's RAM takes the MMC3's
-    lines (an assumption the wiki does not settle; Mesen2 makes it too). The
-    CHR registers power on as 0, 2, 4, 5, 6, 7 (Mesen2's choice, which a game
-    writing CHR-RAM before setting them needs; the MMC3's are unspecified)
-    and the outer registers as Mesen2's soft reset leaves them, with
-    register 2 = $0F.
+    lines (an assumption the wiki does not settle).
+
+    Power-on, which the wiki does not give (the MMC3's own registers are
+    unspecified). The CHR registers start as 0, 2, 4, 5, 6, 7, CHR in order:
+    MAME's BSD-3 mmc3.cpp (``mmc3_common_initialize``) starts them so for
+    unlicensed carts "that use VRAM and don't init banks properly", and the
+    three CHR-RAM dumps here (*7-in-1 Famicom Yarou* Vol. 2 and 3, *8-Bit
+    Slasher*) draw differently if they start at 0, so the games see it. The
+    outer registers start, and return on a reset, as $6001 leaves them ("as
+    a soft reset would", the wiki): 0, 0, $0F, 0, CHR-AND and PRG-AND keeping
+    every MMC3 bit, the masks MAME's ``nes_bmc_hik8_device::pcb_reset`` sets;
+    two menus (*23-in-1 Super Game*, *Mali Jiazu 7-in-1*) draw differently
+    with a CHR-AND of 0. OBSERVED closed-box, Mesen2 2.1.1 shows the same
+    pages and masks at power-on and after a reset that follows outer writes
+    (``scripts/provenance_probes.py 45-power-on``). No hardware test.
     """
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
@@ -652,7 +662,15 @@ class Rex263(MMC3):
         super().cpu_write(register, value, t)
 
 
-#: Mapper 208's protection XOR table (INES_Mapper_208.wiki, from FCEUX).
+#: Mapper 208's protection: the value XORed into a write to $5800-$5FFF, by the index last
+#: written to $5000-$57FF. No hardware description of the chip exists (the wiki's table is
+#: an emulator's). OBSERVED closed-box: recovered from Mesen2 2.1.1 by writing $00 and $FF
+#: at every index and reading the registers back (``scripts/provenance_probes.py
+#: 208-protection``, all 512 answers), measured with the program run as an instrument, not
+#: read. The game's own code confirms the five entries it jumps through ($09, $0D, $62, $8E,
+#: $B3): its pre-XORed writes come out as $4C (JMP) and as targets that decode as its code,
+#: $E32B and $E40D just after an RTS, $F415 inside a routine, $C134 an entry hidden in an
+#: ``EOR #$A5`` (tests/test_mappers_remaining.py). A sixth ($53) it reads back as data.
 PROTECTION_208 = bytes.fromhex(
     "59595959595959595949190959491909"
     "59595959595959595141110151411101"
@@ -676,7 +694,8 @@ PROTECTION_208 = bytes.fromhex(
 class Gouder208(MMC3):
     """Mapper 208 (Street Fighter IV, Gouder): MMC3 CHR and IRQ, a 32 KiB PRG register, protection.
 
-    INES_Mapper_208.wiki (FCEUX's implementation): $4800-$4FFF and
+    INES_Mapper_208.wiki (the page's register map is an emulator's, FCEUX's,
+    as it says; the table is measured, ``PROTECTION_208``): $4800-$4FFF and
     $6800-$6FFF ``..MP...P``: the 32 KiB PRG bank (D4, D0) and the mirroring
     (0 vertical), $11 at power-on; $5000-$57FF the protection table index;
     writes to $5800-$5FFF store data XOR table[index] in one of four

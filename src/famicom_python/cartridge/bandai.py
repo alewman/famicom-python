@@ -28,8 +28,13 @@ class BandaiFCG(Banked):
       it also copies the latch into the counter. B/C: the counter's low and
       high bytes, written straight into it on the FCG, into the latch on the
       LZ93D50. While counting, each M2 cycle the counter is tested and then
-      decremented, a zero asserting /IRQ: the order Mesen2 found makes two
-      games work (Mappers/Bandai/BandaiFcg.h), not otherwise documented.
+      decremented, a zero asserting /IRQ. DOC: the wiki's order
+      (INES_Mapper_016.wiki: "When it holds a value of zero, an IRQ is
+      generated", and enabling it while it holds zero generates one
+      "immediately"). OBSERVED closed-box: Mesen2 2.1.1 gives the immediate
+      IRQ too, but asserts /IRQ one cycle sooner after counts of $100-$108
+      (``scripts/provenance_probes.py fcg-test-then-decrement``); MAME's
+      bandai.cpp decrements first. That cycle is open: no hardware test.
     - D (LZ93D50): D5 the EEPROM's SCL, D6 SDA, D7 the direction (1: the
       master releases SDA to read). A read of $6000-$7FFF drives D4 alone,
       the SDA line (open drain: the master's level AND the part's).
