@@ -484,8 +484,14 @@ class Latched165(MMC3):
     CHR in two 4 KiB halves, $0000 from R0 or R1 and $1000 from R2 or R4 by
     the halves' latches; 4 KiB page 0 (register value 0-3) is the RAM. The
     latches flip on PPU addresses $xFD0-$xFD7 (0) and $xFE8-$xFEF (1), taking
-    effect after the access: Disch's notes say the game reads $xFD0/$xFE0,
-    which MMC2's ranges would miss; these are Mesen2's ranges.
+    effect after the access. OBSERVED closed-box: Mesen2 2.1.1 has the same
+    ranges (``scripts/provenance_probes.py 165-latch-ranges``, every pair of
+    $xFC0-$xFFF reads). Not settled: Disch's notes say the game reads
+    $xFD0 or $xFE0 to toggle the latch, and the games do read $1FD0 and
+    $1FE0 through $2007, which $xFE8-$xFEF misses; but every CHR-RAM upload
+    of the four games lands in RAM whether $xFE0-$xFEF sets the latch or
+    not (2,000 frames each, checked 2026-11-14), while their pictures then
+    differ, with no judge to say which is right. No hardware source.
     """
 
     watches_ppu_address = True
