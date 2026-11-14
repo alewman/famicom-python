@@ -21,7 +21,7 @@ dependencies = [
     # (pip install -e ../ym2413-python). To be pinned by git revision once it has one.
     "ym2413-python",
     # The Sunsoft 5B's sound (mapper 69): the YM2149 variant.
-    "ay8910-python @ git+https://github.com/alewman/ay8910-python@5abe2dfcd8419d0019c43c1c59018aa643e5e3c8",
+    "ay8910-python @ git+https://github.com/alewman/ay8910-python@7f56b2e9b7d7d1e187b3d3791618ccdcc6a80524",
     # The PlayChoice-10's supervisor (supervisor.py): the callables contract of 0.4.0,
     # as sms-python pins it.
     "z80-python>=0.4.0",
