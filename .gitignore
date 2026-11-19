@@ -34,3 +34,6 @@ coverage.json
 # and its RP2C07-0 its PAL chroma decoder.
 [HV]PLA_*.bin
 PALChromaDecoder.bin
+
+# Set aside instead of deleted
+trash/

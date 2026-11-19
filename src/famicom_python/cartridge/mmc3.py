@@ -19,9 +19,13 @@ MMC3.wiki and MMC6.wiki (specification tier); judged by blargg's
 
 Names are behaviours, never chip letters (contradiction C17).
 
-**The A12 filter**: the counter is clocked by a rise of PPU A12 after the
-line has stayed low through three falling edges of M2 (the value is
-discussed in docs/claims.md). The connector gives every
+**The A12 filter**: the counter is clocked by a rise of PPU A12 after the line
+has stayed low through ``A12_LOW_FALLS`` (3) falling edges of M2. TEST ROM:
+blargg's ``2-details`` and ``4-scanline_timing`` fail with one or two falls on
+both revisions and every MMC3 judge passes from three to sixteen (a sweep of
+2026-11-19 and the seeded faults, docs/claims.md); three is a CHOICE at that
+lower bound. (Until 2026-11-19 this cited a schematic hosted by an author whose
+work the family excludes; nothing here rests on it now.) The connector gives every
 address phase with its master-clock time, and the CPU cycles end (M2 falls)
 at the multiples of ``cpu_cycle_ticks``, so the rise counts when the third
 multiple after A12 fell is no later than the rise. The pathological
@@ -39,6 +43,10 @@ from .ines import RomImage
 
 class MMC3(Banked):
     watches_ppu_address = True
+
+    #: M2 falls A12 must stay low through before a rise clocks the counter (see the module
+    #: docstring, "The A12 filter").
+    A12_LOW_FALLS = 3
 
     def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
         super().__init__(image, cpu_cycle_ticks)
@@ -123,7 +131,7 @@ class MMC3(Banked):
         elif self.a12:
             self.a12 = 0
             ticks = self.cpu_cycle_ticks
-            self.a12_ready = (t // ticks + 3) * ticks
+            self.a12_ready = (t // ticks + self.A12_LOW_FALLS) * ticks
 
     def clock_counter(self) -> None:
         was = self.counter

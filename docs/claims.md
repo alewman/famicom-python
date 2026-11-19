@@ -75,11 +75,14 @@ written against the NES 2.0 definition, not measured on hardware.
 | 96 Oeka Kids, 115 Kǎshèng, 470 INX_007T_V01 | as cartridge.md | 96 and 115: their licensed dumps equal Mesen2; 470: Mesen2 2.1.1 has no 470, so by eye (Retro-Bit's menu, then the game from another outer bank) | detector only (470: none) | the Oeka Kids tablet; C51 |
 | The unlicensed and homebrew mappers, 2026-10-30 (conversions.py the FDS conversions; multiasic.py 351, 394, 446; vrc5.py 547; pic16c54.py 355; `multicart.py`, `mmc3_clones.py`, `konami.py`, `chinese.py`, `waixing.py`, `sachen.py` the rest) | each its wiki page; 355 a PIC16C54 core running the image's Misc ROM, from Microchip's data sheet; 406, 451 flash with the ID their games check; 529 a 93C56 | `tests/test_mappers_remaining.py`; Mesen2 2.1.1 refuses nearly all of them, so by eye: 43 dumps of 33 mappers, every one reaching its title or menu but 399.1; where it loads them, 272 of 373 identical, the differences sorted by picture (validation.md, "The remaining mappers") | model only | audio on 266 (DAC), 284 and 594 (ADPCM), 451's MP3 controller, 400's LCD and LEDs, 517's ADC, not modelled; 399.1 (C60); 314 (C61); 539's RAM folding (C62); 117's IRQ is a reading of a vague page; 42.2, 170, 216, 238, 244 rest on the games (C65, C68, C69); 446 on the games for its reset state (C70); 258, 413, 418, 549, 555, 557 on MAME's notes, 222 and 272 on forum readings of the hardware; 555's RJ11, 413's $D000, not modelled |
 
-**The MMC3's A12 filter** is three falls of M2,
-a value taken on the word of a source the family now excludes,
-not a judge's: seeded faults show the judges catch
-two falls (`2-details`) but pass four, six, eight and sixteen; only 32 fails
-(`3-A12_clocking`, `4-scanline_timing`). What does separate three from four,
+**The MMC3's A12 filter** is three falls of M2, the smallest value the judges
+accept: a sweep of 1 to 12 falls over the 22 MMC3 test-ROM cases (2026-11-19)
+fails `2-details` and `4-scanline_timing` on both revisions at one and two and
+passes everything from three; seeded faults pass four, six, eight and sixteen,
+and 32 fails (`3-A12_clocking`, `4-scanline_timing`). So the judges bound it to
+3-16 (TEST ROM) and three is a choice at the lower bound. Until 2026-11-19 the
+value was cited to the wiki's line from an MMC3C schematic hosted by furrtek,
+whose work the family excludes (the owner's decision 7); nothing rests on it now. What does separate three from four,
 the 8-dot A12 low after an odd frame's skip with BG at `$1000` (C27), no ROM
 here measures. `4-scanline_timing` did need the PPU's address at dot 0 (C27,
 settled on PPUSim): without it, `$2000=$10` counted every line twice.

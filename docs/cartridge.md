@@ -133,7 +133,7 @@ connector (C27): an MMC3 counting with BG at `$1000` needs it.
 | Stress | Mappers |
 | --- | --- |
 | Every CPU write with its cycle (consecutive-cycle writes ignored, the reset bit never) | MMC1 (1, 155). *Bill & Ted* needs the ignore |
-| A12 rises filtered by M2: A12 low through three M2 falls | MMC3/MMC6 (4), 118, 119 |
+| A12 rises filtered by M2: A12 low through three M2 falls (TEST ROM lower bound; a choice within 3-16, claims.md) | MMC3/MMC6 (4), 118, 119 |
 | A12 falls ÷8 | MC-ACC (4.3) |
 | Every PPU read + M2 counting + CPU snooping | MMC5: 3 equal NT reads = a scanline; in-frame exit after 3 M2 rises without /RD; snoops $2000/$2001/$2002/$2005/$2006/$4014 and $FFFA/B reads |
 | Specific pattern reads ($0FD8, $0FE8, $1FD8–$1FDF, $1FE8–$1FEF) | MMC2 (9), MMC4 (10) |
