@@ -1,14 +1,15 @@
 # Mappers: where they stand
 
 **Closed as an active effort on 2026-10-30.** 294 mappers were implemented then;
-mapper 99, the Vs. System's own sockets, makes 295 (2026-11-11).
+mapper 99, the Vs. System's own sockets, makes 295 (2026-11-11), and 559,
+read off the licensed game it was patched from (C88), 296 (2026-11-20).
 That is feature complete, with the gaps listed below; it is not a claim that
 each is verified. This file is the place to start if you want to reopen the
 work: the [registry](#registry) is generated, the rest is written by hand.
 
 | Set | Dumps on an implemented mapper | |
 | --- | ---: | ---: |
-| Main (`Nintendo Entertainment System (Headered)`) | 4,455 of 4,464 | 99.80 % |
+| Main (`Nintendo Entertainment System (Headered)`) | 4,456 of 4,464 | 99.82 % |
 | Aftermarket | 2,905 of 2,913 | 99.73 % |
 | Private | 634 of 634 | 100 % |
 
@@ -77,6 +78,13 @@ mirroring; `BBBBBB..` fields may be bank numbers; `Banked.chr_offsets` start at
 
 This is how 170, 216, 222, 238, 244, 258, 42.2 and 530's details were found.
 
+0. **Look for the original first.** Many pirate boards carry a licensed game with
+   only its mapper writes rewritten. Search the No-Intro sets for the same title
+   (the licensed release, other pirates, translations) and compare the dumps bank
+   by bank (famicom-mapper-study's `tools/diff_dumps.py`). If the banks agree,
+   every patched store names a documented register and its new address, and
+   stores turned into `BIT` are writes the new board does not want. This is how
+   559 was found (C88), after fifteen rounds of bank sweeps that did not.
 1. `scripts/rom_scan.py ROM`: the header, which banks hold vectors (the fixed bank
    must be there), and the registers the code touches.
 2. Search `reference/mame-nes/` by game title, not only by mapper number.
@@ -101,7 +109,6 @@ This is how 170, 216, 222, 238, 244, 258, 42.2 and 530's details were found.
 | 405 | 1 | UM6578 "enhanced" mode: a famiclone |
 | 127 | *Double Dragon II* bootleg | the page names the game; `mapper_trial.py --as 4` stops early, registers around `$8000-$8003`, `$8030-$8053` |
 | 169 | Yuxing VCD BIOS | hardware that plays VCDs |
-| 559 | *Sangokushi II* (Subor) | no page found |
 | 563 | *TMNT II* bootleg | no page found |
 | 564 | NTDEC 22-in-1 | no page found |
 | 576 | 100-in-1 | no page found |
@@ -451,7 +458,7 @@ in `tests/sweep_failures.tsv`, which is also the next quick-sweep list.
 | 555 | Event2 | mmc3 | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes, its own source |
 | 557 | LH42 | conversions | 1 | 0 | 0 | 0 / 0 / 1 | wiki, MAME | matches mame_nes, its own source |
 | 558 | YC0309 | nanjing | 4 | 6 | 0 | 0 / 0 / 10 | wiki | by eye (Mesen2 refuses) |
-| 559 | **not implemented** |  | 1 | 0 | 0 |  |  |  |
+| 559 | Subor559 | chinese | 1 | 0 | 0 | 0 / 0 / 0 | wiki, the game (C88) | unit tests only |
 | 563 | **not implemented** |  | 1 | 0 | 0 |  |  |  |
 | 564 | **not implemented** |  | 1 | 0 | 0 |  |  |  |
 | 576 | **not implemented** |  | 1 | 0 | 0 |  |  |  |

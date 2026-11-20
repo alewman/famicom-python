@@ -42,6 +42,7 @@ from .chinese import (
     MiHunChe27,
     Noraebang515,
     Sangokushi330,
+    Subor559,
     Zemina190,
 )
 from .connector import Cartridge
@@ -535,6 +536,7 @@ MAPPERS: dict[int, Callable[[RomImage, int], Banked]] = {
     555: Event2,
     557: LH42,
     558: YC0309,
+    559: Subor559,
     594: Rinco594,
 }
 

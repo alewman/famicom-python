@@ -1994,8 +1994,10 @@ game was read first and MAME used as a check.
   blank), 30/64 *Games* (C61).
 - **Not modelled**: 517's ADC, 413's `$D000`, 555's RJ11, 446's other FPGA boards
   (no dump asks for them), 547's unused kanji mode at PPU `$1000`.
-- **Left**: 127 (*Double Dragon II* bootleg), 171 (BBK), 169 (Yuxing), 559, 563,
-  564, 576, 585 (one or two dumps each, no description anywhere found); 256
+- **Left**: 127 (*Double Dragon II* bootleg), 171 (BBK), 169 (Yuxing), 563,
+  564, 576, 585 (one or two dumps each, no description anywhere found); 559
+  was left too until 2026-11-20, when the licensed game it was patched from
+  gave its map (C88: lockstep against that cart, not a detector); 256
   and 405 (VT02+, UM6578: famiclones more than mappers); 682 (Rainbow: its
   Wi-Fi hardware, documented outside the wiki); 186.
 

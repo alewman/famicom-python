@@ -343,7 +343,8 @@ a wiki page, a forum analysis (`reference/nesdev-forum/`) or MAME's notes
 
 Not implemented: 186 (the StudyBox tape drive), 682 (Rainbow, Broke Studio's
 Wi-Fi mapper, documented outside the wiki), 256 and 405 (the VT02+ and UM6578
-famiclones). No description found: 127, 169, 171, 559, 563, 564, 576, 585.
+famiclones). No description found: 127, 169, 171, 563, 564, 576, 585. 559 had
+none either; it was read off the licensed game it was patched from (C88).
 
 ## Mapper test ROMs and what they can judge
 

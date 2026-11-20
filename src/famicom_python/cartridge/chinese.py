@@ -739,6 +739,89 @@ class Sangokushi330(Banked):
         return self.nametables[(address >> 10) & 3]
 
 
+class Subor559(Banked):
+    """Mapper 559 (Subor's *Sangokushi II - Haou no Tairiku*): the Namco 163 game, moved.
+
+    No page or emulator describes it. The dump is Namco's mapper-19 release (its
+    Japanese one) with 968 bytes patched, and each patched store lines up a
+    163 register (INES_Mapper_019.wiki, and the original's own code) with the
+    address the pirate board uses instead (C88; famicom-mapper-study, 559 audit
+    entry 16). The map is that reading, FITTED by the game: on it the dump plays
+    within 0-20 pixels a frame of the licensed cart on the Namco163 class.
+
+    - $8000, $A000: PRG at $8000, $A000 (the 163's $E000, $E800). The game
+      still ORs $C0 into the $A000 value: D4-D0 are taken, the dump's 32 banks.
+    - $9C00: PRG at $C000 (the 163's $F000); the last 8 KiB fixed.
+      $9C0C-$9C0F: the four nametables (the 163's $C000-$D800); the game
+      writes only $E0/$E1, so D0 is CIRAM A10. The other $9C0x are unused by it.
+    - $B000-$EC00 in steps of $400: the eight 1 KiB CHR banks, two addresses
+      each (the 163's $8000-$B800). The game writes the same value to both,
+      so either sets the whole bank: whether they are two halves is open.
+    - $F000/$F400: the IRQ latch (the game writes both). $F800: D1 set starts
+      an 8-bit up-counter from the latch, clear stops it and acknowledges; it
+      asserts /IRQ on the wrap past $FF. The game's own conversion tables
+      ($F700-$F7FF of the last bank) assume a step every 115 CPU cycles, but
+      the licensed cart's picture is matched by one step per 341/3 CPU cycles,
+      a scanline (7 differing pixels a frame against 1,782): FITTED. A scanline
+      counter and an M2 divider agree on NTSC and Dendy (both 341/3 CPU cycles
+      a line) and differ only on PAL and with rendering off; this is the divider.
+    - $9800: written 1 at reset where the original wrote $2001; unknown, ignored.
+    - PRG-RAM at $6000: always on (the 163's protection port became $F800).
+
+    No hardware has been seen. Power-on registers unspecified: 0 here.
+    """
+
+    counts_m2 = True
+    STEP_THIRDS = 341  # thirds of a CPU cycle per step: a scanline
+
+    def __init__(self, image: RomImage, cpu_cycle_ticks: int) -> None:
+        super().__init__(image, cpu_cycle_ticks)
+        self.nametables = [0, 1, 0, 1]  # not given; the game sets them at once
+        self.latch = 0
+        self.counter = 0
+        self.prescaler = 0  # in thirds of a CPU cycle
+        self.counting = False
+        self.map_prg(3, 8, len(self.prg) // 0x2000 - 1)
+
+    def cpu_write(self, address: int, value: int, t: int) -> None:
+        if address < 0x8000:
+            super().cpu_write(address, value, t)
+            return
+        region = address & 0xFC00
+        if region == 0x8000:
+            self.map_prg(0, 8, value & 0x1F)
+        elif region == 0xA000:
+            self.map_prg(1, 8, value & 0x1F)
+        elif region == 0x9C00:
+            index = address & 0x0F
+            if index == 0:
+                self.map_prg(2, 8, value & 0x1F)
+            elif index >= 0x0C:
+                self.nametables[index - 0x0C] = value & 1
+        elif 0xB000 <= region < 0xF000:
+            self.map_chr((region - 0xB000) >> 11, 1, value)
+        elif region in (0xF000, 0xF400):
+            self.latch = value
+        elif region == 0xF800:
+            self.irq = False
+            self.counting = bool(value & 2)
+            if self.counting:
+                self.counter = self.latch
+                self.prescaler = 0
+
+    def m2(self, t: int) -> None:
+        if self.counting:
+            self.prescaler += 3
+            if self.prescaler >= self.STEP_THIRDS:
+                self.prescaler -= self.STEP_THIRDS
+                self.counter = (self.counter + 1) & 0xFF
+                if not self.counter:
+                    self.irq = True
+
+    def ciram_a10(self, address: int) -> int | None:
+        return self.nametables[(address >> 10) & 3]
+
+
 class FutureMedia117(Banked):
     """Mapper 117 (Future Media's Crayon Shin-Chan, San Guo Zhi 4): 8 KiB PRG, 1 KiB CHR.
 

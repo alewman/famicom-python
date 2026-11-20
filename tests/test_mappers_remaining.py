@@ -365,6 +365,42 @@ def test_mapper_330_counter_stops_at_the_wrap() -> None:
     assert not cart.irq
 
 
+def test_mapper_559_banks_and_nametables() -> None:
+    cart = build(559, prg_kib=256, chr_kib=256)
+    assert offset(cart, 0xE000) == 31 * 0x2000  # the last bank fixed
+    cart.cpu_write(0x8000, 5, 0)
+    cart.cpu_write(0xA000, 0xC0 | 23, 0)  # the game's ORed value
+    cart.cpu_write(0x9C00, 13, 0)
+    assert [cart.prg_offsets[i] // 0x2000 for i in range(4)] == [5, 23, 13, 31]
+    for slot in range(8):  # each bank has two addresses, either sets it
+        cart.cpu_write(0xB000 + slot * 0x800 + (slot & 1) * 0x400, 0x40 + slot, 0)
+    assert [o // 0x400 for o in cart.chr_offsets] == [0x40 + s for s in range(8)]
+    for i, value in enumerate((0xE1, 0xE0, 0xE1, 0xE0)):
+        cart.cpu_write(0x9C0C + i, value, 0)
+    assert [cart.ciram_a10(0x2000 + 0x400 * i) for i in range(4)] == [1, 0, 1, 0]
+    cart.cpu_write(0x9C01, 7, 0)  # an unused $9C0x
+    assert cart.prg_offsets[2] == 13 * 0x2000 and cart.nametables == [1, 0, 1, 0]
+
+
+def test_mapper_559_counter_steps_once_a_scanline() -> None:
+    cart = build(559, prg_kib=256, chr_kib=256)
+    cart.cpu_write(0xF000, 0xFE, 0)  # two steps to the wrap
+    cart.cpu_write(0xF400, 0xFE, 0)
+    cart.cpu_write(0xF800, 2, 0)
+    cycles = 0
+    while not cart.irq:
+        cart.m2(0)
+        cycles += 1
+        assert cycles < 1000
+    assert cycles == 228  # two steps of 341/3: 113.67 then 227.33, so the 228th cycle
+    assert cart.counter == 0
+    cart.cpu_write(0xF800, 0, 0)  # stop and acknowledge
+    assert not cart.irq
+    for _ in range(500):
+        cart.m2(0)
+    assert not cart.irq and cart.counter == 0
+
+
 def test_mappers_252_253_ram_pages() -> None:
     cart = build(253, prg_kib=256, chr_kib=512)
     cart.map_chr(0, 1, 5)

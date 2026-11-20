@@ -945,6 +945,23 @@ before the board takes a side.
   *Pro Wrestling*'s 96 KiB of EPROM is nes20db's 128 KiB image behind 32 KiB of
   zeros. `scripts/pc10_images.py` writes the first three with MAME's area and says so
   in its manifest; the BIOS accepts MAME's PROMs for them.
+- **C88. Mapper 559, read off the game it was patched from.** No page, no emulator.
+  *Sangokushi II - Haou no Tairiku (China) (Ja) (Subor) (Pirate)* is Namco's mapper-19
+  *(Japan)* release with 968 bytes patched (27 of 32 PRG banks and 255 of 256 CHR KiB
+  identical; famicom-mapper-study's `tools/diff_dumps.py`, its 559 audit entry 16). Each
+  patched store moves a 163 register: `$E000`/`$E800`/`$F000` to `$8000`/`$A000`/`$9C00`,
+  the nametables `$C000-$D800` to `$9C0C-$9C0F`, the eight CHR banks to pairs at
+  `$B000-$EC00`, and the 15-bit cycle counter to an 8-bit counter with a latch at
+  `$F000`/`$F400` and a control at `$F800`; the 21 writes to the 163's sound port
+  `$F800` became `BIT`, as did 18 single CHR writes to `$9800`/`$B800`. The game
+  converts each 163 count with tables that assume a step every 115 CPU cycles, plus a
+  busy-wait in 8-cycle units. *Board*: the patched map (`Subor559`); the step FITTED to
+  341/3 CPU cycles, a scanline, against the licensed cart on `Namco163` in lockstep
+  (`famicom` machine, same inputs, mean differing pixels a frame on the map screen: 115
+  cycles 1,782, 341/3 7.0, 114 30.9). Held out: title, menu and map screen within 0-23
+  pixels a frame, the menu's other ~1,220 the copyright text the pirate erased. **Open**:
+  `$9800 = 1` at reset (where the original wrote `$2001`); whether each CHR pair is two
+  halves; scanline counter or M2 divider (equal on NTSC and Dendy). No hardware.
 
 ## Open items
 
