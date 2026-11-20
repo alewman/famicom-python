@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """A desktop window: play a cartridge with picture, sound, keyboard and gamepads.
 
     famicom-python play "Super Mario Bros. (World).zip"

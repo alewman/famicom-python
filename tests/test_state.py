@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Save states (state.py): a run saved and loaded continues exactly as the one that wasn't.
 
 The quick tests use small test ROMs; scripts/state_roundtrip.py runs the same check

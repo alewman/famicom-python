@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Discrete-logic multicarts: outer and inner banks latched from the data or the address bus.
 
 Each from its NESdev wiki page. No judge ROM exists for any of them; the

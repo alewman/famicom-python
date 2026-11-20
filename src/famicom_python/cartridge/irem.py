@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Irem's mappers: G-101 (32), H3001 (65), LROG017 (77) and TAM-S1 (97).
 
 No judge ROM exists (docs/cartridge.md); the claims rest on sweeps against

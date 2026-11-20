@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // A compare.py scenario on Visual 2C02: its register schedule from a saved
 // pre-render state, CHR from the scenario; prints JSON {reads, lines, skips}.
 //

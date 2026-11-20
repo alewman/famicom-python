@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Mappers know the console only through the connector (docs/cartridge.md)."""
 
 from __future__ import annotations

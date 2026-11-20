@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Konami's VRC mappers: VRC1 (75), VRC2 and VRC4 (21, 22, 23, 25), VRC3 (73), VRC6 (24, 26),
 the VRC IRQ.
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The Famicom Disk System: the RAM adapter (RP2C33) and its disk drive.
 
 On the connector the RAM adapter is a cartridge (Family_Computer_Disk_System.wiki):

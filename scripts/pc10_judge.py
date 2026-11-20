@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """The same buttons at the same CPU cycles: a PlayChoice-10 game's inputs for both sides.
 
 Mesen2 (a detector, docs/validation.md) runs a PlayChoice-10 image as its game

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The APU's noise and DMC period tables, decoded from the 2A03's and 2A07's die
 masks (scripts/apu_period_roms.py): die-derived for both chips' tables."""
 

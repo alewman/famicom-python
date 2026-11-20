@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Homebrew mappers: Action 53 (28), the NSF subset (31) and GTROM (111).
 
 Mapper 31's judge, rainwarrior's 31_test, is in the mapper suite

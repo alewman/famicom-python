@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: CI
 
 # Kept minimal: PyPy only (the interpreter the board is certified on), main and

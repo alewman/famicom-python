@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Count iNES / NES 2.0 mapper usage across the local No-Intro NES sets.
 
 Read-only: opens each zip, streams the first 16 bytes of each .nes member,

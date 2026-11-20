@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Who made this cartridge, and how: nes20db first, MAME's software list second.
 
 **nes20db** (NewRisingSun, release 2026-09-26) describes 21,339 dumps in NES 2.0

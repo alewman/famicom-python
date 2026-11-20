@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Milestone 8's mapper: UNROM 512 (30), the homebrew board, on synthetic images.
 
 No judge ROM exists; UNROM_512.wiki and the SST39SF040 data sheet's command

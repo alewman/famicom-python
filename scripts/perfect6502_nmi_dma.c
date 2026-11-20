@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /* perfect6502 (die-derived): an NMI that falls while RDY halts a read, as DMA
  * halts the 2A03's CPU (undocumented-behavior.md C30, validation.md milestone 6).
  * Loops: LDA $10 (= 0), then a taken same-page BEQ $0200 or a JMP $0200. Cycle

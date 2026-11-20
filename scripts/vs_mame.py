@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """A Vs. game's attract screens against MAME's ``vsnes`` driver (a second detector).
 
 MAME 0.285 (``/usr/games/mame``; vsnes.cpp is BSD-3) runs the sets the images

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The Vs. DualSystem: both sides of the mainboard running, on one clock.
 
 Vs._System.wiki (specification tier): "The Vs. DualSystem has a main CPU, main

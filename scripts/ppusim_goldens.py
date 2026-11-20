@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Record PPUSim's answers to the C12 scenes for the quick test to replay.
 
     python scripts/ppusim_goldens.py           # write tests/ppusim_goldens.json.gz

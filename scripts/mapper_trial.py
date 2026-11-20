@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Run a dump on a board of your choice and show what its game asks the cartridge for.
 
     python scripts/mapper_trial.py ROM.nes [--as MAPPER[.SUB]] [--frames N] [--mask HEX]

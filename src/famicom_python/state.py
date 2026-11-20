@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Save states: the whole console between two instructions, as bytes, and back.
 
 A save state is everything that changes as the console runs: the CPU (6502-python's

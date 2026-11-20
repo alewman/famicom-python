@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """iNES 1.0 and NES 2.0 files: the header and the ROM it describes.
 
 The header says what the dumper believed about the cartridge; nes20db usually

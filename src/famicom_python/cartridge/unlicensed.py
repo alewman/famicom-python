@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Unlicensed North American discrete boards: Color Dreams (11), Camerica/Codemasters (71,
 232) and AVE's NINA-03/06 (79) with HES's multicart extension (113).
 

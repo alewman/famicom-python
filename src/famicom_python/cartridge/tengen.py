@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Tengen's RAMBO-1 (64): the MMC3 with more banks and a CPU-cycle counter mode.
 
 RAMBO-1.wiki. No judge ROM exists; the claim rests on sweeps against Mesen2,

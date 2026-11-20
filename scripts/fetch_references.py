@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Fetch the pinned documents, test ROMs and source trees into reference/ and tests/test_roms/.
 
 Nothing fetched here is committed (see .gitignore). Two pin files drive it:

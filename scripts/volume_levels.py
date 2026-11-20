@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Compare the board's channel balance with an NES-001 recording of volume_tests.
 
 Damian Yerrick's ``volume_tests`` plays 12 tones near 1 kHz (pulse 1 at four

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Run a test ROM on Breaknes's APUSim (the whole RP2A03G, die-derived), on a stub board.
 
 The board around the chip (scripts/apusim/apusim_shim.cpp) has work RAM, NROM

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The cartridge connector, as signals: the only thing a mapper knows of the console.
 
 docs/cartridge.md "The connector" has the pins and the reasons; this is the

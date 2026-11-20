@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """A small 6502 disassembler for reading a dump's bank-switching and protection code.
 
     python scripts/disasm6502.py ROM.nes OFFSET [BYTES] [--at ADDRESS]

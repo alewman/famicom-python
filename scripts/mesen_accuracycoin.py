@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Run AccuracyCoin on Mesen2 or MesenCE and print what it fails.
 
     MESEN_LIB=... python scripts/mesen_accuracycoin.py [--frames N]

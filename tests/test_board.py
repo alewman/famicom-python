@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The board's CPU side: memory map, open bus, ports, OAM DMA, power-on (milestone 1).
 
 Each case names its source (docs/start-here.md "The CPU side", docs/timing.md).

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Record Visual 2C02's OAM counter for the OAM-address cases, for the quick test.
 
     python scripts/visual2c02/goldens.py                 # run every case (about 3 min each)

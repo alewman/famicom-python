@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Run an AccuracyCoin test on the board and on the PPUSim board in lockstep.
 
 The two boards differ only in the PPU (scripts/ppusim_board.py, skew 3), so

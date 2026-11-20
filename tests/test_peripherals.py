@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Controllers besides the standard pad (peripherals.py), each against its wiki page."""
 
 from __future__ import annotations

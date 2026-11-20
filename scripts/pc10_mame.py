@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """A PlayChoice-10 cabinet's two screens against MAME's ``playch10`` driver.
 
 MAME 0.285 (``/usr/games/mame``; playch10.cpp is BSD-3) runs the sets the

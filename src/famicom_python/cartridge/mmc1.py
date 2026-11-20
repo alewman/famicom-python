@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """MMC1 (mappers 1 and 155): five serial writes load a register.
 
 MMC1.wiki (specification tier); judged by Holy Mapperel, ``serom`` and

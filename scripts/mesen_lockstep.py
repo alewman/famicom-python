@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Milestone 6: the board against Mesen2's trace, instruction by instruction.
 
 docs/handoff-brief.md, milestone 6: Mesen2's trace logger (one line per

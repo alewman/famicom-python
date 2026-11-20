@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Sort the sweep's differing dumps by what the board did where the pixels differ.
 
 For each dump ``compat_sweep.py`` found differing, the board runs again to the

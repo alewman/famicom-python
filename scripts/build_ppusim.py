@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Build Breaknes's PPUSim with our shim into reference/build-ppusim/libppusim.so.
 
 PPUSim (gate-level RP2C02G, CC0-1.0) comes from the pinned breaknes checkout in

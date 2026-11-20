@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The iNES/NES 2.0 parser and the board-identification order (docs/cartridge.md)."""
 
 from __future__ import annotations

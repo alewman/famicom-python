@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Decode the 2A03's and 2A07's noise and DMC period ROMs from their die masks.
 
 BreakingNESWiki (reference/src/breaks, pinned) prints each decoder's second

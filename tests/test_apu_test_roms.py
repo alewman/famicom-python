@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Milestone 3's hardware-corrected judges: the APU, DMA and interrupt test ROMs.
 
 Slow (``pytest -m slow``): each runs for emulated seconds. The certification

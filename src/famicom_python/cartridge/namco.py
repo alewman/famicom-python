@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Namco's mappers: the 108 family (206, and its boards 76, 88, 95 and 154), the 129/163 (19)
 and the 175/340 (210).
 

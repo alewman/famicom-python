@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Milestone 2's hardware-corrected judges: blargg's PPU test ROMs.
 
 Slow (``pytest -m slow``): each runs for emulated seconds. The certification

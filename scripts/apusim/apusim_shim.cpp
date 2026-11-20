@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // A minimal CPU-side NES board around Breaknes's APUSim (the whole RP2A03G:
 // its gate-level 6502 and the APU), for scripts/apusim_board.py.
 //

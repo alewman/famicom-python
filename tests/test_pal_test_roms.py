@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Milestone 10's hardware-corrected judges: the PAL NES's test ROMs.
 
 Slow (``pytest -m slow``). ``scripts/run_test_roms.py --suite pal`` gives the

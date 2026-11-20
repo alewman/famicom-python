@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The licensed-gap mappers (2026-10-29) on synthetic images: their wiki pages' bank arithmetic.
 
 No judge ROM exists for these boards; the sweeps against Mesen2 carry the

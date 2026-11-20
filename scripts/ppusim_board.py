@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Run a test ROM with Breaknes's gate-level PPUSim in place of the board's PPU.
 
 docs/undocumented-behavior.md open item 1: before PPUSim may judge the PPU

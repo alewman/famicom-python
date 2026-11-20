@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """MMC2 (mapper 9) and MMC4 (mapper 10): CHR banks that the PPU's own fetches switch.
 
 MMC2.wiki and MMC4.wiki; judged by Holy Mapperel (docs/claims.md), which has

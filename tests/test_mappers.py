@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Milestone 5's mappers where no judge ROM reaches: MMC6, MC-ACC, the A12 filter's edge.
 
 The judge ROMs (``famicom_python.testrom.MAPPER_ROMS``) carry the claims;

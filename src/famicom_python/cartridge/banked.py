@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """What most mappers share: PRG and CHR in windows, PRG-RAM, the CIRAM wiring.
 
 A discrete-logic or ASIC mapper is, on the connector, a few registers that

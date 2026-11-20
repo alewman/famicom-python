@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Milestone 1's hardware-corrected judges: blargg's and Bisqwit's CPU test ROMs.
 
 Slow (``pytest -m slow``): each runs for emulated seconds. The certification

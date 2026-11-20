@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """The board against NewRisingSun's expansion-audio recordings (open item 20).
 
 NewRisingSun ran his 2018 test ROMs (``ExpAudio_testroms.7z``) on a Sharp

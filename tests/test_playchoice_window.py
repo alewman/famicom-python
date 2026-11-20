@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The PlayChoice-10 in the window: the menu screen above the game's, one
 monitor, no BIOS, and sixteen DIP switches (frontend.py). The BIOS here is a
 few bytes of Z80 code (test_playchoice.py's)."""

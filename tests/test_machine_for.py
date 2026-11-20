@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The console a cartridge asks for (System.machine_for, the window's ``--machine auto``)."""
 
 from __future__ import annotations

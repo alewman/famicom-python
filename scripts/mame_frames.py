@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Frames from mame_nes, a MAME fork that passes all of AccuracyCoin, as a detector.
 
 mame_nes runs headless as a binary only (validation.md). Lua hands over each wanted frame as

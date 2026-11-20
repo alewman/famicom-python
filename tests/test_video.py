@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The window's colours: palettes and the 2C07's red/green emphasis swap."""
 
 from __future__ import annotations

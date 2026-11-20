@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The FDS's sound: the RP2C33's wavetable channel and its modulator (FDS_audio.wiki).
 
 A 64-step, 6-bit wavetable is stepped by a 24-bit accumulator; a 32-entry

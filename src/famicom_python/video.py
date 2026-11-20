@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """From the PPU's 9-bit pixels to RGB, and a PNG without dependencies.
 
 The 2C02 has no RGB anywhere: it emits composite video from a 6-bit palette

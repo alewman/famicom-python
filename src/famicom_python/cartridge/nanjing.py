@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """One Chinese ASIC family on four boards: Nánjīng's FC-001 (163), Wàixīng's FS304 (162),
 Dōngdá/Yànchéng's cy2000-3 (164) and Yànchéng's YC-03-09 (558).
 

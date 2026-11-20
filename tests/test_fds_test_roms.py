@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Milestone 9's judges: the FDS test disks with hardware answers.
 
 Slow (``pytest -m slow``). Skipped without the test disks (fetch_references.py)

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Discrete-logic boards: NROM (0), UxROM (2), CNROM (3), AxROM (7), CPROM (13), UNROM 512
 (30), BNROM and NINA-001 (34), GxROM (66), J87 (87), UN1ROM (94), UNROM with a fixed first
 bank (180) and CNROM with copy-protection diodes (185).

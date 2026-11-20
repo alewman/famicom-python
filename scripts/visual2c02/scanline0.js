@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // scanline0.py's schedule on Visual 2C02 (see there). Starts from one of the
 // simulator's saved pre-render states, so that state's frame parity decides
 // which frame skips; run it from both.

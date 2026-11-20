@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """A whole console: 6502-python's RP2A03 on a :class:`~famicom_python.board.Board`.
 
 The CPU is embedded through 6502-python's callables contract: its two bus

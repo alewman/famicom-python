@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The PlayChoice-10's supervisor: a Z80, its BIOS, its own screen, and the cabinet.
 
 Sources, by tier (``playchoice.py`` has the game board's): Nintendo's PCH1-CPU

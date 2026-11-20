@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Build Breaknes's APUSim with our shim into reference/build-apusim/libapusim.so.
 
 APUSim (gate-level RP2A03, its M6502Core 6502 included; CC0-1.0) comes from the

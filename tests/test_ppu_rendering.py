@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The PPU's picture and its bus, on a synthetic NROM: the quick-loop checks.
 
 The test ROMs of milestone 2 are the judges (``pytest -m slow``,

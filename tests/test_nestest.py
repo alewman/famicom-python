@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """nestest in automation mode matches nestest.log on every line (milestone 1).
 
 nestest.log is emulator-derived (Nintendulator) and universally cross-checked;

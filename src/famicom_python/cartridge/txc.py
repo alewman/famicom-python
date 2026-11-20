@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The latch-adder-inverter protection chips and their boards: TXC's 05-00002-010 (36, 132, 173)
 and the JV001 (136, 147, 172).
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Probe ROMs for the provenance audit (wave 2, item 3): one behaviour each, on the board and on
 Mesen2 run as a closed box.
 

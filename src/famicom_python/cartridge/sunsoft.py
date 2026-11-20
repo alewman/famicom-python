@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Sunsoft's mappers: Sunsoft-3 (67), Sunsoft-4 (68), FME-7, 5A and 5B (69), and the discrete
 Sunsoft-1 (184) and Sunsoft-2 (89, 93).
 

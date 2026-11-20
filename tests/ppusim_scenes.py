@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The C12 sweeps as scenes, for PPUSim's answers to be replayed without PPUSim.
 
 Each scene drives a driver through mid-line register writes, as

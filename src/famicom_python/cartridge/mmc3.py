@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """MMC3 and its relatives (mapper 4): MMC6, MC-ACC, and the NEC and Sharp IRQs; and its boards
 TxSROM (118), TQROM (119), the AA6023 (268), the multicarts 37 and 47, and Kǎshèng's clone
 (115).

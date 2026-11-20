@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Run all of AccuracyCoin on the board and print every test's result.
 
 AccuracyCoin (100th_Coin, MIT; pinned in scripts/pinned_repos.json) runs all

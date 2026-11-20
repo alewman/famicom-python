@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Assemble NES 2.0 images of the PlayChoice-10 games from MAME's ROM sets.
 
 nes20db (the pinned release) describes 65 PlayChoice-10 images (console type

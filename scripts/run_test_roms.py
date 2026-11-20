@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Run a milestone's test ROMs in parallel and print the certification record.
 
 Each ROM runs in its own process (under ``nice``; at most ``--jobs``, 16 by

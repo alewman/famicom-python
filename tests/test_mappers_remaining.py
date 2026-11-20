@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The unlicensed and homebrew mappers (2026-10-30) on synthetic images.
 
 No judge ROM exists for these boards, and Mesen2 refuses most of them, so their

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Line 0's sprite after the odd-frame skip: PPUSim against Visual 2C02, same writes.
 
 AccuracyCoin "Sprites On Scanline 0" error 3 (composite PPUs): when the

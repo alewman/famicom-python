@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The Vs. System's own ROM sockets: iNES mapper 99.
 
 A Vs. mainboard has no cartridge connector. Each side has six EPROM sockets,

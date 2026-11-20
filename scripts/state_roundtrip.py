@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Save states, proven complete: a run saved and loaded continues as the run that wasn't.
 
 For each ROM: power on, run to frame A plus a few instructions (so the save falls

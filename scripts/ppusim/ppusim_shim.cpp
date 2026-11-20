@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // A board around Breaknes's PPUSim (gate-level RP2C02G or RP2C07-0, CC0) for co-simulation
 // with famicom-python's CPU: see scripts/ppusim_board.py and docs/validation.md
 // ("PPUSim as a judge"). Our code; PPUSim itself is fetched, never committed.

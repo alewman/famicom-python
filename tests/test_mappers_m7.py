@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Milestone 7's mappers where neither a judge ROM nor the sweep reaches.
 
 The sweep (``scripts/compat_sweep.py``) compares games' frames with Mesen2's

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The console board: the CPU bus, open bus, the ports, DMA, and the one clock.
 
 **One timeline in master ticks** (docs/timing.md "The units and the one

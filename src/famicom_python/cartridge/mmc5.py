@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """MMC5 (mapper 5), its banking, ExRAM, scanline detection and vertical split.
 
 MMC5.wiki throughout. The forum's ``mmc5test`` ROMs are not pinned; the claim

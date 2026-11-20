@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The PlayChoice-10: its game board's row and panel, the security PROM, the
 supervisor's memory, ports, screen, interrupt and watchdog, and the cabinet's
 lines to the game.

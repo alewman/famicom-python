@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Serial EEPROMs on Bandai's boards: the 24C02 (I²C, 256 bytes) and Xicor's X24C01 (128 bytes).
 
 Written from the protocols as INES_Mapper_016.wiki, _157.wiki and _159.wiki

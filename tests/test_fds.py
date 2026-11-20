@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The FDS RAM adapter and disk model on synthetic disks: statements of the
 model (``cartridge/fds.py``), not judges; the judges are the test disks of
 ``tests/test_fds_test_roms.py``. No BIOS needed: a blank one stands in."""

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Replay a Breaknes PPU register dump into PPUSim and show where its writes land.
 
 emu-russia/breaknes#196 (white strips under SMB's menu in the PPU Player, fine

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The board's OAM counter against Visual 2C02's recorded answers.
 
 ``scripts/visual2c02/goldens.py`` ran each case of its CASES on Visual 2C02

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Put the board's PPU and PPUSim through the same register accesses and compare pins.
 
 docs/undocumented-behavior.md open item 1: with PPUSim shown to reproduce

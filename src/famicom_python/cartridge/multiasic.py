@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Multicarts that switch whole mapper ASICs: 394, 351 and Mindkids' FPGA (446).
 
 Each from its NESdev wiki page. One die holds an MMC3 clone and a J.Y. Company ASIC, or

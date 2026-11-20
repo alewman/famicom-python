@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Assemble NES 2.0 images of the Vs. System games from MAME's ROM sets.
 
 nes20db (the pinned release, ``famicom_python.cartridge.database``) describes

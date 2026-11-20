@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """One coin, one start button, the same DIP switches: a Vs. game's inputs for both sides.
 
 A Vs. System game shows its attract mode until a coin drops, and Mesen2 (a

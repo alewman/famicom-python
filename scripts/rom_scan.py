@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """What a dump's PRG-ROM says about its mapper, without running it.
 
     python scripts/rom_scan.py ROM.nes

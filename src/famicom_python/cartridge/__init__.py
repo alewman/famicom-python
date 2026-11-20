@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Cartridges: the connector protocol, the file loader and the mappers.
 
 Nothing here imports the board: a mapper knows the console only through

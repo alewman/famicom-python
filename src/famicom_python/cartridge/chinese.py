@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Chinese, Taiwanese and Korean discrete-logic and simple ASIC boards, each from its NESdev
 wiki page.
 

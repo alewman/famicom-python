@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Kaiser's and others' FDS-to-cartridge conversions: 8 KiB PRG banks at $6000 and simple
 cycle counters standing in for the disk system's timer.
 

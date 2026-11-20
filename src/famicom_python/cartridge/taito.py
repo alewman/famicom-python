@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Taito's mappers: TC0190 (33), TC0690 (48), X1-005 (80, 207) and X1-017 (82, 552).
 
 No judge ROM exists (docs/cartridge.md); the claims rest on sweeps against

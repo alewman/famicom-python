@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The Vs. DualSystem: two sides of one mainboard on one clock (dual.py).
 
 Vs._System.wiki for the shared RAM, the cross interrupt and the watchdog;

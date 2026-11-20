@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The standard controller: a 4021 shift register behind the port.
 
 Standard_controller.wiki, Controller_reading.wiki. While the strobe (OUT0) is

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Generate docs/mappers.md's registry: one row for every mapper, implemented or not.
 
     NO_INTRO_DIR=... python scripts/mapper_registry.py --results tests/mame_traces/sweep-final \\

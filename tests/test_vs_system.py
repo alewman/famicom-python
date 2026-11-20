@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The Vs. System: its machine rows, RGB PPUs, mainboard I/O, sockets and chips.
 
 Sources as the code cites them: Vs._System.wiki, NES_2.0.wiki "Vs. System

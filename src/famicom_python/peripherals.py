@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Controllers besides the standard pad, on the controller ports and the Famicom expansion port.
 
 Input_devices.wiki: each controller port carries OUT0 (the strobe), its /OE and

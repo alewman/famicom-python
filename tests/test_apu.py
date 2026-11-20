@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The APU and DMC DMA (milestone 3): channels, mixer, and the DMA cycle costs.
 
 Each case names its source (docs/timing.md "The APU" and "DMA"). The test ROMs

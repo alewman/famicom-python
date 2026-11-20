@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Cartridge conversions of Famicom Disk System games.
 
 Mappers 347, 368, 415, 418, 535, 538, 539, 548, 549, 554, 557.

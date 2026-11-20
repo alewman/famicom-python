@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Record MAME 0.285's per-instruction 2A03 trace and register log for an NES cartridge.
 
 Runs the recipe in docs/mame-oracle.md in a fresh directory (default

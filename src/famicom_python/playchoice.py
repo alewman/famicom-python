@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The PlayChoice-10's game board: what differs from a console around the 2A03.
 
 Sources, by tier: Nintendo's own PCH1-CPU schematic (© 1986 Nintendo of

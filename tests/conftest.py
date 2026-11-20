@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Shared fixtures: the fetched test ROMs, and a skip when they are absent."""
 
 from __future__ import annotations

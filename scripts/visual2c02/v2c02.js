@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Visual 2C02 (Quietust's transistor-level RP2C02G netlist on the visual6502
 // simulator, reference/docs/visual2c02, fetched by scripts/fetch_references.py
 // and never committed) run headless under Node: an independent die-level

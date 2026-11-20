@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The board's PPU against PPUSim's recorded answers to the C12 sweeps.
 
 ``scripts/ppusim_goldens.py`` ran each scene of ppusim_scenes.py on PPUSim

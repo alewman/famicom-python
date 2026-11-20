@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The SST39SF040 flash, the self-flashing homebrew boards' PRG (mappers 30, 111).
 
 From Microchip's data sheet (DS20005022C, ``reference/docs/SST39SF040.pdf``,

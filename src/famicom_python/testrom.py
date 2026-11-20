@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Reading test ROMs' verdicts: blargg's $6000 and $F8 protocols, AccuracyCoin, the screen.
 
 docs/validation.md "The result protocols the harness reads":

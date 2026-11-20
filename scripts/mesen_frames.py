@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Compare the board's frames with Mesen2's, pixel for pixel (a detector, docs/validation.md).
 
 Mesen2 normally hands Lua its frame as RGB through its palette. Here

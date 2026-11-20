@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """J.Y. Company's ASIC (209, and the boards 35, 90 and 211), from J.Y._Company_ASIC.wiki.
 
 No judge ROM exists; the claims rest on sweeps against Mesen2, a detector

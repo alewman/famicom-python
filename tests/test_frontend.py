@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The desktop frontend: its conversions without pygame, and the window itself
 through SDL's dummy drivers when pygame-ce is installed (the ``frontend`` extra)."""
 

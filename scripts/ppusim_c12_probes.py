@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The C12 probes: mid-line rendering toggles on the board's PPU and PPUSim.
 
 Each mode drives a ``ppusim_compare.Pair`` through a scenario and prints

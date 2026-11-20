@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """One register schedule on three PPUs: the board's, PPUSim and Visual 2C02.
 
 Visual 2C02 (Quietust's transistor netlist, scripts/visual2c02/v2c02.js) is a

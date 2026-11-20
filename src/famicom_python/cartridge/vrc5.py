@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Konami's VRC5 in the Q-Ta adapter (mapper 547): NHK Gakuen's Space School and Space College.
 
 From NES_2.0_Mapper_547.wiki. The adapter holds 128 KiB of its own PRG, a 128 KiB

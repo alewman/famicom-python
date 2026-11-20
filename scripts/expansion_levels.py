@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """The board's expansion-sound levels against the measured ones (docs/undocumented-behavior.md).
 
 rainwarrior's ``nes-audio-tests`` ``db_*`` ROMs play a full-volume 440 Hz APU

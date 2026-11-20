@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Milestone 7's compatibility sweep: every licensed dump, frames against Mesen2's (a detector).
 
 For each licensed No-Intro dump whose mapper the board implements, read in

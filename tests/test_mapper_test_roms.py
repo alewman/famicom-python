@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Milestone 5's judges: blargg's MMC3 suites, Holy Mapperel and the forum's mapper tests.
 
 Slow (``pytest -m slow``). The certification record comes from

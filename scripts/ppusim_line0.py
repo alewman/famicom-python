@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Line 0's stale sprite slot 0, on the board's PPU and PPUSim.
 
 Milestone 7's sweep: ten games differ from Mesen2 at one pixel, (255, 0),

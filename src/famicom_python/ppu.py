@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The RP2C02 picture processor, dot by dot, every fetch on its bus.
 
 A frame is 262 lines of 341 dots (docs/timing.md "The PPU"). :meth:`PPU.run_to`

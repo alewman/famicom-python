@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Changing FDS disks without a player: for scripted runs and the window's default.
 
 Not part of the console. A player ejects the disk when a game asks for

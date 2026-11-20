@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """kevtris's nestest in automation mode against nestest.log (docs/handoff-brief.md, milestone 1)."""
 
 from __future__ import annotations

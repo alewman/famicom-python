@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Mapper 85, the VRC7: banking (VRC7.wiki) and its sound wired to ym2413-python's DS1001.
 
 The banking is pinned on a synthetic image; *Lagrange Point* and *Tiny Toon

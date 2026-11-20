@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Famicom Disk System disks: a ``.fds`` or ``.qd`` file's sides as the drive's head meets them.
 
 FDS_file_format.wiki: a ``.fds`` file is an optional 16-byte header ("FDS",

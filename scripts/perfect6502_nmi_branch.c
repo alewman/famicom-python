@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /* perfect6502 (die-derived): when is an NMI taken around a taken same-page
  * branch, against a JMP of the same cycle shape? (validation.md, milestone 6;
  * undocumented-behavior.md C29.) Build against the pinned checkout:

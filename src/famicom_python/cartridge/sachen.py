@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Sachen's boards: the 8259 family (137, 138, 139, 141), the "74LS374N" ASIC (150, 243) and
 the discrete latches (133, 143, 145, 148, 149).
 

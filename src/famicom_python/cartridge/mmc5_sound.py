@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The MMC5's sound: two pulses and an 8-bit PCM DAC (MMC5_audio.wiki).
 
 The pulses are the APU's (APU_Pulse.wiki) without the sweep, without the

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Bandai's FCG family: FCG-1/2 and LZ93D50 (16), the Datach Joint ROM System (157), and the
 LZ93D50 with an X24C01 (159) or 8 KiB of RAM (153); the discrete 74161/7432 boards (70, 152);
 the Oeka Kids board (96); and Karaoke Studio's M60001 (188).

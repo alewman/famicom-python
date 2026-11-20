@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The PPU as the CPU sees it in milestone 1: registers, buffer, palette, frame timing.
 
 PPU_registers.wiki, PPU_scrolling.wiki, PPU_palettes.wiki, PPU_power_up_state.wiki;

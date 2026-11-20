@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Run a cartridge headless: ``python -m famicom_python ROM [--frames N]``.
 
 ``famicom-python play ROM`` opens a window instead (frontend.py, pygame-ce).

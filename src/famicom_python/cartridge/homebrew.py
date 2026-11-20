@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Homebrew boards: Action 53 (28), the NSF subset (31), GTROM (111), Magic Floor (218) and
 Drip (284).
 

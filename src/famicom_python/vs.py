@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """The Nintendo Vs. System's mainboard: what it adds around a 2A03 and an RGB PPU.
 
 Vs._System.wiki (NESdev wiki; specification tier) is the source of every

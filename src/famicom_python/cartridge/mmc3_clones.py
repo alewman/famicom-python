@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """MMC3 clones on pirate and multicart boards: outer banks, rewired registers, 32 KiB PRG modes.
 
 Each from its NESdev wiki page. No judge ROM exists for any of them; the

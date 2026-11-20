@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Milestone 8's expansion sound: the chips' channels on synthetic images, and the path.
 
 The mix levels are judged by rainwarrior's ``db_*`` ROMs
