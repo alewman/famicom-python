@@ -3,7 +3,7 @@
 """Compare the board's frames with Mesen2's, pixel for pixel (a detector, docs/validation.md).
 
 Mesen2 normally hands Lua its frame as RGB through its palette. Here
-scripts/mesen_run.py gives it a 512-entry identity palette instead, so its
+mesen_run.py (FAMICOM_GPL_TOOLS) gives it a 512-entry identity palette instead, so its
 "RGB" is the PPU's 9-bit value (palette value | emphasis << 6), the board's own
 pixel format, and the comparison is exact by index, not by colour. It also
 turns on Mesen2's power-up write-ignore and zero-fills its RAM, to match the
@@ -16,7 +16,7 @@ PPUSim's (docs/validation.md milestone 10), and this is a detector.
 
 Mesen2 counts frames from its own power-on; the board's frames within
 ``--window`` either side are tried and the closest reported. Needs the
-hand-built MesenCore.so of scripts/mesen_run.py; nothing it writes is committed.
+hand-built MesenCore.so of mesen_run.py (FAMICOM_GPL_TOOLS); nothing it writes is committed.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import gpl_tools  # noqa: F401  (FAMICOM_GPL_TOOLS on sys.path, for mesen_run)
 from mesen_run import FRAMES_LUA, REGIONS, ROOT, decode_frames, run_mesen
 
 from famicom_python.machine import MACHINES, NES_001, Machine

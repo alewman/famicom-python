@@ -181,13 +181,15 @@ nice -n 10 make core USE_GCC=true LTO=false STATICLINK=false -j8
 ```
 
 1 min 04 s wall on this machine (g++ 15.2, SDL2 2.32.10), producing
-`InteropDLL/obj.linux-x64/MesenCore.so`. `scripts/mesen_run.py` drives it through
+`InteropDLL/obj.linux-x64/MesenCore.so`. `mesen_run.py` (a GPL tool kept outside this
+repository since 2026-11-21: `FAMICOM_GPL_TOOLS` names its directory, docs/provenance.md)
+drives it through
 `ctypes` the way Mesen's own `TestRunner.cs` does (our code calling the GPL
 library at run time; nothing copied), and `scripts/mesen_blargg.lua` stops it
 when a blargg ROM reports through `$6000`:
 
 ```sh
-python scripts/mesen_run.py tests/test_roms/nes-test-roms/apu_test/apu_test.nes \
+python "$FAMICOM_GPL_TOOLS/mesen_run.py" tests/test_roms/nes-test-roms/apu_test/apu_test.nes \
     --lua scripts/mesen_blargg.lua --home tests/mame_traces/mesen-home --seconds 60
 ```
 
@@ -207,7 +209,7 @@ trace logger writes one line per instruction with the real PPU scanline and dot
 nestest in 0.8 s. The Lua API also offers per-access memory callbacks;
 logging them to a file needs `ScriptAllowIoOsAccess` set through
 `SetDebugConfig` (not done yet). MesenCE should build the same way (not tried).
-For lockstep (milestone 6) apply `scripts/mesen2-detector-fixes.patch` first:
+For lockstep (milestone 6) apply `mesen2-detector-fixes.patch` (in `FAMICOM_GPL_TOOLS`) first:
 three corrections where a higher tier shows `b9fa69d` wrong.
 
 ## What is *not* available
@@ -696,7 +698,7 @@ DMC's attenuation of the triangle as it rises (0.70 and 0.52 of its level at
 0.8-0.9 dB loud and the DMC tone 0.4-1.5 dB loud; noise is random and within
 about 1 dB. Open item 17.
 
-**Against Mesen2's sound** (`scripts/mesen_audio.py`, a detector). Mesen2
+**Against Mesen2's sound** (`mesen_audio.py` (`FAMICOM_GPL_TOOLS`), a detector). Mesen2
 records its own mixer output (its channel volumes, 0 when headless, set to
 100); both streams pass the same 90 Hz high-pass, each window gets its own
 alignment (within 1 ms) and gain. `apu_mixer` (20 s each) plays a beep, a
@@ -982,7 +984,7 @@ real time) on PyPy.
 
 **Pins.** famicom-python at the commit that adds this record; 6502-python
 `080fc80` (PR #7: `dma_stalled` and `note_stall`); Mesen2 `b9fa69d` built as
-"Mesen2 as a second detector" says, with `scripts/mesen2-detector-fixes.patch`
+"Mesen2 as a second detector" says, with `mesen2-detector-fixes.patch` (`FAMICOM_GPL_TOOLS`)
 applied (below); perfect6502 as pinned. Games from the local No-Intro
 `Nintendo - Nintendo Entertainment System (Headered)` set, read in place.
 PyPy 7.3.20.
@@ -1027,7 +1029,7 @@ before a run was extended.
 | Zelda: `$2002` overflow bit | **Mesen2 setting**: OAM row corruption (C26, AccuracyCoin's key) is off by default; Zelda turns rendering off mid-frame on its title | `configure_for_comparison` turns it on |
 | **SMB3: its status-bar IRQ's dummy `LDA $2007` (line 193)** | **the board, open**: a `$2007` read during rendering. Replayed on PPUSim (`ppusim_compare.py`'s harness, the game's access sequence), PPUSim loads its buffer from the first fetch at least 5 dots after the access (a garbage nametable fetch, still the old v), the board one fetch later with v already incremented; PPUSim also changes the fetch stream itself (a hybrid pattern address, an extra address phase). The family of AccuracyCoin's failing "ALE + Read", "Hybrid Addresses" and "$2007 Stress Test" (milestone 4) | the board's octal latch (C31, 2026-10-23, below); then Mesen2's: it does not model the collision, and the board now matches PPUSim on SMB3's sequence |
 
-**The Mesen2 patches** (`scripts/mesen2-detector-fixes.patch`, against
+**The Mesen2 patches** (`mesen2-detector-fixes.patch` (`FAMICOM_GPL_TOOLS`), against
 `b9fa69d`; each where a higher tier shows Mesen2 wrong, and each checked
 against blargg's `cpu_interrupts_v2`, `ppu_vbl_nmi`, `instr_test-v5` and
 `apu_test`, all still passing): 1. a taken same-page branch holds an NMI edge
@@ -1082,7 +1084,7 @@ a twelfth of the quiet-machine figures; to repeat when it is quiet.
 ### Milestone 7: the compatibility sweep, and mappers to 95 % (2026-10-23)
 
 **Pins.** famicom-python at the commit that adds this record; 6502-python
-main `9dc34bd`; Mesen2 `b9fa69d` with `scripts/mesen2-detector-fixes.patch`
+main `9dc34bd`; Mesen2 `b9fa69d` with `mesen2-detector-fixes.patch` (`FAMICOM_GPL_TOOLS`)
 (six hunks, below); PPUSim `fb7de61`. Dumps from the local No-Intro
 `Nintendo - Nintendo Entertainment System (Headered)` and its 2024 set, read
 in place, a dump the first set already gave (by its .nes CRC) skipped. PyPy

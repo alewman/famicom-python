@@ -7,8 +7,8 @@ docs/provenance.md lists single behaviours the board first took from reading Mes
 source. Each probe here is a small program written for this audit from the NESdev wiki's
 register descriptions; it exercises one behaviour and leaves its answers in work RAM
 ($0400-$07FF, $03FF = $A5 when finished). The same image runs on the board and on Mesen2's
-library (scripts/mesen_run.py, the hand-built MesenCore.so: Mesen2 2.1.1), which is driven,
-never read, and the answers are printed side by side. A Mesen2 answer is a closed-box
+library (mesen_run.py in FAMICOM_GPL_TOOLS, the hand-built MesenCore.so: Mesen2 2.1.1), which
+is driven, never read, and the answers are printed side by side. A Mesen2 answer is a closed-box
 observation of a detector, not hardware.
 
     python scripts/provenance_probes.py [NAME ...] [--keep DIR]
@@ -31,6 +31,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import gpl_tools  # noqa: F401  (FAMICOM_GPL_TOOLS on sys.path, for mesen_run)
 from mesen_run import ROOT, run_mesen
 
 from famicom_python.system import System

@@ -133,19 +133,21 @@ perfect6502); Mesen2 was the thing compared.
 | `scripts/perfect6502_*.c` | perfect6502, linked and run | MIT (Steil, Silverman, Silverman) | clean |
 | `scripts/visual2c02/` | Visual 2C02's files, loaded unchanged from `reference/` (not vendored) | simulator MIT; netlist licence unstated | clean |
 | `scripts/mame_*.py`, `scripts/mame_nes_colours.json` | MAME and mame_nes run as programs; the colours measured from mame_nes's output | closed box | clean |
-| `scripts/mesen_*.py`, `scripts/mesen_blargg.lua` | Mesen2/MesenCE's library driven through ctypes; `NesConfig` offsets measured with `offsetof()` against its header; `mesen_run.py` "mirrors UI/Utilities/TestRunner.cs" (its call sequence) | the program is GPL-3.0; these are our files driving it | clean as tools (charter item 6); not part of the emulator |
-| `scripts/mesen2-detector-fixes.patch` | a patch to Mesen2's source | GPL-3.0 (a derivative of Mesen2) | **cite**: say in the file or beside it that it is GPL-3.0, as a tool's patch; it carries Mesen2's lines as context |
+| `mesen_run.py`, `mesen_audio.py` (outside this repository since 2026-11-21) | Mesen2/MesenCE's library driven through ctypes; `NesConfig` offsets measured with `offsetof()` against its header; `mesen_run.py` "mirrors UI/Utilities/TestRunner.cs" (its call sequence) | the program is GPL-3.0; harnesses declaring a GPL emulator's C API are GPL tools (the family's rule of 2026-11-19) | clean: **moved out** 2026-11-21 with the history rewrite (Aubrey's ruling 4 of 2026-11-20), kept with the family's other GPL tools; found through `FAMICOM_GPL_TOOLS` (`scripts/gpl_tools.py`) |
+| the other `scripts/mesen_*.py`, `compat_sweep.py`, `provenance_probes.py`, `vs_judge.py`, `scripts/mesen_blargg.lua` | Mesen2 run as a closed box through `mesen_run.py`; the Lua script runs inside it | our files; closed-box use | clean as tools (charter item 6); not part of the emulator |
+| `mesen2-detector-fixes.patch` (outside this repository since 2026-11-21) | a patch to Mesen2's source | GPL-3.0 (a derivative of Mesen2) | clean: **moved out** 2026-11-21 with the history rewrite, kept with the other GPL tools (`FAMICOM_GPL_TOOLS`) |
 | `scripts/pinned_repos.json` notes | "read and cite only" (Mesen2), "read, run as referee, cite" (Nuked-OPLL, YM2203-LLE), Nuked-OPLL line numbers | | **cite**: change the notes to "closed box only" so the next reader does not take them as permission |
 | `tests/ppusim_goldens.json.gz`, `tests/visual2c02_goldens.json.gz` | PPUSim's and Visual 2C02's outputs | CC0; MIT simulator | clean |
 
-Counts (rows of the table): clean 17, cite 3, unclear 1, rewrite 0 (2026-11-19: the A12 filter re-sourced to the test ROMs, decision 7; 2026-11-14: the two
-Mesen2/FCEUX rows settled, below).
+Counts (rows of the table): clean 19, cite 2, unclear 1, rewrite 0 (2026-11-21: the Mesen2
+patch and drivers moved out; 2026-11-19: the A12 filter re-sourced to the test ROMs,
+decision 7; 2026-11-14: the two Mesen2/FCEUX rows settled, below).
 
 ### Re-established (wave 2, item 3, 2026-11-14)
 
 Done by an agent that opened no GPL source (Mesen2's, MesenCE's, FCEUX's, Nestopia's) and
 did not read the flagged code's history beyond its docstrings. Mesen2 2.1.1 (the hand-built
-MesenCore.so of `scripts/mesen_run.py`) was run as a measuring instrument:
+MesenCore.so of `mesen_run.py`) was run as a measuring instrument:
 `scripts/provenance_probes.py` builds one small probe ROM per behaviour, written from the
 wiki's register descriptions, runs it on the board and on Mesen2, and prints both answers.
 All eight probes give the board's answers byte for byte except the FCG's cycle (below). A
@@ -179,9 +181,14 @@ The old citations stay in the public history (`git log -S CnromProtect`).
   (`opll.c:114`, 280-282 and others): its source was read while planning the VRC7, though
   nothing from it is in this repository.
 - The Sunsoft 5B's sound (`68ea474`) and the PlayChoice-10 are local only.
-- `scripts/mesen2-detector-fixes.patch` (GPL-3.0 context lines) has been public since
-  `e636819`.
-- The furrtek pin has been public since `037726a`; the PDF itself was never committed.
+- The history rewrite of 2026-11-21 (wave D of the family's history clean-up; every commit
+  hash older than it changed) took out of every commit: `scripts/mesen2-detector-fixes.patch`
+  (GPL-3.0 context lines, public from 2026-10 until then), `scripts/mesen_run.py` and
+  `scripts/mesen_audio.py` (the Mesen2 ctypes drivers, GPL tools), `.mailmap` (it named the
+  owner), the furrtek-hosted schematic's pin and the A12 rule quoted from the wiki's line
+  citing it (the PDF itself was never committed), and the ROM-mirror paths; the owner's
+  full name in 11 commits' author fields became the handle. The tag `famicom-rust-pin-1`
+  keeps its name on the rewritten commit.
 - Mesen2 source citations in docstrings and docs (above) are in the public history.
 
 ### Not done here

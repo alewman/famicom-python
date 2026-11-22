@@ -37,6 +37,7 @@ import argparse
 import hashlib
 import html
 import json
+import os
 import re
 import subprocess
 import sys
@@ -50,7 +51,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from famicom_python.cartridge.database import NES20DB  # noqa: E402
 
-DEFAULT_ROMS = Path("$MAME_ROMPATH")
+#: MAME's set zips, read in place: MAME_ROMPATH names the directory (never a machine path here).
+DEFAULT_ROMS = Path(os.environ.get("MAME_ROMPATH", "roms"))
 SOURCE = "nintendo/vsnes.cpp"
 BANK = 0x2000
 

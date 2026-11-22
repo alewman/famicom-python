@@ -24,7 +24,7 @@ Each project's AI policy is checked by the owner before anything further goes ou
 Against `b9fa69d`, 2.1.1, which is the end of SourMesen/Mesen2: that repository is
 archived, and development moved to
 [nesdev-org/MesenCE](https://github.com/nesdev-org/MesenCE) (2.2.1 and on). MesenCE is built here (`reference/build-mesence`, `MESEN_LIB`), run as a
-binary only; its results are below as they come in. `scripts/mesen2-detector-fixes.patch` holds the
+binary only; its results are below as they come in. `mesen2-detector-fixes.patch` (`FAMICOM_GPL_TOOLS`) holds the
 fixes we carry; that file is GPL-3.0 as a patch to Mesen2.
 
 **MesenCE's CONTRIBUTING.md (read 2026-10-30) rules out sending these as code**:

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 
+import gpl_tools  # noqa: F401  (FAMICOM_GPL_TOOLS on sys.path, for mesen_run)
 from mesen_run import ROOT, run_mesen
 
 from famicom_python.testrom import accuracycoin_tests

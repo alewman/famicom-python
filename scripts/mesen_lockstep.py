@@ -19,7 +19,8 @@ entries (6502-python steps them separately) are dropped: a step that pushed
 three bytes, set I and landed on the NMI or IRQ vector's target without
 executing BRK. P is compared without bits 5 and 4 (not flags).
 
-Mesen2 must be built with ``scripts/mesen2-detector-fixes.patch`` applied,
+Mesen2 must be built with ``mesen2-detector-fixes.patch`` (a GPL tool kept outside this
+repository, in ``FAMICOM_GPL_TOOLS``) applied,
 where a higher tier shows it wrong: it delays only IRQs after a taken same-
 page branch, and perfect6502 shows NMIs wait too (C29); and it ignores a DMC
 rate written in the timer's reload cycle, which AccuracyCoin's hardware answer
@@ -42,6 +43,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
+import gpl_tools  # noqa: F401  (FAMICOM_GPL_TOOLS on sys.path, for mesen_run)
 from mesen_run import REGIONS, ROOT, run_mesen
 
 from famicom_python.machine import MACHINES, NES_001, Machine

@@ -33,6 +33,7 @@ import argparse
 import contextlib
 import json
 import multiprocessing
+import os
 import re
 import subprocess
 import sys
@@ -49,7 +50,8 @@ from famicom_python.ppu import HEIGHT  # noqa: E402
 from famicom_python.system import System  # noqa: E402
 from famicom_python.video import write_png  # noqa: E402
 
-DEFAULT_ROMS = Path("$MAME_ROMPATH")
+#: MAME's set zips, read in place: MAME_ROMPATH names the directory (never a machine path here).
+DEFAULT_ROMS = Path(os.environ.get("MAME_ROMPATH", "roms"))
 PIXELS = 256 * 240
 
 LUA = """

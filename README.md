@@ -168,7 +168,7 @@ by the scripts that use them, not by the test suite.
 | `scripts/fetch_references.py` | the pinned references and test ROMs |
 | `scripts/run_test_roms.py` | a milestone's test ROMs in parallel, as a certification table |
 | `scripts/mame_trace.py` | MAME 0.285 per-instruction trace and register log of an NES cartridge ([docs/mame-oracle.md](docs/mame-oracle.md)) |
-| `scripts/mesen_run.py`, `scripts/mesen_blargg.lua` | a locally built Mesen2 core driven headless, stopping on blargg's `$6000` result ([docs/validation.md](docs/validation.md)) |
+| `mesen_run.py` (a GPL tool, outside this repository: `FAMICOM_GPL_TOOLS`), `scripts/mesen_blargg.lua` | a locally built Mesen2 core driven headless, stopping on blargg's `$6000` result ([docs/validation.md](docs/validation.md)) |
 | `scripts/mesen_frames.py` | a frame of the board against Mesen2's, pixel value for pixel value |
 | `scripts/build_ppusim.py`, `scripts/ppusim/` | Breaknes PPUSim (gate-level 2C02G) built with our shim, which records its pins |
 | `scripts/ppusim_board.py` | a test ROM on the board with PPUSim in place of the PPU |
@@ -177,7 +177,7 @@ by the scripts that use them, not by the test suite.
 | `scripts/ppusim_lockstep.py` | an AccuracyCoin test on the board and the PPUSim board in lockstep, to the first divergence |
 | `scripts/ppusim_c12_probes.py` | the C12 investigation's probes: mid-line toggles on the board's PPU and PPUSim, with PPUSim's internal signals |
 | `scripts/ppusim_goldens.py` | records PPUSim's answers to `tests/ppusim_scenes.py` for the quick suite (`--check`: where ours differs) |
-| `scripts/mesen_audio.py` | the board's sound against Mesen2's recording, window by window (aligned, gain-fitted, residual) |
+| `mesen_audio.py` (a GPL tool, outside this repository: `FAMICOM_GPL_TOOLS`) | the board's sound against Mesen2's recording, window by window (aligned, gain-fitted, residual) |
 | `scripts/volume_levels.py` | the channels' relative levels in `volume_tests` against its NES-001 recording |
 | `scripts/expansion_levels.py` | each sound chip's level in rainwarrior's `db_*` ROMs against the measured one |
 | `scripts/nrs_recordings.py` | NewRisingSun's expansion-audio test ROMs on the board against his recordings of thirteen carts: volume steps, levels, the N163's switching, the MMC5 DAC |
@@ -195,7 +195,9 @@ by the scripts that use them, not by the test suite.
 
 ## Licence
 
-MIT (see `LICENSE`), for what is in this repository, except
-`scripts/mesen2-detector-fixes.patch`: a patch to Mesen2, whose context lines
-are Mesen2's, so it is under Mesen2's GPL-3.0. The fetched material keeps its
-own terms, recorded per file in the pin lists.
+MIT (see `LICENSE`), for what is in this repository. The GPL tools that drive or
+patch Mesen2 (`mesen_run.py`, `mesen_audio.py`, `mesen2-detector-fixes.patch`) left
+the repository and its history on 2026-11-21 and are kept with the family's other GPL
+tools; the scripts that run Mesen2 as a closed box find them through
+`FAMICOM_GPL_TOOLS` (`scripts/gpl_tools.py`, docs/provenance.md). The fetched material
+keeps its own terms, recorded per file in the pin lists.
