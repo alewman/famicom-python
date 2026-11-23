@@ -2634,6 +2634,20 @@ are taken as exact and their phases as zero at power. Nothing the two sides shar
 faster than a latch bit, a serial PROM clocked by hand and a flip-flop the BIOS polls
 once a frame, and no source here measures any of it more finely.
 
+**The repin of z80-python (2026-11-23).** From the 0.4.0 release to `b59c80b` (main,
+as megadrive-python pins it; the commit the family's Rust Z80s transcribe), which adds
+two fixes: EI re-arms the interrupt delay and EI; DI leaves it at 0 (`d37c8e8`; DOC:
+Young, *The Undocumented Z80 Documented* 5.5), and RESET clears I and R (`1cec5c9`;
+DOC: Zilog UM0080, "RESET"). Neither shows here, and why: the supervisor drives
+only the Z80's /NMI, never /INT, so the EI delay changes no interrupt it takes; and
+I and R were already 0 at power, so RESET clearing them matters only after a watchdog
+reset, which no run here has. OBSERVED, as a check: all 56 images under both
+`pc10_mame.py` scripts (`play`, `time`), each screen and the Z80's whole state
+compared at every sixtieth to frame 1,500 or 1,600, identical under 0.4.0 and
+`b59c80b`: 112 of 112 runs, no watchdog reset in any. After a watchdog reset the
+board now clears I and R as the manual says; nothing here has seen what the BIOS does
+with them.
+
 **Not done, plainly.** One game, in channel 1: the other nine sockets are empty, so
 choosing between games with Channel Select is not exercised (the BIOS's menu with
 one game is). The one-monitor BIOS (`--bios single`) boots, sells time (its four

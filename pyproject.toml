@@ -21,12 +21,17 @@ dependencies = [
     # from documents, pinned by git revision (67fdb1e: f88dccf after the 2026-11-22 history
     # rewrite, which took the GPL harness out; the same package).
     "ym2413-python @ git+https://github.com/alewman/ym2413-python@67fdb1e983b62a5c1334fead4e8b157af45cd3a1",
-    # The Sunsoft 5B's sound (mapper 69): the YM2149 variant (e9420aa: e244a09 after the
-    # 2026-11-22 history rewrite, the same package).
-    "ay8910-python @ git+https://github.com/alewman/ay8910-python@e9420aaa6a833d3870f403c06f2e773787c97bc8",
-    # The PlayChoice-10's supervisor (supervisor.py): the callables contract of 0.4.0,
-    # as sms-python pins it.
-    "z80-python>=0.4.0",
+    # The Sunsoft 5B's sound (mapper 69): the YM2149 variant. a3bb485 (2026-11-23; was
+    # e9420aa, e244a09 before the 2026-11-22 history rewrite): main, whose src/ differs
+    # from e9420aa's only by SPDX lines; ay8910-rust transcribes a3bb485, so the two match
+    # exactly.
+    "ay8910-python @ git+https://github.com/alewman/ay8910-python@a3bb48511db96356581b010e87a6476eaa03e9bc",
+    # The PlayChoice-10's supervisor (supervisor.py). b59c80b (2026-11-23; was ">=0.4.0"
+    # from PyPI): z80-python's main, as megadrive-python pins it, with two hardware fixes
+    # 0.4.0 lacks (EI re-arms the interrupt delay, d37c8e8; RESET clears I and R,
+    # 1cec5c9) and the access-timing table. The family's Rust Z80s (z80-rust,
+    # z80-rust-fast) transcribe b59c80b, so the PlayChoice-10 can be carried down.
+    "z80-python @ git+https://github.com/alewman/z80-python@b59c80b88086299f277d4d21d82a09e112acdaaf",
 ]
 
 [project.optional-dependencies]
