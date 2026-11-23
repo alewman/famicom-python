@@ -19,7 +19,10 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-MAME_NES = Path(os.environ.get("MAME_NES", "/data/emu/mame-nes-theklap/nes.tip"))
+#: Default: the fork built in a ``mame-nes-theklap`` checkout beside this repository.
+MAME_NES = Path(
+    os.environ.get("MAME_NES", Path(__file__).resolve().parents[2] / "mame-nes-theklap" / "nes.tip")
+)
 PIXELS = 256 * 240
 
 COLOURS = json.loads((Path(__file__).parent / "mame_nes_colours.json").read_text())["colours"]
