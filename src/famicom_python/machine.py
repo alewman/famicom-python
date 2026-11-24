@@ -1,4 +1,6 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MIT AND BSD-3-Clause
+# The RC2C05-01's identifier ($1B) is MAME's ppu2c0x.cpp (BSD-3-Clause, Ernesto Corvi,
+# Brad Oliver, Fabio Priuli): notice in NOTICE.md.
 """The consoles, as data: one board, many machines.
 
 Every console this project models is the same board with different chips and

@@ -1,4 +1,6 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MIT AND BSD-3-Clause
+# The BIOS SHA-1s and the screen's weights are MAME's playch10.cpp (BSD-3-Clause, Ernesto
+# Corvi, Brad Oliver); the RP5H01 its rp5h01.cpp (BSD-3-Clause, Nicola Salmoria): NOTICE.md.
 """The PlayChoice-10's supervisor: a Z80, its BIOS, its own screen, and the cabinet.
 
 Sources, by tier (``playchoice.py`` has the game board's): Nintendo's PCH1-CPU
@@ -162,11 +164,13 @@ class Bios:
 
 def bios_path() -> Path:
     """Where the BIOS is: the zip (or folder) FAMICOM_PC10_BIOS names, else
-    MAME's ``playch10.zip`` under MAME_ROM_DIR (default ``MAME``)."""
+    MAME's ``playch10.zip`` in the directory MAME_ROMPATH names (the family's
+    variable for MAME's sets, as ``scripts/vs_images.py`` reads it; default
+    ``roms``)."""
     named = os.environ.get("FAMICOM_PC10_BIOS")
     if named:
         return Path(named)
-    return Path(os.environ.get("MAME_ROM_DIR", "MAME")) / "playch10.zip"
+    return Path(os.environ.get("MAME_ROMPATH", "roms")) / "playch10.zip"
 
 
 def load_bios(name: str = "dual", path: str | Path | None = None) -> Bios:
@@ -175,7 +179,9 @@ def load_bios(name: str = "dual", path: str | Path | None = None) -> Bios:
     it is Nintendo's."""
     path = Path(path) if path is not None else bios_path()
     if not path.exists():
-        raise FileNotFoundError(f"PlayChoice-10 BIOS not found at {path}: set FAMICOM_PC10_BIOS")
+        raise FileNotFoundError(
+            f"PlayChoice-10 BIOS not found at {path}: set MAME_ROMPATH or FAMICOM_PC10_BIOS"
+        )
     if path.is_dir():
         read: Callable[[str], bytes] = lambda member: (path / member).read_bytes()  # noqa: E731
     else:

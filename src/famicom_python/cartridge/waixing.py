@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MIT AND BSD-3-Clause
+# WAIXING_GAL is MAME's vrc_clones.cpp (BSD-3-Clause, kmg): notice in NOTICE.md.
 """Waixing's MMC3 boards: the 8025 "enhanced MMC3" (176), the CHR-ROM/CHR-RAM mixes (74, 191,
 192, 194, 195) and FS309 (199).
 

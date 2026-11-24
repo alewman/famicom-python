@@ -222,8 +222,8 @@ NES on an arcade board under a Z80 supervisor that sells time. Two objects:
   it.
 - **The cabinet** is `supervisor.PlayChoice`: that `System` plus
   `supervisor.Supervisor`, the Z80 with the BIOS (never shipped:
-  `FAMICOM_PC10_BIOS` names MAME's `playch10.zip`, else `playch10.zip` under
-  `MAME_ROM_DIR`), its RAM, its 32 x 32 character screen and colour PROMs, the
+  `FAMICOM_PC10_BIOS` names MAME's `playch10.zip`, else `playch10.zip` in
+  `MAME_ROMPATH`), its RAM, its 32 x 32 character screen and colour PROMs, the
   two latches and the game's RP5H01 security PROM.
 
 | The Z80's | |

@@ -1,4 +1,6 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MIT AND BSD-3-Clause
+# The Vs. protection bytes (VS_SEQUENCES, VS_XEVIOUS) are MAME's vsnes.cpp (BSD-3-Clause,
+# Pierpaolo Prazzoli, Brad Oliver, Fabio Priuli): notice in NOTICE.md.
 """Namco's mappers: the 108 family (206, and its boards 76, 88, 95 and 154), the 129/163 (19)
 and the 175/340 (210).
 

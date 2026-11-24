@@ -6,9 +6,10 @@ lines to the game.
 Sources as the code cites them: Nintendo's PCH1-CPU schematic, MAME's
 playch10.cpp and rp5h01.cpp, PC10_ROM-Images.wiki, NES_2.0.wiki. The quick
 cases run a few bytes of Z80 code in place of the BIOS; the cases with the
-real BIOS and a game need MAME's ``playch10`` set (``FAMICOM_PC10_BIOS``) and
-the images ``scripts/pc10_images.py`` assembles (``PC10_IMAGES_DIR``), and
-skip without them.
+real BIOS and a game need MAME's ``playch10`` set (``playch10.zip`` in
+``MAME_ROMPATH``, or ``FAMICOM_PC10_BIOS``) and the images
+``scripts/pc10_images.py`` assembles (``PC10_IMAGES_DIR``), and skip without
+them.
 """
 
 from __future__ import annotations
@@ -426,7 +427,7 @@ def test_a_save_state_keeps_both_processors() -> None:
 
 def real(name: str = "Super Mario Bros..nes") -> PlayChoice:
     if not bios_path().exists():
-        pytest.skip("PlayChoice-10 BIOS not found (FAMICOM_PC10_BIOS)")
+        pytest.skip("PlayChoice-10 BIOS not found (MAME_ROMPATH, FAMICOM_PC10_BIOS)")
     path = PC10_IMAGES / name
     if not path.exists():
         pytest.skip("PlayChoice-10 images not assembled: scripts/pc10_images.py (PC10_IMAGES_DIR)")

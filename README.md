@@ -24,8 +24,8 @@ mapper's source and evidence, what is left, and how to pick it up.
 
 The two arcade machines are built as first passes, uncertified: the Vs. System
 (UniSystem and DualSystem) and the PlayChoice-10, whose Z80 supervisor
-(z80-python) boots Nintendo's BIOS (yours: `FAMICOM_PC10_BIOS` names MAME's
-`playch10.zip`), checks each game's security PROM, shows its menu on a second
+(z80-python) boots Nintendo's BIOS (yours: MAME's `playch10.zip` in `MAME_ROMPATH`,
+or where `FAMICOM_PC10_BIOS` names), checks each game's security PROM, shows its menu on a second
 screen and sells time ([docs/validation.md](docs/validation.md), "The
 PlayChoice-10"). Not built, by choice: the speed work (reference boards aim to
 be correct; `*-fast` projects are for speed).
@@ -199,5 +199,8 @@ MIT (see `LICENSE`), for what is in this repository. The GPL tools that drive or
 patch Mesen2 (`mesen_run.py`, `mesen_audio.py`, `mesen2-detector-fixes.patch`) left
 the repository and its history on 2026-11-21 and are kept with the family's other GPL
 tools; the scripts that run Mesen2 as a closed box find them through
-`FAMICOM_GPL_TOOLS` (`scripts/gpl_tools.py`, docs/provenance.md). The fetched material
+`FAMICOM_GPL_TOOLS` (`scripts/gpl_tools.py`, docs/provenance.md). What was taken from
+MAME's BSD-3 files (the Vs. protection bytes, the RC2C05-01's identifier, the
+PlayChoice-10's BIOS hashes and screen weights, two smaller tables) carries MAME's
+notice in [NOTICE.md](NOTICE.md). The fetched material
 keeps its own terms, recorded per file in the pin lists.

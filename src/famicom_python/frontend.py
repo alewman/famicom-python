@@ -93,7 +93,7 @@ Vs. System: 5 and 6 drop a coin in acceptor 1 and 2, 9 (hold) is the service
             is the mouse. A DualSystem game opens both screens: 7 and 8 are
             the second side's coins, gamepads 3 and 4 its sticks, and the
             sound is the first side's
-PlayChoice-10 (with its BIOS: FAMICOM_PC10_BIOS names MAME's playch10.zip):
+PlayChoice-10 (with its BIOS: playch10.zip in MAME_ROMPATH, or as FAMICOM_PC10_BIOS names):
             the menu screen is above the game's (--bios single: one monitor,
             which the supervisor switches); 5 and 6 are the coin slots, 0
             (hold) Channel Select, - Enter, = the cabinet's Reset, 9 Service;
