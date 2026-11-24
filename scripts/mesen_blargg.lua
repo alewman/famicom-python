@@ -1,5 +1,5 @@
 -- Stop Mesen2 when a blargg-shell test ROM reports a result through $6000.
--- Used by mesen_run.py (FAMICOM_GPL_TOOLS) --lua; docs/validation.md has the protocol:
+-- Used by mesen_run.py ($EMU_TOOLS_GPL/tools/famicom-python) --lua; docs/validation.md has the protocol:
 -- $6001-$6003 = DE B0 61 once the data is valid, $6000 = $80 while running,
 -- $81 when it wants a reset, else the result code ($00 = passed).
 -- nesDebug reads without side effects, so this never disturbs the test.

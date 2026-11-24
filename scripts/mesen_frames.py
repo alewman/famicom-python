@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: MIT
 """Compare the board's frames with Mesen2's, pixel for pixel (a detector, docs/validation.md).
 
-Mesen2 normally hands Lua its frame as RGB through its palette. Here
-mesen_run.py (FAMICOM_GPL_TOOLS) gives it a 512-entry identity palette instead, so its
-"RGB" is the PPU's 9-bit value (palette value | emphasis << 6), the board's own
-pixel format, and the comparison is exact by index, not by colour. It also
-turns on Mesen2's power-up write-ignore and zero-fills its RAM, to match the
-board (``configure_for_comparison``).
+Mesen2 is run as a separate program, the family's mesen2-runner (machine ``nes``) at
+``$EMU_TOOLS_GPL/tools/mesen2/run.py`` (scripts/mesen2_tool.py), which gives it a
+512-entry identity palette, so the frame it writes (a 16-bit grey PNG) holds the PPU's
+9-bit value (palette value | emphasis << 6), the board's own pixel format, and the
+comparison is exact by index, not by colour. It also turns on Mesen2's power-up
+write-ignore and zero-fills its RAM, to match the board.
 
     python scripts/mesen_frames.py ROM --frame 300 [--png diff.png] [--machine pal]
 
@@ -15,25 +15,24 @@ On PAL the border (line 0, x 0-1 and 254-255) is left out: the board's is
 PPUSim's (docs/validation.md milestone 10), and this is a detector.
 
 Mesen2 counts frames from its own power-on; the board's frames within
-``--window`` either side are tried and the closest reported. Needs the
-hand-built MesenCore.so of mesen_run.py (FAMICOM_GPL_TOOLS); nothing it writes is committed.
+``--window`` either side are tried and the closest reported. Needs ``EMU_TOOLS_GPL``
+(exit status 3 without it) and a MesenCore.so (scripts/mesen2_tool.py says which);
+nothing it writes is committed.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+import tempfile
 from pathlib import Path
 
-import gpl_tools  # noqa: F401  (FAMICOM_GPL_TOOLS on sys.path, for mesen_run)
-from mesen_run import FRAMES_LUA, REGIONS, ROOT, decode_frames, run_mesen
+import mesen2_tool
 
 from famicom_python.machine import MACHINES, NES_001, Machine
 from famicom_python.ppu import HEIGHT
 from famicom_python.system import System
 from famicom_python.video import load_palette, write_png
-
-HOME = ROOT / "tests" / "mame_traces" / "mesen-home"
 
 
 def unswap_emphasis(value: int) -> int:
@@ -54,23 +53,15 @@ def finished_picture(system: System) -> list[int]:
     return list(ppu.picture)
 
 
-def mesen_frame(rom: Path, frame: int, seconds: float, region: int = 1) -> list[list[int]]:
-    lines: dict[str, str] = {}
-    code, _, _ = run_mesen(
-        rom,
-        lua=(FRAMES_LUA % (f"[{frame}]=true", frame)).encode(),
-        lua_name="frame.lua",
-        seconds=seconds,
-        home=HOME,
-        until="DONE",
-        for_comparison=True,
-        region=region,
-        collect=lines,
-    )
-    picture = decode_frames(lines).get(frame)
-    if code != 0 or not picture:
-        raise SystemExit(f"Mesen2 gave no frame {frame} (stop code {code})")
-    return [picture[y : y + 256] for y in range(0, len(picture), 256)]
+def mesen_frame(rom: Path, frame: int, seconds: float, region: str = "ntsc") -> list[list[int]]:
+    with tempfile.TemporaryDirectory(prefix="mesen-frames-") as scratch:
+        out = Path(scratch)
+        mesen2_tool.run(rom, out, frame, region=region, frames_at=[frame], timeout=seconds)
+        png = out / f"frame-{frame:06d}.png"
+        if not png.exists():
+            raise SystemExit(f"Mesen2 gave no frame {frame}")
+        width, _, picture = mesen2_tool.read_grey16_png(png)
+    return [picture[y : y + width] for y in range(0, len(picture), width)]
 
 
 def compare(
@@ -81,7 +72,7 @@ def compare(
     png: Path | None,
     machine: Machine = NES_001,
 ) -> int:
-    theirs = mesen_frame(rom, frame, seconds, REGIONS[machine.timing.name])
+    theirs = mesen_frame(rom, frame, seconds, mesen2_tool.REGIONS[machine.timing.name])
     if machine.timing.swapped_emphasis:
         theirs = [[unswap_emphasis(v) for v in row] for row in theirs]
     height, width = len(theirs), len(theirs[0])

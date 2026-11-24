@@ -39,7 +39,7 @@ import tempfile
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-import gpl_tools  # noqa: F401  (FAMICOM_GPL_TOOLS on sys.path, for mesen_run)
+import gpl_tools  # noqa: F401  ($EMU_TOOLS_GPL/tools/famicom-python on sys.path, for mesen_run)
 from mesen_run import ALPHABET, ROOT, decode_frames, run_mesen
 
 from famicom_python.joypad import SELECT, START, UP, A
@@ -191,7 +191,7 @@ end, emu.callbackType.read, 0x4016, 0x4017)
 
 # A frame as DAC levels (each channel of Mesen2's colour to its nearest of
 # eight, 0oRGB), two characters a pixel, in the numbered lines
-# mesen_run.py (FAMICOM_GPL_TOOLS)'s ``run_mesen(collect=...)`` gathers and
+# mesen_run.py ($EMU_TOOLS_GPL/tools/famicom-python)'s ``run_mesen(collect=...)`` gathers and
 # ``decode_frames`` reads. (Whole colours would be four characters, and a frame
 # then outruns the 500 lines the script log keeps.)
 LEVEL_FRAMES_LUA = """

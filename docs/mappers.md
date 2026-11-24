@@ -66,7 +66,7 @@ claims here, because none of it is committed.
 - `reference/mame-nes/`: MAME's NES cartridge sources at a pinned commit, **BSD-3**,
   so they may be read. They have boards the wiki does not. Cited per class.
 - **Never** read or copy FCEUX or Mesen2 source: GPL. Mesen2 is run as a binary
-  only (`mesen_run.py` (`FAMICOM_GPL_TOOLS`)). Some docstrings cite FCEUX's behaviour as the
+  only (the family's Mesen2 tool in `EMU_TOOLS_GPL`). Some docstrings cite FCEUX's behaviour as the
   wiki reports it; that is the wiki's statement.
 
 Reading traps that have bitten: `A~` diagrams are address bits and `D~` data

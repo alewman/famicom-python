@@ -72,7 +72,7 @@ import time
 import zipfile
 from pathlib import Path
 
-import gpl_tools  # noqa: F401  (FAMICOM_GPL_TOOLS on sys.path, for mesen_run)
+import gpl_tools  # noqa: F401  ($EMU_TOOLS_GPL/tools/famicom-python on sys.path, for mesen_run)
 import pc10_judge
 import vs_judge
 from count_mappers import BASE, classify

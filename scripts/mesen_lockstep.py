@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 """Milestone 6: the board against Mesen2's trace, instruction by instruction.
 
-docs/handoff-brief.md, milestone 6: Mesen2's trace logger (one line per
+docs/handoff-brief.md, milestone 6: Mesen2's instruction trace (one record per
 instruction: registers, CPU cycle count, PPU scanline and dot) against the
 board's state at every instruction boundary, from power-on, no input, for
 ``--frames`` frames; the first divergence is printed with the lines before it.
@@ -19,41 +19,40 @@ entries (6502-python steps them separately) are dropped: a step that pushed
 three bytes, set I and landed on the NMI or IRQ vector's target without
 executing BRK. P is compared without bits 5 and 4 (not flags).
 
-Mesen2 must be built with ``mesen2-detector-fixes.patch`` (a GPL tool kept outside this
-repository, in ``FAMICOM_GPL_TOOLS``) applied,
-where a higher tier shows it wrong: it delays only IRQs after a taken same-
+Mesen2 is run as a separate program: the family's mesen2-runner, machine ``nes`` with
+``--trace insn``, at ``$EMU_TOOLS_GPL/tools/mesen2/run.py`` (scripts/mesen2_tool.py; exit
+status 3 without ``EMU_TOOLS_GPL``). Its library must be built with the Mesen2 patch
+(``mesen2-detector-fixes.patch``, a GPL file kept with the tool, which its ``build.sh``
+applies), where a higher tier shows it wrong: it delays only IRQs after a taken same-
 page branch, and perfect6502 shows NMIs wait too (C29); and it ignores a DMC
 rate written in the timer's reload cycle, which AccuracyCoin's hardware answer
 key applies (validation.md, milestone 6). The board runs with Mesen2's power-
-on (``MACHINE``); Mesen2 runs with ``configure_for_comparison`` (RAM zeroed,
-the first frame's PPU writes ignored where the machine holds the PPU's reset)
-and its trace goes to ``--trace-dir`` (gitignored ``tests/mame_traces/lockstep``
-by default; about 80 bytes an instruction, 1.7 GB a minute).
+on (``MACHINE``); Mesen2 runs with RAM zeroed and the first frame's PPU writes
+ignored where the machine holds the PPU's reset, and the tool's trace
+(``insn.jsonl.gz``, contract trace/insn records, ending exactly at the last frame) is
+kept in ``--trace-dir`` (gitignored ``tests/mame_traces/lockstep`` by default).
+
+``--machine vs`` still imports ``vs_judge``, which loads Mesen2's old in-process driver
+(scripts/gpl_tools.py) for its own runs; only its Lua input script is used here.
 """
 
 from __future__ import annotations
 
 import argparse
-import re
+import shutil
 import sys
 import tempfile
 import time
-import zipfile
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
-import gpl_tools  # noqa: F401  (FAMICOM_GPL_TOOLS on sys.path, for mesen_run)
-from mesen_run import REGIONS, ROOT, run_mesen
+import mesen2_tool
+from mesen2_tool import ROOT
 
 from famicom_python.machine import MACHINES, NES_001, Machine
 from famicom_python.system import System
 
-MESEN_LINE = re.compile(
-    rb"^([0-9A-F]{4}) +[0-9A-F]{2,4} +"
-    rb"A:([0-9A-F]{2}) X:([0-9A-F]{2}) Y:([0-9A-F]{2}) S:([0-9A-F]{2}) "
-    rb"P:([0-9A-F]{2}) CYC:(\d+) SL:(-?\d+) DOT:(\d+) FR:(\d+)"
-)
 P_MASK = 0xCF
 PASSED_OVER = "rows after a rendering-time $2007 read passed over"
 # Mesen2's power-on where hardware leaves it open and the board's default
@@ -103,30 +102,17 @@ def lockstep_machine(name: str, ppu_dot: int | None, ppu_ticks: int | None = Non
     return machine
 
 
-STOP_AFTER_FRAMES = """
-local frames = 0
-emu.addEventCallback(function()
-  frames = frames + 1
-  if frames >= {frames} then emu.stop(0) end
-end, emu.eventType.endFrame)
-"""
-
-
 def mesen_rows(path: Path):
-    """(pc, a, x, y, s, p, cycles, line, dot, frame) for each line of Mesen2's trace.
-
-    Mesen2's ``[PC,4h]`` drops leading zeros in zero page ("0029  29   A:"): its
-    own address prefix carries all four digits, so that one is read.
-    """
-    with path.open("rb") as stream:
-        for text in stream:
-            m = MESEN_LINE.match(text)
-            if m is None:
-                continue
-            pc, a, x, y, s, p = (int(m[i], 16) for i in range(1, 7))
-            line = int(m[8])
-            line = LINES - 1 if line < 0 else line
-            yield pc, a, x, y, s, p, int(m[7]), line, int(m[9]), int(m[10])
+    """(pc, a, x, y, s, p, cycles, line, dot, frame) for each record of the tool's
+    trace/insn (``insn.jsonl.gz``). Mesen2 numbers the pre-render line -1."""
+    for record in mesen2_tool.insn_records(path):
+        regs = record["regs"]
+        line = record["line"]
+        line = LINES - 1 if line < 0 else line
+        yield (
+            record["pc"], regs["A"], regs["X"], regs["Y"], regs["S"], regs["P"],
+            record["t"], line, record["dot"], record["frame"],
+        )  # fmt: skip
 
 
 def board_rows(system: System):
@@ -170,15 +156,6 @@ def board_rows(system: System):
                 continue  # an interrupt entry: Mesen2 logs none
         yield regs + fetch[0] + (after_2007,)
         after_2007, read_2007[0] = read_2007[0], False
-
-
-def mesen_path(rom: Path) -> Path:
-    """Mesen2 opens a .zip's member as "archive\\x01member" (Utilities/VirtualFile.cpp)."""
-    if rom.suffix.lower() != ".zip":
-        return rom
-    with zipfile.ZipFile(rom) as archive:
-        (member,) = [n for n in archive.namelist() if n.lower().endswith((".nes", ".fds"))]
-    return Path(f"{rom.resolve()}\x01{member}")
 
 
 def position(line: int, dot: int) -> int:
@@ -284,7 +261,7 @@ def main() -> int:
     args = parser.parse_args()
     global LINES
     name = args.machine
-    lua = STOP_AFTER_FRAMES.replace("{frames}", str(args.frames))
+    lua = ""
     prepare = None
     if name == "vs":
         # The Vs. UniSystem with the game's PPU, and one input script for both
@@ -305,22 +282,38 @@ def main() -> int:
     machine = lockstep_machine(name, args.ppu_dot, args.ppu_ticks)
     LINES = machine.timing.lines
     args.trace_dir.mkdir(parents=True, exist_ok=True)
-    trace = args.trace_dir / f"{args.rom.stem}.{args.machine}.{args.frames}.trace"
+    trace = args.trace_dir / f"{args.rom.stem}.{args.machine}.{args.frames}.insn.jsonl.gz"
     if not (args.reuse and trace.exists()):
-        code, _, wall = run_mesen(
-            mesen_path(args.rom),
-            lua=lua.encode(),
-            seconds=3600,
-            # A fresh home each run: Mesen2 keeps battery saves there, and a
-            # save from an earlier run would be the cartridge's RAM at power.
-            home=Path(tempfile.mkdtemp(prefix="mesen-home-", dir=args.trace_dir)),
-            trace=trace,
-            for_comparison=True,
-            region=REGIONS[machine.timing.name],
+        # A fresh output folder each run (the tool keeps Mesen2's home in it): Mesen2
+        # keeps battery saves there, and a save from an earlier run would be the
+        # cartridge's RAM at power.
+        out = Path(tempfile.mkdtemp(prefix="mesen-run-", dir=args.trace_dir))
+        script = None
+        if lua:
+            script = out / "input.lua"
+            script.write_text(lua, encoding="utf-8")
+        start = time.perf_counter()
+        manifest = mesen2_tool.run(
+            args.rom,
+            out / "run",
+            args.frames,
+            region=mesen2_tool.REGIONS[machine.timing.name],
+            trace="insn",
+            lua=script,
             ppu_reset_at_power=machine.ppu_reset_at_power,
             oam_row_corruption=machine.timing.oam_corruption,
+            timeout=3600,
         )
-        print(f"Mesen2: stop code {code}, {wall:.0f} s, {trace.stat().st_size:,} bytes of trace")
+        shutil.move(out / "run" / "insn.jsonl.gz", trace)
+        wall = time.perf_counter() - start
+        records = next(
+            (o.get("records") for o in manifest["outputs"] if o["path"] == "insn.jsonl.gz"), None
+        )
+        print(
+            f"Mesen2: {manifest['status']}, {wall:.0f} s, {records} instructions of trace"
+            f" (Mesen2 {manifest['upstream']['commit'][:7]}, via {manifest['tool']}"
+            f" {manifest['tool_version']})"
+        )
     start = time.perf_counter()
     _, report = compare(
         args.rom, trace, tolerate_2007=args.tolerate_2007, machine=machine, prepare=prepare
