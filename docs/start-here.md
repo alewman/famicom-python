@@ -350,7 +350,7 @@ disagree with their own measurements: undocumented-behavior.md).
 **Expansion audio** (Famicom only: the 2A03's output goes into the cartridge on
 pin 45 and comes back on pin 46): VRC6, VRC7, Namco 163, Sunsoft 5B, MMC5, FDS.
 Two of these are chips the family will want as shared cores: the **VRC7 is a
-YM2413 (OPLL) variant**, judged by Nuked-OPLL's `opll_type_ds1001`, and shares a
+YM2413 (OPLL) variant**, judged by Nuked-OPLL's VRC VII type (run as a closed box), and shares a
 core with sms-python's FM unit; the **5B is a YM2149 (AY-3-8910 family)**, an
 arcade-wide chip. The others stay in the cartridge package. Measured mix levels
 per chip are in undocumented-behavior.md.

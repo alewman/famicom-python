@@ -63,7 +63,7 @@ Python's `urllib`.
   (an NSF player, the Vs. System). Not now.
 - **Expansion sound chips that are real chips become shared cores**: VRC7 →
   a YM2413 core with a VRC7 variant (shared with sms-python's FM unit; judge
-  Nuked-OPLL `opll_type_ds1001`); Sunsoft 5B → an AY-3-8910/YM2149 core. Not in
+  Nuked-OPLL's VRC VII type, run as a closed box); Sunsoft 5B → an AY-3-8910/YM2149 core. Not in
   this brief's milestones; VRC6, N163, MMC5 audio and FDS stay here.
 - **Reference boards are correct, not fast.** Speed is a later `-fast` project's
   job.

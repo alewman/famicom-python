@@ -318,9 +318,9 @@ milestone 2*: with register writes two dots into the CPU cycle, the board
 samples rendering **as dot 338 runs**: a $2001 write that lands after dot 338,
 enabling or disabling, is too late for that frame's skip (logged on
 `10-even_odd_timing`: enables landing after dots 337 and 338, one skipping and
-one not, as the expected `08 08` requires). Mesen2 gets the same answer from a
-1-dot delayed rendering flag sampled at 339 (`NesPpu.cpp` 946–954); the two
-cannot be told apart by this test. Whether BG alone or BG-or-sprites gates it
+one not, as the expected `08 08` requires). Mesen2 passes the same test (OBSERVED); that it
+does so with a 1-dot delayed rendering flag sampled at 339 is HYPOTHESIS (read from its GPL
+source before the 2026-11-14 rule; for review). The two cannot be told apart by this test. Whether BG alone or BG-or-sprites gates it
 (C13) the test cannot say (it uses BG only); the board uses either.
 
 **Turning rendering off or on mid-frame**: v stops incrementing and is driven on
@@ -350,8 +350,8 @@ frame (`PPU_OAM.wiki`; blargg `sprite_hit_tests_2005.10.05`).
 
 ### Frame counter, in CPU cycles after the frame counter resets
 
-`APU_Frame_Counter.wiki` (APU cycle N's put = CPU cycle 2N+1); identical to
-Mesen2 `ApuFrameCounter.h` l.19–22.
+`APU_Frame_Counter.wiki` (APU cycle N's put = CPU cycle 2N+1). Mesen2 was read to use the
+same table (HYPOTHESIS: GPL source, read before the 2026-11-14 rule).
 
 | Mode | Event | NTSC | PAL |
 | --- | --- | ---: | ---: |

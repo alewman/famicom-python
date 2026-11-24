@@ -159,11 +159,11 @@ AccuracyCoin scores from the doclic.eu leaderboard
 | TriCNES (100th_Coin) | 140 | AccuracyCoin was written against it | MIT | `94f1b11` |
 | mame_nes (fork of MAME 0.260) | 140 | reworked NES PPU/DMA | not asserted | `f8b7c1d` |
 | **Mesen2 / MesenCE** | 137 | 100 % TASVideos; builds and runs headless here (below) | GPL-3.0 | Mesen2 `b9fa69d` (archived), MesenCE `a60e79f` (live successor) |
-| Nintendulator | 103 | made `nestest.log` | no licence file | `1409c6a` |
-| puNES | 101 | | GPL-2.0 | `b1758ec` |
-| Nestopia UE | 97 | | GPL-2.0 | `7b5c87d` |
-| FCEUX | 85 | | GPL-2.0 | `a62b868` |
-| **MAME 0.285** (installed) | **81/144** (measured here, current AccuracyCoin) | CPU matches `nestest.log`; PPU scanline-based; recipe in [mame-oracle.md](mame-oracle.md) | BSD-3-Clause (driver, PPU, cart bus); **`nes_apu.cpp` GPL-2.0+** | `mame0285` = `f379cd0`, sparse |
+| Nintendulator | 103 | made `nestest.log` | GPL-2.0+ (file headers) | `1409c6a`; source not fetched since 2026-11-24 |
+| puNES | 101 | | GPL-2.0 | `b1758ec`; source not fetched since 2026-11-24 |
+| Nestopia UE | 97 | | GPL-2.0 | `7b5c87d`; source not fetched since 2026-11-24 |
+| FCEUX | 85 | | GPL-2.0 | `a62b868`; source not fetched since 2026-11-24 |
+| **MAME 0.285** (installed) | **81/144** (measured here, current AccuracyCoin) | CPU matches `nestest.log`; PPU scanline-based; recipe in [mame-oracle.md](mame-oracle.md) | BSD-3-Clause (driver, PPU, cart bus); **`nes_apu.cpp` GPL-2.0+** (not fetched since 2026-11-24) | `mame0285` = `f379cd0`, sparse |
 | TetaNES | — | Rust | Apache-2.0/MIT | `a0a6b17` |
 | Breaknes | 70 | gate-level (above) | CC0 | `215ab82` |
 
@@ -172,19 +172,16 @@ Nintendulator) are emulator-derived.
 
 ### Mesen2 as a second detector (measured 2026-10-05)
 
-Mesen2's core builds here **without .NET**:
-
-```sh
-git clone https://github.com/SourMesen/Mesen2 reference/build-mesen2/Mesen2   # then check out b9fa69d
-cd reference/build-mesen2/Mesen2
-nice -n 10 make core USE_GCC=true LTO=false STATICLINK=false -j8
-```
-
-1 min 04 s wall on this machine (g++ 15.2, SDL2 2.32.10), producing
-`InteropDLL/obj.linux-x64/MesenCore.so`. `mesen_run.py` (a GPL tool kept outside this
+Mesen2's core (https://github.com/SourMesen/Mesen2 @ `b9fa69ddc6d0`) was built here **without
+.NET** before 2026-11-24 (`make core USE_GCC=true LTO=false STATICLINK=false`, 1 min 04 s wall,
+g++ 15.2, SDL2 2.32.10), producing `InteropDLL/obj.linux-x64/MesenCore.so`. Since 2026-11-24 no
+Mesen source is kept in this repository (Aubrey's rule): the source copy was moved out unopened
+and the built library (sha1 `c48cfc76`) put back at
+`reference/build-mesen2/Mesen2/InteropDLL/obj.linux-x64/MesenCore.so`; a fresh checkout uses the
+build emu-tools-gpl's Mesen2 tool makes (scripts/mesen2_tool.py's fallback) or `MESEN_CORE`. `mesen_run.py` (a GPL tool kept outside this
 repository since 2026-11-21, at `$EMU_TOOLS_GPL/tools/famicom-python/mesen_run.py`, where
 `EMU_TOOLS_GPL` names a checkout of emu-tools-gpl, docs/provenance.md) drives it through
-`ctypes` the way Mesen's own `TestRunner.cs` does (our code calling the GPL
+`ctypes` the way Mesen's own test runner does (code calling the GPL
 library at run time; nothing copied), and `scripts/mesen_blargg.lua` stops it
 when a blargg ROM reports through `$6000`:
 
@@ -1026,7 +1023,7 @@ before a run was extended.
 | --- | --- | --- |
 | SMB1's first `$2002` read: `$30` vs `$10` | power-on PPUSTATUS ("+0+x xxxx"): the board sets the overflow bit (PPUSim), Mesen2 does not | `PowerOn.ppustatus` (new; default unchanged); the lockstep machine uses Mesen2's |
 | OAM DMA's 513 cycles in a different row | attribution: the board stalls the next opcode fetch, Mesen2 logs after the stall | rows taken at the opcode fetch's read |
-| VBL's NMI one instruction apart | power-on phase: Mesen2's PPU starts a CPU cycle and a dot ahead (`NesCpu::Reset`) | `PowerOn.ppu_dot` (new; default 0); only 4, of 0-9, keeps SMB1's first 120 frames in step, and the board passes all 79 PPU and APU judges at 4 with the same synchronization CRCs |
+| VBL's NMI one instruction apart | power-on phase: Mesen2's PPU starts a CPU cycle and a dot ahead (OBSERVED: the `ppu_dot` sweep finds only 4 in step) | `PowerOn.ppu_dot` (new; default 0); only 4, of 0-9, keeps SMB1's first 120 frames in step, and the board passes all 79 PPU and APU judges at 4 with the same synchronization CRCs |
 | NMI after a taken same-page branch (MM2, Kirby, Battletoads) | **Mesen2**: delays only IRQs there; perfect6502 delays NMIs too (C29) | Mesen2 patch 1 |
 | Zelda and Kirby read different SRAM | Mesen2 keeps battery saves in its home: a second run powered on with the first's | a fresh Mesen2 home per run |
 | Kirby: a DMC fetch 4 cycles apart | power-on DMC rate timer: Mesen2 starts it at a full period | `PowerOn.dmc_timer` (new; default 0); only 213 APU cycles of 0 and 211-214, either APU parity, holds |
@@ -1034,7 +1031,7 @@ before a run was extended.
 | Kirby: VBL's NMI during a DMC DMA inside its wait-loop `BEQ` | **the board**: 6502-python saw a request raised during a stall as late; perfect6502 with RDY held low polls it (C30) | 6502-python `note_stall` (PR #7); the board reports each stall boundary |
 | AccuracyCoin "Interrupt flag latency" test A regressed (136 to 135) with the first `note_stall` | a taken branch's next-opcode read ignores a request raised in the stall's last cycle (perfect6502 too) | the refined `note_stall` (080fc80): 136 again, milestone 5's cycles |
 | Kirby: rows lost after its IRQ | **the tool**: Mesen2 prints a zero-page PC with two digits ("0029  29"); the parser skipped those lines | parser |
-| Kirby: `LDA $4015` bit 5 after a DMC DMA | **Mesen2**: `GetInternalOpenBus` returns the external bus, and DMA reads set the internal one; AccuracyCoin's key ("Internal Data Bus", C24) says neither | Mesen2 patch 3 |
+| Kirby: `LDA $4015` bit 5 after a DMC DMA | **Mesen2**: its internal open bus reads back as the external bus, and DMA reads set the internal one (OBSERVED in the trace; the mechanism, read from its source when patching it, HYPOTHESIS); AccuracyCoin's key ("Internal Data Bus", C24) says neither | Mesen2 patch 3 |
 | Zelda: `$2002` overflow bit | **Mesen2 setting**: OAM row corruption (C26, AccuracyCoin's key) is off by default; Zelda turns rendering off mid-frame on its title | `configure_for_comparison` turns it on |
 | **SMB3: its status-bar IRQ's dummy `LDA $2007` (line 193)** | **the board, open**: a `$2007` read during rendering. Replayed on PPUSim (`ppusim_compare.py`'s harness, the game's access sequence), PPUSim loads its buffer from the first fetch at least 5 dots after the access (a garbage nametable fetch, still the old v), the board one fetch later with v already incremented; PPUSim also changes the fetch stream itself (a hybrid pattern address, an extra address phase). The family of AccuracyCoin's failing "ALE + Read", "Hybrid Addresses" and "$2007 Stress Test" (milestone 4) | the board's octal latch (C31, 2026-10-23, below); then Mesen2's: it does not model the collision, and the board now matches PPUSim on SMB3's sequence |
 
@@ -2045,7 +2042,9 @@ mame_nes both passing all 147 (2026-10-30, not run here), so three emulators are
 SourMesen/Mesen2 is archived; development went to
 [nesdev-org/MesenCE](https://github.com/nesdev-org/MesenCE). Built as Mesen2 was, by
 hand and not by the fetch script, because it is GPL: `4b8a196e` in
-`reference/build-mesence/MesenCE`, `USE_GCC=true make core`, run as a library only.
+`reference/build-mesence/MesenCE`, `USE_GCC=true make core`, run as a library only. Since
+2026-11-24 only the built library stays there (sha1 `6bdbfe4a`); the source copy was moved out
+unopened (Aubrey's rule).
 `MESEN_LIB=.../MesenCore.so` selects it for every script that uses `mesen_run.py`.
 
 What differs from Mesen2, found by measuring the running library: `NesConfig` has

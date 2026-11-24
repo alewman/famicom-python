@@ -406,9 +406,9 @@ before the board takes a side.
   the source changed after); the harness claims only the other values.
 - **C29. Does a taken branch delay an NMI, or only an IRQ?**
   `CPU_interrupts.wiki` says interrupts: a taken same-page branch "ignores
-  IRQ/NMI during its last clock". Mesen2 (`b9fa69d`, `NesCpu.h`
-  `BranchRelative`) says NMI too in its comment but delays only the IRQ in its
-  code. *Settled on perfect6502* (`scripts/perfect6502_nmi_branch.c`): with
+  IRQ/NMI during its last clock". Mesen2 (`b9fa69d`) was read to say NMI too in a
+  comment but delay only the IRQ (HYPOTHESIS: GPL source, read before the 2026-11-14
+  rule; for review). *Settled on perfect6502* (`scripts/perfect6502_nmi_branch.c`): with
   /NMI falling 1-2 half-cycles after the opcode fetch, a JMP takes it after
   itself and a taken BEQ only after the next instruction. The board
   (6502-python's branch poll points) delays both. Found in lockstep: Mega Man
@@ -445,7 +445,7 @@ before the board takes a side.
   *write* during rendering (open item 8).
 - **C32. OAMADDR when rendering starts.** Errata.wiki: on 2C02C-H, an OAMADDR
   of 8 or more when rendering starts copies the 8 bytes at OAMADDR & $F8 over
-  OAM[0-7]; Mesen2 does (`DisableOamAddrBug` off by default). PPUSim does not:
+  OAM[0-7]; Mesen2 does by default (its "disable OAMADDR bug" emulation option is off). PPUSim does not:
   with OAMADDR left at $80 or $84 by $2004 writes (no $2003 write, which has
   its own corruption) and a sprite only in row $80, it shows no sprite-0 hit,
   as the board; the control, the sprite in row 0, hits in both

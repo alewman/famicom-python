@@ -58,9 +58,8 @@ PASSED_OVER = "rows after a rendering-time $2007 read passed over"
 # Mesen2's power-on where hardware leaves it open and the board's default
 # differs: PPUSTATUS bits 7-5 clear (the board's default sets the overflow bit,
 # as PPUSim does; "+0+x xxxx" allows both), and the PPU 4 dots into line 0 as
-# the CPU starts (NesCpu::Reset adds a CPU divider to the master clock, and
-# the PPU runs 1 tick behind it). Found by sweeping ppu_dot over a trace: only
-# 4 stays in lockstep. The board passes every PPU and APU judge at 4, with the
+# the CPU starts (OBSERVED: found by sweeping ppu_dot over a trace, only 4
+# stays in lockstep; the mechanism once read from Mesen2's source is not cited). The board passes every PPU and APU judge at 4, with the
 # same synchronization CRCs (validation.md, milestone 6).
 # The DMC's rate timer starts at a full period (DeltaModulationChannel::Reset:
 # 427 CPU cycles, the board's 213 APU cycles): the only start, of 0 and

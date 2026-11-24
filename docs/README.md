@@ -54,7 +54,8 @@ any single document:
    follow from the coefficients they were derived from** (which give about
    28 Hz, 1.2 Hz and 11.9 kHz), and later sweeps fit ~16 Hz (NES) and ~32 Hz
    (Famicom). The board's analogue stage is a labelled fit.
-9. **Nuked-OPLL already models the VRC7** (`opll_type_ds1001`), so a YM2413 core
+9. **Nuked-OPLL already models the VRC7** (as a chip type of its own; a closed box, its
+   source not fetched since 2026-11-24), so a YM2413 core
    would serve both the Master System FM unit and the VRC7.
 10. **The Famicom microphone is read at $4016 D2**, not $4017; and the RF
     Famicom clocks its pads on every read cycle where the NES-001 clocks once per

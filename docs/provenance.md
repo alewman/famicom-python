@@ -195,3 +195,28 @@ The old citations stay in the public history (`git log -S CnromProtect`).
 ### Not done here
 
 No SPDX headers yet (0 of 145 source files): owed, as across the family.
+
+### Closed-box sources removed (2026-11-24)
+
+Aubrey's rule of 2026-11-24: an MIT repository does not download or keep the source of
+anything the family's `sources.md` marks closed box only, nor copyleft or unlicensed
+emulator code. Pins removed from `scripts/pinned_repos.json`, trees moved aside unopened,
+out of the repository (not deleted): Mesen2
+(`b9fa69ddc6d0`), MesenCE (`a60e79feb4d6`), NES_MiSTer (`49a0a662e244`), Nuked-OPLL
+(`1269cf5a783b`), VRC7dump (`404294ad94e0`), YM2203-LLE (`817387fd89af`), FCEUX
+(`a62b868e9247`), Nestopia UE (`7b5c87d8dc3c`), Nintendulator (`1409c6af5cee`, GPL-2.0+ by
+its file headers), puNES (`b1758ec26a3d`), VisualNes (`f7dbdf2b2fb1`, no licence file) and
+AprVisual (`ced0e1d53357`, no licence file); MAME's `nes_apu.*` (GPL-2.0+) left the MAME
+sparse list. The hand-built Mesen2 and MesenCE libraries stay at their paths
+(`reference/build-mesen2/.../MesenCore.so` sha1 `c48cfc76`, `reference/build-mesence/.../MesenCore.so`
+sha1 `6bdbfe4a`), and the source copies they were built in moved out with the rest;
+scripts/mesen2_tool.py falls back to emu-tools-gpl's own build on a fresh checkout. Kept:
+the MIT/BSD/CC0/zlib trees (TriCNES, FlawlessChips, perfect6502, breaknes, breaks, metalnes,
+tetanes, holy-mapperel, mame_nes's BSD files, AccuracyCoin, the test ROMs).
+
+Passages rewritten (internal names dropped, source-read facts HYPOTHESIS): Nuked-OPLL's chip
+type identifier (docs/README.md, handoff-brief.md, start-here.md), Mesen2's `NesPpu.cpp` and
+`ApuFrameCounter.h` lines (timing.md), `NesCpu.h`/`BranchRelative` and an option's symbol
+(undocumented-behavior.md C29, C32), `TestRunner.cs`, `NesCpu::Reset`, `GetInternalOpenBus`
+(validation.md), `NesCpu::Reset` (scripts/mesen_lockstep.py). The earlier citations remain
+in the public history, as recorded above.
