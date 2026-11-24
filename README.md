@@ -29,6 +29,8 @@ or where `FAMICOM_PC10_BIOS` names), checks each game's security PROM, shows its
 screen and sells time ([docs/validation.md](docs/validation.md), "The
 PlayChoice-10"). Not built, by choice: the speed work (reference boards aim to
 be correct; `*-fast` projects are for speed).
+The gate and its latest counts, with the commit they were measured at, are in
+[docs/status.md](docs/status.md).
 Open questions with no hardware answer are in
 [docs/undocumented-behavior.md](docs/undocumented-behavior.md).
 
