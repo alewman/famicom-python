@@ -14,6 +14,8 @@ them.
 
 from __future__ import annotations
 
+import dataclasses
+import itertools
 import os
 from pathlib import Path
 
@@ -41,6 +43,7 @@ from famicom_python.supervisor import (
     GAME_RES,
     GAME_STOP,
     INT_DETECT,
+    NMI_EI,
     PPU_RES,
     RP5H01,
     SDCS,
@@ -395,6 +398,53 @@ def test_game_res_resets_the_2a03_and_ppu_res_the_ppu() -> None:
     machine.supervisor.write_port(GAME_RES, 1)
     machine.run_frames(3)
     assert machine.game.board.ram[0x10] != count and ppu.ctrl == 0x80
+
+
+WATCHDOG_PROGRAM = Path(__file__).with_name("pc10_watchdog.hex")
+
+
+def read_program(path: Path) -> bytes:
+    """A supervisor program from its listing (``pc10_watchdog.hex``'s format:
+    ``ADDRESS: BYTES``, a ``#`` comment after), 16 KiB, $FF where unwritten."""
+    rom = bytearray(b"\xff" * 0x4000)
+    for line in path.read_text().splitlines():
+        fields = line.split("#", 1)[0].split()
+        if fields:
+            address = int(fields[0].rstrip(":"), 16)
+            data = bytes.fromhex("".join(fields[1:]))
+            rom[address : address + len(data)] = data
+    return bytes(rom)
+
+
+def test_our_supervisor_program_lets_the_watchdog_run_out() -> None:
+    """tests/pc10_watchdog.hex, the lockstep gate's pc10-watchdog case: each
+    boot holds the counter (NMI EI on odd boots, DOG DI on even), drops the
+    hold, and the eighth blank after resets the Z80; its reset clears the
+    latches SDCS first, so /DISP MASK's fall flips no monitor."""
+    ours = dataclasses.replace(bios(), program=read_program(WATCHDOG_PROGRAM))
+    machine = PlayChoice(load(pc10_image(COUNTING), use_database=False), ours)
+    supervisor = machine.supervisor
+    drops = []  # the blanks seen when each boot's hold dropped
+    for boot in (1, 2, 3):
+        hold = NMI_EI if boot % 2 else DOG_DI
+        while not supervisor.latch[hold]:
+            machine.step()
+        # Lines up, the program's own flip done: once a boot.
+        assert supervisor.latch[SDCS] and supervisor.latch[DISP_MASK] and not machine.in_reset
+        assert machine.monitor_on_game == (boot % 2 == 1)
+        assert supervisor.latch[GAME_STOP] == boot % 2
+        assert supervisor.ram_8w[0] == boot and supervisor.video_ram[0] == boot
+        while supervisor.latch[hold]:
+            machine.step()
+        drops.append(supervisor.blanks)
+        while supervisor.watchdog_resets < boot:
+            machine.step()
+        assert supervisor.blanks == drops[-1] + 8
+        assert supervisor.latch == [0] * 16 and machine.in_reset and supervisor.screen_blank
+        assert machine.monitor_on_game == (boot % 2 == 1)  # the reset flipped nothing
+    # Each boot is the hold (three or four blanks) and the eight after it.
+    assert all(11 <= b - a <= 12 for a, b in itertools.pairwise(drops))
+    assert machine.game.board.ram[0x10] != 0  # the game ran between resets
 
 
 def test_cntrl_mask_reaches_the_panel() -> None:

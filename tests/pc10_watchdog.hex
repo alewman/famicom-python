@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: MIT
+# A supervisor program of our own, in place of the PlayChoice-10's BIOS program
+# (8T): it lets the watchdog run out, again and again. The real BIOS never does
+# (it holds NMI EI high, or DOG DI in its error loops), so without this nothing
+# outside the unit tests resets the Z80. The characters and colour PROMs stay
+# the real set's (MAME_ROMPATH); only the program is replaced. Lines are
+# "ADDRESS: BYTES", hex, after which a "#" starts a comment; everything not
+# written reads $FF (an unprogrammed EPROM). Hand-assembled; Z80 cycles in the
+# comments where they set a time.
+#
+# Each boot (power, or the watchdog's reset):
+#   - counts itself in 8W ($8800; kept through the Z80's reset) and writes the
+#     count to the screen's first character while SDCS is low;
+#   - raises SDCS, /PPU RES, /GAME RES, /CNTRL MASK, /SOUND MASK and /DISP MASK
+#     (the game starts), then drops /DISP MASK with SDCS high and raises it
+#     again (the one-monitor board's flip, once a boot);
+#   - on odd boots raises /GAME STOP (the game runs) and holds the watchdog's
+#     counter with NMI EI for about 3.5 blanks (one NMI taken, $0066 RETN);
+#     on even boots leaves /GAME STOP low (the game stops at its first NMI)
+#     and holds the counter with DOG DI instead;
+#   - drops the hold and spins: the eighth blank after resets the Z80, whose
+#     reset clears both latches, SDCS first, so /DISP MASK falls with SDCS low.
+0000: 31 00 88      # LD SP,$8800
+0003: 21 00 88      # LD HL,$8800     8W's first byte
+0006: 34            # INC (HL)        the boot count
+0007: 7E            # LD A,(HL)
+0008: 32 00 90      # LD ($9000),A    the screen's first character (SDCS low)
+000B: 3E 01         # LD A,1
+000D: D3 00         # OUT ($00),A     SDCS high
+000F: D3 0A         # OUT ($0A),A     /PPU RES high
+0011: D3 04         # OUT ($04),A     /GAME RES high: the 2A03 starts
+0013: D3 01         # OUT ($01),A     /CNTRL MASK high
+0015: D3 03         # OUT ($03),A     /SOUND MASK high
+0017: D3 02         # OUT ($02),A     /DISP MASK high
+0019: AF            # XOR A
+001A: D3 02         # OUT ($02),A     /DISP MASK low, SDCS high
+001C: 3C            # INC A
+001D: D3 02         # OUT ($02),A     /DISP MASK high again
+001F: CB 46         # BIT 0,(HL)
+0021: 28 0C         # JR Z,$002F      even boots
+0023: D3 05         # OUT ($05),A     odd: /GAME STOP high
+0025: D3 08         # OUT ($08),A     NMI EI high: the counter held
+0027: CD 39 00      # CALL $0039
+002A: AF            # XOR A
+002B: D3 08         # OUT ($08),A     NMI EI low: the counter counts
+002D: 18 FE         # JR $
+002F: D3 09         # OUT ($09),A     even: DOG DI high: the counter held
+0031: CD 39 00      # CALL $0039
+0034: AF            # XOR A
+0035: D3 09         # OUT ($09),A     DOG DI low: the counter counts
+0037: 18 FE         # JR $
+0039: 01 28 23      # LD BC,9000      the delay: 9,000 x 26 T-states, 3.5 blanks
+003C: 0B            # DEC BC          6
+003D: 78            # LD A,B          4
+003E: B1            # OR C            4
+003F: 20 FB         # JR NZ,$003C     12 taken
+0041: C9            # RET
+0066: ED 45         # RETN            the blank's NMI, taken once (NMI EI not re-armed)

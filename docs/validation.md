@@ -2619,7 +2619,7 @@ digit or the blinking line (four) and in which frame of the game is left frozen
 its NMI where MAME halts it at once (C83, C85), so the two freeze a moving game a
 frame or more apart. Nothing here says which frame the hardware leaves.
 
-**The tests** (`tests/test_playchoice.py`: 24 quick cases, 23 of them on a BIOS of a
+**The tests** (`tests/test_playchoice.py`: 25 quick cases, 24 of them on a BIOS of a
 few bytes of Z80 code and one on the real BIOS's first seconds; 2 slow with the real
 BIOS and a game, above; `tests/test_playchoice_window.py`, 3 quick): the row; the image's
 three areas; the panel's reports, player 2's missing buttons, /CNTRL MASK; the port
@@ -2631,7 +2631,25 @@ blanks in ten seconds; a character through the colour PROMs and the two rows the
 blank hides; the game held in reset, stopped only at its NMI, reset without the PPU
 and the PPU without it; the two clocks within an instruction; a save state of the
 whole cabinet; the window with the menu above the game, with one monitor, and
-without a BIOS.
+without a BIOS; the watchdog run out by a program of our own, below.
+
+**The watchdog run out (2026-11-24).** The real BIOS never lets the watchdog count:
+it holds NMI EI high while it runs and DOG DI high in its error loops (a wrong PROM
+leaves it at `$144F` with both up, no reset in 30 s), so no run with it resets the
+Z80, and famicom-rust-fast's seeded faults showed the cost: a watchdog firing on the
+seventh blank was caught only by a unit test, and the cabinet's /DISP MASK rule
+reading SDCS wrongly at the reset was caught by nothing. `tests/pc10_watchdog.hex` is
+a supervisor program of our own (a hand-assembled listing, 68 bytes; no firmware)
+that takes the BIOS program's place with the set's characters and colours kept: each
+boot counts itself in 8W, raises the lines, flips the one-monitor screen once, holds
+the counter with NMI EI (odd boots, the game let run) or DOG DI (even boots, the game
+stopped at its first NMI) for 3.5 blanks, and spins until the eighth blank resets the
+Z80. `test_our_supervisor_program_lets_the_watchdog_run_out` checks three boots:
+the reset on the eighth blank after the hold, both latches cleared, the game held,
+the screen blank, no flip from the reset. famicom-rust's lockstep table runs it with
+*Super Mario Bros.* in channel 1 for 600 slices (`pc10-watchdog-Super_Mario_Bros`,
+`--bios-program`). This exercises the specification's own rules; it adds no hardware
+evidence about them (the watchdog's count is the schematic read by eye, C84).
 
 **How the two processors are coupled.** An instruction at a time: the Z80 or the
 2A03, whichever is behind on the nominal clocks (a T-state is 945/176 master ticks),
@@ -2649,7 +2667,7 @@ Young, *The Undocumented Z80 Documented* 5.5), and RESET clears I and R (`1cec5c
 DOC: Zilog UM0080, "RESET"). Neither shows here, and why: the supervisor drives
 only the Z80's /NMI, never /INT, so the EI delay changes no interrupt it takes; and
 I and R were already 0 at power, so RESET clearing them matters only after a watchdog
-reset, which no run here has. OBSERVED, as a check: all 56 images under both
+reset, which no run with the real BIOS has (only our own program's, above). OBSERVED, as a check: all 56 images under both
 `pc10_mame.py` scripts (`play`, `time`), each screen and the Z80's whole state
 compared at every sixtieth to frame 1,500 or 1,600, identical under 0.4.0 and
 `b59c80b`: 112 of 112 runs, no watchdog reset in any. After a watchdog reset the
