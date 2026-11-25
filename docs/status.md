@@ -17,6 +17,15 @@ is the gate a change must pass and the counts it was last measured at.
 
 ## What changed on 2026-11-24
 
+- mesen2-runner 0.3.0: `mesen_accuracycoin.py`'s Lua logs the 256 result bytes and `DONE` at
+  the end of the first frame in which every test's byte is final (the board's rule in
+  `run_accuracycoin`), or at `--frames`, and `run.py --until log:DONE` ends the run there
+  (`--frames`, 20,000, is the cap; `mesen2_tool.run` takes `until`). Gate: AccuracyCoin 131 of
+  147 on Mesen2 (the hand build) and 143 of 147 on MesenCE, the same failures and codes line for
+  line before and after; 90 s to 16 s wall on Mesen2, 61 s to 11 s on MesenCE (a loaded machine,
+  one run each). The blargg command in validation.md reads the manifest's `end.stop_code`
+  (apu_test: `{"by": "script-stop", "frame": 305, "stop_code": 0}`, "All 8 tests passed").
+  Values OBSERVED (Mesen2 b9fa69d via mesen2-runner 0.3.0).
 - Mesen2 only as a program: `mesen_accuracycoin.py`, `vs_judge.py`,
   `provenance_probes.py` and `compat_sweep.py` no longer import the old driver
   (`$EMU_TOOLS_GPL/tools/famicom-python/mesen_run.py`); they run mesen2-runner 0.2.0

@@ -70,6 +70,7 @@ def run(
     frames_at: list[int] | None = None,
     trace: str | None = None,
     lua: Path | None = None,
+    until: str | None = None,
     fds_bios: Path | None = None,
     ppu_reset_at_power: bool = True,
     oam_row_corruption: bool = True,
@@ -79,7 +80,10 @@ def run(
     """One run of machine ``nes``; returns the manifest. Stops with the tool's status if not 0,
     or, with ``check`` false, returns the manifest anyway (``{}`` if none was written), the
     tool's exit status under ``"exit"``. ``fds_bios``: the player's Disk System BIOS, a file
-    (the tool copies it into the run and removes the copy)."""
+    (the tool copies it into the run and removes the copy). ``until``: the tool's ``--until``
+    (``"log:TEXT"``, with ``lua``): the run ends at the end of the frame in which the script logs
+    a line starting with TEXT, ``frames`` being the most it runs; the manifest's ``end`` says
+    how it ended (mesen2-runner 0.3.0)."""
     command = [
         TOOL_PYTHON, "-I", str(run_py()), "--machine", "nes",
         "--rom", str(loose_rom(rom, out / "rom")), "--out", str(out),
@@ -93,6 +97,8 @@ def run(
         command += ["--trace", trace]
     if lua:
         command += ["--lua", str(lua)]
+    if until:
+        command += ["--until", until]
     if fds_bios:
         command += ["--fds-bios", str(fds_bios)]
     if not os.environ.get("MESEN_CORE") and HAND_BUILD.exists():

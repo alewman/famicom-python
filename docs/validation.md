@@ -189,11 +189,17 @@ through `$6000` to the run's `script-log.txt`:
 python3 -I "$EMU_TOOLS_GPL/tools/mesen2/run.py" --machine nes \
     --rom tests/test_roms/nes-test-roms/apu_test/apu_test.nes --out tests/mame_traces/blargg-run \
     --frames 600 --lua scripts/mesen_blargg.lua --timeout 60
+python3 -I -c 'import json, sys; end = json.load(open(sys.argv[1])).get("end", {}); print(end.get("stop_code", "no result"))' \
+    tests/mame_traces/blargg-run/manifest.json
 ```
 
-(Until 2026-11-24 the old driver, `$EMU_TOOLS_GPL/tools/famicom-python/mesen_run.py`, ran it and
-printed the script's stop code; mesen2-runner 0.2.0 does not report a script's `emu.stop` code,
-so the result is the logged text, "Passed" or the failing test's message.)
+The result is the manifest's `end.stop_code` (mesen2-runner 0.3.0): the run ends at the end of
+the frame in which the script calls `emu.stop(code)`, `end` is `{"by": "script-stop", "frame":
+F, "stop_code": C}`, and C is blargg's result code (0 passed); the run's exit status is 0
+whatever the code. `script-log.txt` holds the text, "Passed" or the failing test's message. No
+`end` means the ROM gave no result in `--frames`. (Until 2026-11-24 the old driver,
+`$EMU_TOOLS_GPL/tools/famicom-python/mesen_run.py`, ran it and printed the script's stop code;
+mesen2-runner 0.2.0 did not report it, so the logged text was the result.)
 
 Since 2026-11-24 no script here imports that old driver: `scripts/mesen_frames.py`,
 `scripts/mesen_lockstep.py`, and since that evening `mesen_accuracycoin.py`, `vs_judge.py`,
@@ -2034,7 +2040,8 @@ board passes **147 of 147** on it, with the Famicom power-on change (C72); the
 test ROMs run on the NES-001.
 
 Others, for scale (detectors, not judges). **MesenCE** `4b8a196`, run here by
-`scripts/mesen_accuracycoin.py`: 143 of 147; it passes the new test and fails DMC Reload
+`scripts/mesen_accuracycoin.py` (since 2026-11-24 its run stops when every result is in,
+`--until log:DONE`; same results, status.md): 143 of 147; it passes the new test and fails DMC Reload
 Timing, ALE + Read, Hybrid Addresses and Frozen OAM2 Increment. Our patched Mesen2
 2.1.1: 130 of 146. **Breaknes**, the whole emulator: not run here (a Windows
 program); its author's screenshot on #531 shows 97 of 146 on 2026-10-13. Our harness

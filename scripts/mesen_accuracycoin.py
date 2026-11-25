@@ -25,14 +25,28 @@ from famicom_python.testrom import accuracycoin_tests
 
 HOME = ROOT / "tests" / "test_roms" / "AccuracyCoin"
 
+#: The script logs the result bytes and DONE at the end of the first frame (after Start is
+#: released) in which every test's byte is final, as run_accuracycoin decides on the board
+#: (pass or fail in the low bits, or $FF skipped), or at --frames; run.py's ``--until log:DONE``
+#: (mesen2-runner 0.3.0) ends the run there. Until 2026-11-24 it logged them only at --frames
+#: and the run went on to 20,000 frames.
 LUA = """
-local frame, last = 0, %d
+local frame, last, logged = 0, %d, false
+local results = {%s}
+local function finished()
+  for _, address in ipairs(results) do
+    local value = emu.read(address, emu.memType.nesMemory)
+    if value ~= 0xFF and (value & 3) ~= 1 and (value & 3) ~= 2 then return false end
+  end
+  return true
+end
 emu.addEventCallback(function()
   if frame >= 60 and frame < 66 then emu.setInput({start = true}, 0) end
 end, emu.eventType.inputPolled)
 emu.addEventCallback(function()
   frame = frame + 1
-  if frame == last then
+  if not logged and (frame == last or (frame > 66 and finished())) then
+    logged = true
     for line = 0, 15 do
       local parts = {}
       for i = 0, 15 do
@@ -52,9 +66,16 @@ def main() -> None:
     parser.add_argument("--frames", type=int, default=20000)
     parser.add_argument("--seconds", type=float, default=280)
     args = parser.parse_args()
+    tests = accuracycoin_tests((HOME / "AccuracyCoin.asm").read_text())
+    addresses = ", ".join(str(0x400 | test.address & 0xFF) for test in tests)
     began = time.monotonic()
     log = mesen2_tool.run_lua(
-        HOME / "AccuracyCoin.nes", LUA % args.frames, args.frames, timeout=args.seconds, check=False
+        HOME / "AccuracyCoin.nes",
+        LUA % (args.frames, addresses),
+        args.frames,
+        until="log:DONE",
+        timeout=args.seconds,
+        check=False,
     )
     wall = time.monotonic() - began
     lines = dict(line.partition(" ")[::2] for line in log if line.startswith("L"))
@@ -62,7 +83,6 @@ def main() -> None:
         print("no result:", "\n".join(log[-10:]))
         return
     data = bytes.fromhex("".join(lines[f"L{n}"] for n in range(16)))
-    tests = accuracycoin_tests((HOME / "AccuracyCoin.asm").read_text())
     passed = 0
     for test in tests:
         value = data[test.address & 0xFF]
