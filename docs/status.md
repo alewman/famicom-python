@@ -10,10 +10,19 @@ is the gate a change must pass and the counts it was last measured at.
 
 | Step | Command | Count | Measured at |
 | --- | --- | --- | --- |
-| Lint | `ruff check .` and `ruff format --check .` | clean, 151 files | `c52a6d3`, 2026-11-23 |
-| Quick suite (PyPy, CI's) | `PYPY_GC_NURSERY=1M nice .venv-pypy/bin/python -m pytest -q` | 346 passed, 205 deselected (with `MAME_ROMPATH` set and `PC10_IMAGES_DIR` naming `scripts/pc10_images.py`'s output; without the BIOS, 345 and 1 skipped) | `c52a6d3`, 2026-11-23 |
+| Lint | `ruff check .` and `ruff format --check .` | clean, 153 files | `fa30248`, 2026-11-24 |
+| Quick suite (PyPy, CI's) | `PYPY_GC_NURSERY=1M nice .venv-pypy/bin/python -m pytest -q` | 347 passed, 205 deselected (with `MAME_ROMPATH` set and `PC10_IMAGES_DIR` naming `scripts/pc10_images.py`'s output; without the BIOS, 346 and 1 skipped) | `fa30248`, 2026-11-24 |
 | The PlayChoice-10's slow cases | `pytest -m slow tests/test_playchoice.py` | 2 of 2 | `c52a6d3`, 2026-11-23 |
 | The slow suites (CPU, PPU, APU, mappers) | `pytest -m slow`, `scripts/run_test_roms.py --suite ...` | not rerun on 2026-11-23 (no behaviour changed; see validation.md for the last full run) | |
+
+## What changed on 2026-11-24
+
+- `fa30248`: `tests/pc10_watchdog.hex`, a supervisor program of our own (no
+  firmware) in the BIOS program's place, lets the PlayChoice-10's watchdog run
+  out every boot, which the real BIOS never does; one quick test, and famicom-rust's
+  lockstep case `pc10-watchdog-Super_Mario_Bros` (validation.md, "The watchdog run
+  out"). No behaviour changed. `1d64fd9` and `fb3a045` before it changed tooling
+  and documents only.
 
 ## What changed on 2026-11-23
 
@@ -27,6 +36,6 @@ is the gate a change must pass and the counts it was last measured at.
 
 ## Downstream
 
-famicom-rust transcribes this tree at `c52a6d3`, the PlayChoice-10 included;
+famicom-rust transcribes this tree at `fa30248` (whose `src/` is `c52a6d3`'s), the PlayChoice-10 included;
 famicom-rust-fast merges famicom-rust. Their README and docs/status.md hold
 their gates.
