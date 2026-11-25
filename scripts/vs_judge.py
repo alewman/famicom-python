@@ -35,12 +35,11 @@ from __future__ import annotations
 
 import argparse
 import sys
-import tempfile
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-import gpl_tools  # noqa: F401  ($EMU_TOOLS_GPL/tools/famicom-python on sys.path, for mesen_run)
-from mesen_run import ALPHABET, ROOT, decode_frames, run_mesen
+import mesen2_tool
+from mesen2_tool import ROOT
 
 from famicom_python.joypad import SELECT, START, UP, A
 from famicom_python.machine import Machine
@@ -189,11 +188,13 @@ emu.addMemoryCallback(function(address, value)
 end, emu.callbackType.read, 0x4016, 0x4017)
 """
 
+#: The 64 digits of a frame's text in the script log (:data:`LEVEL_FRAMES_LUA`).
+ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/"
+
 # A frame as DAC levels (each channel of Mesen2's colour to its nearest of
-# eight, 0oRGB), two characters a pixel, in the numbered lines
-# mesen_run.py ($EMU_TOOLS_GPL/tools/famicom-python)'s ``run_mesen(collect=...)`` gathers and
-# ``decode_frames`` reads. (Whole colours would be four characters, and a frame
-# then outruns the 500 lines the script log keeps.)
+# eight, 0oRGB), two characters a pixel (R, then G and B), in numbered lines of
+# 280 characters, ``L<frame>.<n>``, closed by ``E<frame> <count>``, which
+# :func:`decode_frames` reads back from mesen2-runner's script log.
 LEVEL_FRAMES_LUA = """
 local wanted, frame, last = {%s}, 0, %d
 local alphabet = "ALPHABET"
@@ -221,6 +222,30 @@ emu.addEventCallback(function()
   if frame == last then emu.log("DONE") end
 end, emu.eventType.endFrame)
 """.replace("ALPHABET", ALPHABET)
+
+
+def decode_frames(log: list[str]) -> dict[int, list[int]]:
+    """The frames :data:`LEVEL_FRAMES_LUA` logged, as 0oRGB DAC levels, by frame number."""
+    digit = {c: i for i, c in enumerate(ALPHABET)}
+    parts: dict[int, dict[int, str]] = {}
+    counts: dict[int, int] = {}
+    for line in log:
+        key, _, text = line.partition(" ")
+        if key.startswith("L") and "." in key:
+            frame, _, n = key[1:].partition(".")
+            parts.setdefault(int(frame), {})[int(n)] = text
+        elif key.startswith("E") and key[1:].isdigit():
+            counts[int(key[1:])] = int(text)
+    frames = {}
+    for frame, count in counts.items():
+        chunks = parts.get(frame, {})
+        if any(n not in chunks for n in range(count)):
+            continue
+        all_ = "".join(chunks[n] for n in range(count))
+        frames[frame] = [
+            digit[all_[i]] << 6 | digit[all_[i + 1]] for i in range(0, len(all_) - 1, 2)
+        ]
+    return frames
 
 
 def lua(script: Script, held: tuple[int, int], side: int = 0) -> str:
@@ -252,7 +277,6 @@ def mesen_level_frames(
     frames: list[int],
     script: Script,
     held: tuple[int, int],
-    home: Path,
     ppu_reset_at_power: bool = True,
     side: int = 0,
     seconds: float = 900,
@@ -260,25 +284,22 @@ def mesen_level_frames(
 ) -> dict[int, list[int]]:
     """Mesen2's frames ``frames`` of ``rom`` under ``script``, as DAC levels.
     ``ports``: the Lua for the ports instead of the Vs. mainboard's
-    (scripts/pc10_judge.py)."""
+    (scripts/pc10_judge.py). Mesen2 runs as mesen2-runner (scripts/mesen2_tool.py),
+    a fresh output folder each run; a frame it did not reach is missing."""
     text = (lua(script, held, side) if ports is None else ports) + LEVEL_FRAMES_LUA % (
         ", ".join(f"[{f}]=true" for f in frames),
         max(frames),
     )
-    lines: dict[str, str] = {}
-    run_mesen(
+    log = mesen2_tool.run_lua(
         rom,
-        lua=text.encode(),
-        lua_name="vs.lua",
-        seconds=seconds,
-        home=home,
-        until="DONE",
-        for_comparison=True,
+        text,
+        max(frames),
+        timeout=seconds,
+        check=False,
         ppu_reset_at_power=ppu_reset_at_power,
-        collect=lines,
         oam_row_corruption=False,  # the RGB PPUs have none (C76)
     )
-    return decode_frames(lines)
+    return decode_frames(log)
 
 
 PROBE_LUA = """
@@ -310,24 +331,22 @@ def probe(rom: Path) -> None:
     system.board.bus_observers.append(observe)
     system.run_frames(60)
     print("the board:", *seen, sep="\n  ")
-    with tempfile.TemporaryDirectory(prefix="mesen-home-") as home:
-        _, log, _ = run_mesen(
-            rom,
-            lua=PROBE_LUA.encode(),
-            seconds=60,
-            home=Path(home),
-            until="DONE",
-            for_comparison=True,
-            ppu_reset_at_power=machine.ppu_reset_at_power,
-            oam_row_corruption=False,
-        )
-    print("Mesen2:", *[line for line in log.splitlines() if line.startswith("read")], sep="\n  ")
+    log = mesen2_tool.run_lua(
+        rom,
+        PROBE_LUA,
+        60,
+        timeout=60,
+        ppu_reset_at_power=machine.ppu_reset_at_power,
+        oam_row_corruption=False,
+    )
+    print("Mesen2:", *[line for line in log if line.startswith("read")], sep="\n  ")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--probe", type=Path, metavar="IMAGE", required=True)
     args = parser.parse_args()
+    mesen2_tool.run_py()  # exit status 3 before the board's run, without the tool
     probe(args.probe)
     return 0
 

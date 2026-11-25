@@ -32,8 +32,7 @@ ignored where the machine holds the PPU's reset, and the tool's trace
 (``insn.jsonl.gz``, contract trace/insn records, ending exactly at the last frame) is
 kept in ``--trace-dir`` (gitignored ``tests/mame_traces/lockstep`` by default).
 
-``--machine vs`` still imports ``vs_judge``, which loads Mesen2's old in-process driver
-(scripts/gpl_tools.py) for its own runs; only its Lua input script is used here.
+``--machine vs`` imports ``vs_judge`` for its Lua input script (the Vs. mainboard's ports).
 """
 
 from __future__ import annotations

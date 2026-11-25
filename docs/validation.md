@@ -178,20 +178,27 @@ g++ 15.2, SDL2 2.32.10), producing `InteropDLL/obj.linux-x64/MesenCore.so`. Sinc
 Mesen source is kept in this repository (Aubrey's rule): the source copy was moved out unopened
 and the built library (sha1 `c48cfc76`) put back at
 `reference/build-mesen2/Mesen2/InteropDLL/obj.linux-x64/MesenCore.so`; a fresh checkout uses the
-build emu-tools-gpl's Mesen2 tool makes (scripts/mesen2_tool.py's fallback) or `MESEN_CORE`. `mesen_run.py` (a GPL tool kept outside this
-repository since 2026-11-21, at `$EMU_TOOLS_GPL/tools/famicom-python/mesen_run.py`, where
-`EMU_TOOLS_GPL` names a checkout of emu-tools-gpl, docs/provenance.md) drives it through
-`ctypes` the way Mesen's own test runner does (code calling the GPL
-library at run time; nothing copied), and `scripts/mesen_blargg.lua` stops it
-when a blargg ROM reports through `$6000`:
+build emu-tools-gpl's Mesen2 tool makes (scripts/mesen2_tool.py's fallback) or `MESEN_CORE`.
+The family's mesen2-runner (a GPL tool kept outside this repository, at
+`$EMU_TOOLS_GPL/tools/mesen2/run.py`, where `EMU_TOOLS_GPL` names a checkout of emu-tools-gpl,
+docs/provenance.md) runs it headless as a separate program (code calling the GPL library at
+run time; nothing copied), and `scripts/mesen_blargg.lua` logs the text a blargg ROM reports
+through `$6000` to the run's `script-log.txt`:
 
 ```sh
-python "$EMU_TOOLS_GPL/tools/famicom-python/mesen_run.py" tests/test_roms/nes-test-roms/apu_test/apu_test.nes \
-    --lua scripts/mesen_blargg.lua --home tests/mame_traces/mesen-home --seconds 60
+python3 -I "$EMU_TOOLS_GPL/tools/mesen2/run.py" --machine nes \
+    --rom tests/test_roms/nes-test-roms/apu_test/apu_test.nes --out tests/mame_traces/blargg-run \
+    --frames 600 --lua scripts/mesen_blargg.lua --timeout 60
 ```
 
-Since 2026-11-24 `scripts/mesen_frames.py` and `scripts/mesen_lockstep.py` do not import that
-driver: they run the family's mesen2-runner, `$EMU_TOOLS_GPL/tools/mesen2/run.py --machine nes`,
+(Until 2026-11-24 the old driver, `$EMU_TOOLS_GPL/tools/famicom-python/mesen_run.py`, ran it and
+printed the script's stop code; mesen2-runner 0.2.0 does not report a script's `emu.stop` code,
+so the result is the logged text, "Passed" or the failing test's message.)
+
+Since 2026-11-24 no script here imports that old driver: `scripts/mesen_frames.py`,
+`scripts/mesen_lockstep.py`, and since that evening `mesen_accuracycoin.py`, `vs_judge.py`,
+`provenance_probes.py` and `compat_sweep.py` run the family's mesen2-runner,
+`$EMU_TOOLS_GPL/tools/mesen2/run.py --machine nes`,
 as a separate program (`scripts/mesen2_tool.py`) and read its outputs: the frame as a 16-bit
 grey PNG (palette index | emphasis x 64, the same values the old Lua frame script gave), and
 its contract instruction trace, `insn.jsonl.gz`, which ends exactly at the last frame. The
@@ -2045,13 +2052,17 @@ hand and not by the fetch script, because it is GPL: `4b8a196e` in
 `reference/build-mesence/MesenCE`, `USE_GCC=true make core`, run as a library only. Since
 2026-11-24 only the built library stays there (sha1 `6bdbfe4a`); the source copy was moved out
 unopened (Aubrey's rule).
-`MESEN_LIB=.../MesenCore.so` selects it for every script that uses `mesen_run.py`.
+`MESEN_LIB=.../MesenCore.so` selected it for every script that used `mesen_run.py`; since
+2026-11-24 `MESEN_CORE=.../MesenCore.so` selects it for every script that runs mesen2-runner
+(scripts/mesen2_tool.py; AccuracyCoin on MesenCE, `mesen_accuracycoin.py`, 143 of 147 both
+ways, the same four failures and codes, OBSERVED).
 
 What differs from Mesen2, found by measuring the running library: `NesConfig` has
 the same layout, but `ControllerType` was renumbered (the NES pad is 10, not 6, and with 6
 no controller is plugged in), and script log lines wrap at 300 characters, so frames now
-travel as numbered chunks of two characters a pixel (`FRAMES_LUA`). A frame with a
-chunk missing counts as no frame.
+travel as numbered chunks of two characters a pixel (`FRAMES_LUA` then; since 2026-11-24
+`vs_judge.LEVEL_FRAMES_LUA`, 280 characters a line, and pictures otherwise as the tool's
+PNGs). A frame with a chunk missing counts as no frame.
 
 Results are in upstream-findings.md. Two of the 207 dumps run there were misleading at
 first: `--all` also reads the 2024 set, whose *Tiexue Lianmeng* is a different file

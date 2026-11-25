@@ -170,7 +170,7 @@ by the scripts that use them, not by the test suite.
 | `scripts/fetch_references.py` | the pinned references and test ROMs |
 | `scripts/run_test_roms.py` | a milestone's test ROMs in parallel, as a certification table |
 | `scripts/mame_trace.py` | MAME 0.285 per-instruction trace and register log of an NES cartridge ([docs/mame-oracle.md](docs/mame-oracle.md)) |
-| `mesen_run.py` (a GPL tool, outside this repository: `$EMU_TOOLS_GPL/tools/famicom-python/mesen_run.py`), `scripts/mesen_blargg.lua` | a locally built Mesen2 core driven headless, stopping on blargg's `$6000` result ([docs/validation.md](docs/validation.md)) |
+| `scripts/mesen_blargg.lua`, given to the family's mesen2-runner (a GPL tool, outside this repository: `$EMU_TOOLS_GPL/tools/mesen2/run.py --lua`) | a locally built Mesen2 core run headless as a program, logging blargg's `$6000` result ([docs/validation.md](docs/validation.md)) |
 | `scripts/mesen_frames.py` | a frame of the board against Mesen2's, pixel value for pixel value (Mesen2 through the family's mesen2-runner, `$EMU_TOOLS_GPL/tools/mesen2/run.py`, run as a program: `scripts/mesen2_tool.py`) |
 | `scripts/build_ppusim.py`, `scripts/ppusim/` | Breaknes PPUSim (gate-level 2C02G) built with our shim, which records its pins |
 | `scripts/ppusim_board.py` | a test ROM on the board with PPUSim in place of the PPU |
@@ -202,12 +202,12 @@ patch Mesen2 (`mesen_run.py`, `mesen_audio.py`, `mesen2-detector-fixes.patch`) l
 the repository and its history on 2026-11-21 and are kept with the family's other GPL
 tools, in emu-tools-gpl. The scripts that run Mesen2 as a closed box find them through
 `EMU_TOOLS_GPL`, a checkout of emu-tools-gpl, at the paths its `tools/README.md` documents:
-`mesen_frames.py` and `mesen_lockstep.py` run the family's mesen2-runner
-(`$EMU_TOOLS_GPL/tools/mesen2/run.py`) as a separate program and read its outputs
-(`scripts/mesen2_tool.py`); the others still import the old driver from
-`$EMU_TOOLS_GPL/tools/famicom-python/` until the tool offers what they need
-(`scripts/gpl_tools.py`, docs/provenance.md). Without `EMU_TOOLS_GPL` they stop with exit
-status 3. What was taken from
+since 2026-11-24 every script here that runs Mesen2 (`mesen_frames.py`, `mesen_lockstep.py`,
+`mesen_accuracycoin.py`, `vs_judge.py`, `provenance_probes.py`, `compat_sweep.py`) runs the
+family's mesen2-runner (`$EMU_TOOLS_GPL/tools/mesen2/run.py`) as a separate program and reads
+its outputs (`scripts/mesen2_tool.py`); none imports a GPL module. Without `EMU_TOOLS_GPL`
+they stop with exit status 3. Only `mesen_audio.py` (run by path, above) is still the old
+tool (docs/provenance.md). What was taken from
 MAME's BSD-3 files (the Vs. protection bytes, the RC2C05-01's identifier, the
 PlayChoice-10's BIOS hashes and screen weights, two smaller tables) carries MAME's
 notice in [NOTICE.md](NOTICE.md). The fetched material

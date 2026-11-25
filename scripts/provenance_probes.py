@@ -6,12 +6,11 @@ Mesen2 run as a closed box.
 docs/provenance.md lists single behaviours the board first took from reading Mesen2's
 source. Each probe here is a small program written for this audit from the NESdev wiki's
 register descriptions; it exercises one behaviour and leaves its answers in work RAM
-($0400-$07FF, $03FF = $A5 when finished). The same image runs on the board and on Mesen2's
-library (mesen_run.py in $EMU_TOOLS_GPL/tools/famicom-python, imported in process until the
-family's Mesen2 tool takes the FDS BIOS as an input: scripts/gpl_tools.py; the hand-built
-MesenCore.so: Mesen2 2.1.1), which
-is driven, never read, and the answers are printed side by side. A Mesen2 answer is a closed-box
-observation of a detector, not hardware.
+($0400-$07FF, $03FF = $A5 when finished). The same image runs on the board and on Mesen2
+2.1.1, run as a separate program (the family's mesen2-runner,
+``$EMU_TOOLS_GPL/tools/mesen2/run.py --machine nes --lua``, scripts/mesen2_tool.py; exit status
+3 without it), which is driven, never read, and the answers are printed side by side. A Mesen2
+answer is a closed-box observation of a detector, not hardware.
 
     python scripts/provenance_probes.py [NAME ...] [--keep DIR]
     python scripts/provenance_probes.py --fds-ready
@@ -33,12 +32,12 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import gpl_tools  # noqa: F401  ($EMU_TOOLS_GPL/tools/famicom-python on sys.path, for mesen_run)
-from mesen_run import ROOT, run_mesen
+import mesen2_tool
 
 from famicom_python.system import System
 
-HOME = ROOT / "tests" / "mame_traces" / "mesen-home"
+#: Frames Mesen2 runs a probe for: the board's 120, with room (each finishes in a few).
+PROBE_FRAMES = 240
 RESULTS, LENGTH, DONE = 0x0400, 0x400, 0x03FF
 
 COMMON = """
@@ -563,20 +562,17 @@ end, emu.eventType.endFrame)
 
 
 def on_mesen(rom: Path) -> bytes | None:
+    """Mesen2's answers: the rows logged in the frame the probe finished, up to the first
+    ``DONE`` (the script logs them again every frame after; until 2026-11-24 the run stopped
+    there)."""
     lines: dict[str, str] = {}
-    _, log, _ = run_mesen(
-        rom,
-        lua=MESEN_LUA.encode(),
-        lua_name="probe.lua",
-        seconds=20,
-        home=HOME,
-        until="DONE",
-        for_comparison=True,
-    )
-    for line in log.splitlines():
+    log = mesen2_tool.run_lua(rom, MESEN_LUA, PROBE_FRAMES, timeout=60, check=False)
+    for line in log:
         key, _, text = line.partition(" ")
         if key.startswith("R") and key[1:].isdigit():
-            lines[key] = text
+            lines.setdefault(key, text)
+        elif line == "DONE":
+            break
     if len(lines) < 64:
         return None
     return bytes.fromhex("".join(lines[f"R{row}"] for row in range(64)))
@@ -623,24 +619,17 @@ def spin_up(events: list[tuple[str, int, int]]) -> int | None:
 
 def fds_ready() -> None:
     """How long after the scan starts the drive reports ready, on Mesen2 and on the board."""
-    from mesen_lockstep import mesen_path
-
     from famicom_python.cartridge import fds_bios
 
     game = Path(os.environ.get("NO_INTRO_DIR", "No-Intro")) / FDS_GAME
-    (HOME / "Firmware").mkdir(parents=True, exist_ok=True)
-    (HOME / "Firmware" / "disksys.rom").write_bytes(fds_bios())
-    _, log, _ = run_mesen(
-        mesen_path(game),
-        lua=FDS_LUA.encode(),
-        lua_name="fds.lua",
-        seconds=120,
-        home=HOME,
-        until="DONE",
-        for_comparison=True,
-    )
+    with tempfile.TemporaryDirectory(prefix="fds-bios-") as scratch:
+        # The player's BIOS, given to the tool as a file; the tool copies it into its run and
+        # removes its copy, and this one goes with the scratch folder.
+        bios = Path(scratch) / "disksys.rom"
+        bios.write_bytes(fds_bios())
+        log = mesen2_tool.run_lua(game, FDS_LUA, 400, timeout=120, fds_bios=bios)
     theirs = []
-    for line in log.splitlines():
+    for line in log:
         parts = line.split()
         if len(parts) == 3 and parts[0] in ("W", "R"):
             theirs.append((parts[0], int(parts[1], 16), int(parts[2])))
@@ -677,7 +666,6 @@ def main() -> int:
         fds_ready()
         return 0
     chosen = [p for p in PROBES if not args.names or p.name in args.names]
-    HOME.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as temporary:
         work = args.keep or Path(temporary)
         work.mkdir(parents=True, exist_ok=True)

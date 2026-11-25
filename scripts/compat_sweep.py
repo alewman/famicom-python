@@ -5,8 +5,9 @@
 For each licensed No-Intro dump whose mapper the board implements, read in
 place from its zip (never extracted), Mesen2 and the board both run from power
 with no input, and the board's frames are compared with Mesen2's, pixel value
-for pixel value (``mesen_run.configure_for_comparison`` gives Mesen2 an
-identity palette). The board runs on Mesen2's power-on
+for pixel value (Mesen2 runs as the family's mesen2-runner, ``$EMU_TOOLS_GPL/tools/mesen2/run.py
+--machine nes``, a separate program, scripts/mesen2_tool.py: an identity palette, RAM
+zeroed). The board runs on Mesen2's power-on
 (``mesen_lockstep.MACHINE``), which keeps the two in lockstep instruction for
 instruction; Mesen2 counts frames ended and the board frames begun, so
 Mesen2's frame N is the board's N - 1 (measured on SMB1 and Zelda). The
@@ -72,13 +73,13 @@ import time
 import zipfile
 from pathlib import Path
 
-import gpl_tools  # noqa: F401  ($EMU_TOOLS_GPL/tools/famicom-python on sys.path, for mesen_run)
+import mesen2_tool
 import pc10_judge
 import vs_judge
 from count_mappers import BASE, classify
 from mame_frames import COLOURS, mame_frames
-from mesen_lockstep import lockstep_machine, mesen_path
-from mesen_run import FRAMES_LUA, REGIONS, ROOT, decode_frames, run_mesen
+from mesen2_tool import REGIONS, ROOT
+from mesen_lockstep import lockstep_machine
 
 from famicom_python.cartridge import MAPPERS, fds_bios
 from famicom_python.machine import MACHINES
@@ -155,30 +156,28 @@ def mesen_frames(
     rom: Path,
     frames: list[int],
     home: Path,
-    region: int = 1,
+    region: str = "ntsc",
     ppu_reset_at_power: bool = True,
     ports: str = "",
     oam_row_corruption: bool = True,
 ) -> dict[int, list[int]]:
+    """Mesen2's pictures at ``frames`` (mesen2-runner's ``--frames-at``, scripts/mesen2_tool.py),
+    ``ports`` an optional Lua script for the ports; ``home`` a scratch folder, which receives
+    the player's FDS BIOS for a disk image (the tool copies it again, then removes its copy)."""
+    bios = None
     if rom.name.lower().endswith((".fds", ".fds.zip")) or rom.parent.name == FDS_SET:
-        (home / "Firmware").mkdir(exist_ok=True)
-        (home / "Firmware" / "disksys.rom").write_bytes(fds_bios())
-    lua = ports + FRAMES_LUA % (", ".join(f"[{f}]=true" for f in frames), max(frames))
-    lines: dict[str, str] = {}
-    run_mesen(
-        mesen_path(rom),
-        lua=lua.encode(),
-        lua_name="frames.lua",
-        seconds=600,
-        home=home,
-        until="DONE",
-        for_comparison=True,
+        bios = home / "disksys.rom"
+        bios.write_bytes(fds_bios())
+    return mesen2_tool.frames_at(
+        rom,
+        frames,
+        lua=ports,
         region=region,
         ppu_reset_at_power=ppu_reset_at_power,
-        collect=lines,
         oam_row_corruption=oam_row_corruption,
+        fds_bios=bios,
+        timeout=600,
     )
-    return decode_frames(lines)
 
 
 def unswap_emphasis(value: int) -> int:
@@ -262,7 +261,6 @@ def check(
                     frames,
                     script,
                     held,
-                    Path(home),
                     machine.ppu_reset_at_power,
                     vs_judge.side_of(machine),
                 )
@@ -398,6 +396,8 @@ def main() -> int:
     parser.add_argument("--vs-script", choices=("play", "attract"), default="play")
     args = parser.parse_args()
     frames = sorted(int(f) for f in args.frames.split(","))
+    if args.detector == "mesen":
+        mesen2_tool.run_py()  # exit status 3 here, not an error row per dump, without the tool
     args.out.parent.mkdir(parents=True, exist_ok=True)
     done = set()
     if args.out.exists():

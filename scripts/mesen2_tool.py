@@ -20,6 +20,7 @@ import os
 import struct
 import subprocess
 import sys
+import tempfile
 import zipfile
 import zlib
 from collections.abc import Iterator
@@ -69,11 +70,16 @@ def run(
     frames_at: list[int] | None = None,
     trace: str | None = None,
     lua: Path | None = None,
+    fds_bios: Path | None = None,
     ppu_reset_at_power: bool = True,
     oam_row_corruption: bool = True,
     timeout: float = 600,
+    check: bool = True,
 ) -> dict:
-    """One run of machine ``nes``; returns the manifest. Stops with the tool's status if not 0."""
+    """One run of machine ``nes``; returns the manifest. Stops with the tool's status if not 0,
+    or, with ``check`` false, returns the manifest anyway (``{}`` if none was written), the
+    tool's exit status under ``"exit"``. ``fds_bios``: the player's Disk System BIOS, a file
+    (the tool copies it into the run and removes the copy)."""
     command = [
         TOOL_PYTHON, "-I", str(run_py()), "--machine", "nes",
         "--rom", str(loose_rom(rom, out / "rom")), "--out", str(out),
@@ -87,12 +93,49 @@ def run(
         command += ["--trace", trace]
     if lua:
         command += ["--lua", str(lua)]
+    if fds_bios:
+        command += ["--fds-bios", str(fds_bios)]
     if not os.environ.get("MESEN_CORE") and HAND_BUILD.exists():
         command += ["--lib", str(HAND_BUILD)]
     done = subprocess.run(command, check=False)
-    if done.returncode != 0:
+    if done.returncode != 0 and check:
         raise SystemExit(done.returncode)
-    return json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    manifest = out / "manifest.json"
+    found = json.loads(manifest.read_text(encoding="utf-8")) if manifest.exists() else {}
+    return found | {"exit": done.returncode}
+
+
+def run_lua(rom: Path, lua: str, frames: int, *, check: bool = True, **options) -> list[str]:
+    """Run ``rom`` for ``frames`` frames with the Lua script ``lua`` (text); return every line
+    it logged, in order (the tool's ``script-log.txt``: complete, ending with the last frame).
+    ``options`` are :func:`run`'s. Each run gets a fresh output folder, so a battery save from
+    one run never reaches the next."""
+    with tempfile.TemporaryDirectory(prefix="mesen2-run-") as scratch:
+        out = Path(scratch)
+        script = out / "script.lua"
+        script.write_text(lua, encoding="utf-8")
+        run(rom, out / "run", frames, lua=script, check=check, **options)
+        log = out / "run" / "script-log.txt"
+        return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+
+
+def frames_at(rom: Path, frames: list[int], *, lua: str = "", **options) -> dict[int, list[int]]:
+    """Mesen2's pictures at ``frames`` (each counted from power, as Mesen2 counts frames ended),
+    pixel values as the board holds them (index | emphasis x 64; the identity palette); ``lua``
+    an optional script run beside them (input, say). A frame Mesen2 did not reach is missing."""
+    with tempfile.TemporaryDirectory(prefix="mesen2-frames-") as scratch:
+        out = Path(scratch)
+        script = None
+        if lua:
+            script = out / "script.lua"
+            script.write_text(lua, encoding="utf-8")
+        run(rom, out / "run", max(frames), frames_at=frames, lua=script, check=False, **options)
+        pictures = {}
+        for frame in frames:
+            png = out / "run" / f"frame-{frame:06d}.png"
+            if png.exists():
+                pictures[frame] = read_grey16_png(png)[2]
+        return pictures
 
 
 def read_grey16_png(path: Path) -> tuple[int, int, list[int]]:
