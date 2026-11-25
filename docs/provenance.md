@@ -218,5 +218,7 @@ Passages rewritten (internal names dropped, source-read facts HYPOTHESIS): Nuked
 type identifier (docs/README.md, handoff-brief.md, start-here.md), Mesen2's `NesPpu.cpp` and
 `ApuFrameCounter.h` lines (timing.md), `NesCpu.h`/`BranchRelative` and an option's symbol
 (undocumented-behavior.md C29, C32), `TestRunner.cs`, `NesCpu::Reset`, `GetInternalOpenBus`
-(validation.md), `NesCpu::Reset` (scripts/mesen_lockstep.py). The earlier citations remain
+(validation.md), `NesCpu::Reset` (scripts/mesen_lockstep.py), and on 2026-11-24 the one
+that pass missed, `DeltaModulationChannel::Reset` (scripts/mesen_lockstep.py: the referee's
+DMC start, which rests on the sweep it cites, OBSERVED). The earlier citations remain
 in the public history, as recorded above.

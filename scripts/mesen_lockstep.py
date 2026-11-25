@@ -62,10 +62,9 @@ PASSED_OVER = "rows after a rendering-time $2007 read passed over"
 # stays in lockstep; the mechanism once read from Mesen2's source is not
 # cited). The board passes every PPU and APU judge at 4, with the same
 # synchronization CRCs (validation.md, milestone 6).
-# The DMC's rate timer starts at a full period (DeltaModulationChannel::Reset:
-# 427 CPU cycles, the board's 213 APU cycles): the only start, of 0 and
-# 211-214 on either APU parity, that keeps Kirby's Adventure in step past its
-# first sample.
+# The DMC's rate timer starts at a full period (427 CPU cycles, the board's 213
+# APU cycles; OBSERVED: the only start, of 0 and 211-214 on either APU parity,
+# that keeps Kirby's Adventure in step with Mesen2 past its first sample).
 MACHINE = replace(
     NES_001, power_on=replace(NES_001.power_on, ppustatus=0x00, ppu_dot=4, dmc_timer=213)
 )
