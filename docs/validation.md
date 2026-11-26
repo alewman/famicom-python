@@ -2637,7 +2637,7 @@ digit or the blinking line (four) and in which frame of the game is left frozen
 its NMI where MAME halts it at once (C83, C85), so the two freeze a moving game a
 frame or more apart. Nothing here says which frame the hardware leaves.
 
-**The tests** (`tests/test_playchoice.py`: 25 quick cases, 24 of them on a BIOS of a
+**The tests** (`tests/test_playchoice.py`: 31 quick cases, 30 of them on a BIOS of a
 few bytes of Z80 code and one on the real BIOS's first seconds; 2 slow with the real
 BIOS and a game, above; `tests/test_playchoice_window.py`, 3 quick): the row; the image's
 three areas; the panel's reports, player 2's missing buttons, /CNTRL MASK; the port
@@ -2649,7 +2649,8 @@ blanks in ten seconds; a character through the colour PROMs and the two rows the
 blank hides; the game held in reset, stopped only at its NMI, reset without the PPU
 and the PPU without it; the two clocks within an instruction; a save state of the
 whole cabinet; the window with the menu above the game, with one monitor, and
-without a BIOS; the watchdog run out by a program of our own, below.
+without a BIOS; the watchdog run out by a program of our own, and a save state taken
+while it counts, below.
 
 **The watchdog run out (2026-11-24).** The real BIOS never lets the watchdog count:
 it holds NMI EI high while it runs and DOG DI high in its error loops (a wrong PROM
@@ -2666,7 +2667,14 @@ Z80. `test_our_supervisor_program_lets_the_watchdog_run_out` checks three boots:
 the reset on the eighth blank after the hold, both latches cleared, the game held,
 the screen blank, no flip from the reset. famicom-rust's lockstep table runs it with
 *Super Mario Bros.* in channel 1 for 600 slices (`pc10-watchdog-Super_Mario_Bros`,
-`--bios-program`). This exercises the specification's own rules; it adds no hardware
+`--bios-program`). `test_a_save_state_taken_while_the_watchdog_counts` (2026-11-25,
+six cases) saves the cabinet with the hold dropped and 0, 4 or 7 of the eight blanks
+counted, on an odd boot (the game running) and an even one (stopped), loads it into a
+fresh cabinet, and requires the same reset blank, the same state bytes into the next
+boot's hold, and the same two pictures; a load that loses the count (seeded by hand,
+the counter zeroed after loading) fails it on both boots. famicom-rust's
+`famicom-pc10-states --bios-program` does the same on *Super Mario Bros.* (branch
+`pc10-watchdog-states`). This exercises the specification's own rules; it adds no hardware
 evidence about them (the watchdog's count is the schematic read by eye, C84).
 
 **How the two processors are coupled.** An instruction at a time: the Z80 or the

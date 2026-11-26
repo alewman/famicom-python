@@ -447,6 +447,52 @@ def test_our_supervisor_program_lets_the_watchdog_run_out() -> None:
     assert machine.game.board.ram[0x10] != 0  # the game ran between resets
 
 
+@pytest.mark.parametrize("boot", [1, 2])
+@pytest.mark.parametrize("counted", [0, 4, 7])
+def test_a_save_state_taken_while_the_watchdog_counts(boot: int, counted: int) -> None:
+    """tests/pc10_watchdog.hex saved while the counter runs (its hold dropped,
+    ``counted`` blanks of the eight seen; odd boots with the game running,
+    even with it stopped) and loaded into a fresh cabinet: both reset on the
+    same blank and continue identically into the next boot's hold."""
+    ours = dataclasses.replace(bios(), program=read_program(WATCHDOG_PROGRAM))
+
+    def fresh() -> PlayChoice:
+        return PlayChoice(load(pc10_image(COUNTING), use_database=False), ours)
+
+    first = fresh()
+    supervisor = first.supervisor
+    hold = NMI_EI if boot % 2 else DOG_DI
+    while supervisor.watchdog_resets < boot - 1:
+        first.step()
+    while not supervisor.latch[hold]:
+        first.step()
+    while supervisor.latch[hold]:
+        first.step()
+    dropped = supervisor.blanks
+    while supervisor.blanks < dropped + counted:
+        first.step()
+    for _ in range(37):  # off the blank's own step
+        first.step()
+    assert supervisor.watchdog_resets == boot - 1 and not supervisor.latch[hold]
+    assert supervisor._watchdog == counted
+    second = fresh()
+    load_state(second, save_state(first))
+    assert save_state(second) == save_state(first)
+    for machine in (first, second):
+        while machine.supervisor.watchdog_resets < boot:
+            machine.step()
+    assert first.supervisor.blanks == second.supervisor.blanks == dropped + 8
+    assert first.supervisor.t == second.supervisor.t
+    for machine in (first, second):
+        nxt = NMI_EI if (boot + 1) % 2 else DOG_DI
+        while not machine.supervisor.latch[nxt]:
+            machine.step()
+        machine.run_frames(2)
+    assert save_state(second) == save_state(first)
+    assert first.supervisor.picture() == second.supervisor.picture()
+    assert first.game_picture() == second.game_picture()
+
+
 def test_cntrl_mask_reaches_the_panel() -> None:
     machine = cabinet()
     pads = machine.game.board.pads
