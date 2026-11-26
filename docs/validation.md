@@ -2039,6 +2039,19 @@ OAM Behavior's failure path no longer pulls the stack when it should not. The
 board passes **147 of 147** on it, with the Famicom power-on change (C72); the
 test ROMs run on the NES-001.
 
+Repinned to `66e8711` (2026-11-25; upstream 2026-11-04, "Added extra checks to tests
+relying on DMC DMAs"): no new tests. The file on disk had been that build since
+2026-11-07 while the pin still named `b037b41`, so every AccuracyCoin count here from
+then on (the board's, and the Mesen2 and MesenCE columns) was measured on `66e8711`,
+which is why the pin moved to the file rather than the file to the pin. Its change, in
+its author's words: the DMA-timing subroutine "now confirms proper sample rate stuff
+before doing the 'stopwatch' loop", and the README's error text for those tests names
+the rate they use (%1110). The board on both builds
+(`run_accuracycoin`, PyPy, OBSERVED 2026-11-25): **147 of 147** each, all 147 result
+bytes identical; 126,984,580 CPU cycles on `b037b41`, 126,984,584 on `66e8711`, 4,264
+frames each. `reference/src/AccuracyCoin` (the sparse source tree the documents cite)
+stays at `b037b41`.
+
 Others, for scale (detectors, not judges). **MesenCE** `4b8a196`, run here by
 `scripts/mesen_accuracycoin.py` (since 2026-11-24 its run stops when every result is in,
 `--until log:DONE`; same results, status.md): 143 of 147; it passes the new test and fails DMC Reload

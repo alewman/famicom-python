@@ -211,8 +211,8 @@
  {
   "path": "tests/test_roms/AccuracyCoin",
   "url": "https://github.com/100thCoin/AccuracyCoin",
-  "rev": "b037b4180fdf1c4d35898bc511afc1046a9e6737",
-  "date": "2026-11-02T19:06:24Z",
+  "rev": "66e8711292d432cf009b2831f3ea1a055d75c9ba",
+  "date": "2026-11-04T16:26:22Z",
   "sparse": [],
   "note": "MIT"
  },

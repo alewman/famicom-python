@@ -2431,8 +2431,8 @@
  },
  {
   "path": "tests/test_roms/AccuracyCoin/AccuracyCoin.nes",
-  "url": "https://raw.githubusercontent.com/100thCoin/AccuracyCoin/b037b4180fdf1c4d35898bc511afc1046a9e6737/AccuracyCoin.nes",
-  "sha256": "291e8572219a205aa96cc6c4376b1db26bdb1abc3ec63db38c0eefb067b729f8",
+  "url": "https://raw.githubusercontent.com/100thCoin/AccuracyCoin/66e8711292d432cf009b2831f3ea1a055d75c9ba/AccuracyCoin.nes",
+  "sha256": "9332c3735dd7dea2f4711e670d6478d8b0085edeacdd4f9f300fb04a8bbe3f88",
   "size": 40976,
   "kind": "test-rom",
   "license": "MIT (Chris Siebert 2025)",

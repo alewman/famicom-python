@@ -15,6 +15,19 @@ is the gate a change must pass and the counts it was last measured at.
 | The PlayChoice-10's slow cases | `pytest -m slow tests/test_playchoice.py` | 2 of 2 | `c52a6d3`, 2026-11-23 |
 | The slow suites (CPU, PPU, APU, mappers) | `pytest -m slow`, `scripts/run_test_roms.py --suite ...` | not rerun on 2026-11-23 (no behaviour changed; see validation.md for the last full run) | |
 
+## What changed on 2026-11-25
+
+- `4c8dffa`: a PlayChoice-10 save state taken while the watchdog counts
+  (`test_a_save_state_taken_while_the_watchdog_counts`, six quick cases on
+  `tests/pc10_watchdog.hex`: 0, 4 and 7 of the eight blanks counted, odd and even
+  boots; validation.md, "The watchdog run out"). `tests/test_playchoice.py` 30 passed,
+  1 skipped (`PC10_IMAGES_DIR` unset). The quick suite should now count 353 (347 + 6);
+  it was not rerun (a shared machine). famicom-rust carries it on branch
+  `pc10-watchdog-states`.
+- AccuracyCoin repinned from `b037b41` to `66e8711`, the build that had been on disk
+  since 2026-11-07 (the pin had not followed it). The board on both: 147 of 147, all
+  result bytes identical (validation.md, "AccuracyCoin 147 of 147"). No behaviour changed.
+
 ## What changed on 2026-11-24
 
 - mesen2-runner 0.3.0: `mesen_accuracycoin.py`'s Lua logs the 256 result bytes and `DONE` at
