@@ -23,8 +23,9 @@ Each project's AI policy is checked by the owner before anything further goes ou
 
 Against `b9fa69d`, 2.1.1, which is the end of SourMesen/Mesen2: that repository is
 archived, and development moved to
-[nesdev-org/MesenCE](https://github.com/nesdev-org/MesenCE) (2.2.1 and on). MesenCE is built here (`reference/build-mesence`, `MESEN_LIB`), run as a
-binary only; its results are below as they come in. `mesen2-detector-fixes.patch` (`$EMU_TOOLS_GPL/tools/mesen2/patches/`) holds the
+[nesdev-org/MesenCE](https://github.com/nesdev-org/MesenCE) (2.2.1 and on). MesenCE was built here (`reference/build-mesence`, `MESEN_LIB`) until 2026-11-25 and is now
+emu-tools-gpl's pinned build (`$EMU_TOOLS_GPL/tools/mesen2/run.py --core mesence`, the same
+commit), run as a binary only; its results are below as they come in. `mesen2-detector-fixes.patch` (`$EMU_TOOLS_GPL/tools/mesen2/patches/`) holds the
 fixes we carry; that file is GPL-3.0 as a patch to Mesen2.
 
 **MesenCE's CONTRIBUTING.md (read 2026-10-30) rules out sending these as code**:

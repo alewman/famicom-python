@@ -33,7 +33,8 @@ is what the code's own docstrings cite.
   within the sweep's one frame of slack. Mesen2 is a detector, not a judge: it
   has been wrong against die-level evidence and games (C54, C57), and these
   frames say nothing about a game's later levels. MesenCE, its successor, is the
-  second detector: `MESEN_CORE` selects it (`MESEN_LIB` before 2026-11-24), and it closes the single-pixel differences
+  second detector: the tool's `--core mesence` selects it (since 2026-11-25; `MESEN_CORE` before,
+`MESEN_LIB` before 2026-11-24), and it closes the single-pixel differences
   (upstream-findings.md).
 - **matches mame_nes**: no Mesen matches, but at least one dump's frames are identical
   on mame_nes within three frames of slack (validation.md): the third detector, and

@@ -7,9 +7,10 @@ contract (section 5) it is found at its documented path under ``EMU_TOOLS_GPL``,
 copied here, and only what it writes (``manifest.json``, ``frame-NNNNNN.png``,
 ``insn.jsonl.gz``, ``script-log.txt``) is read, with this repository's own code below.
 
-The library: ``MESEN_CORE`` if set, else this checkout's hand build under
-``reference/build-mesen2`` (docs/validation.md) if present, else the tool's own build. The
-manifest says which and whether its commit and patches were checked.
+The library: with ``core="mesence"`` the tool's own pinned MesenCE build (``--core mesence``,
+mesen2-runner 0.4.0, since 2026-11-25); otherwise ``MESEN_CORE`` if set, else this checkout's
+hand build under ``reference/build-mesen2`` (docs/validation.md) if present, else the tool's
+own Mesen2 build. The manifest says which and whether its commit and patches were checked.
 """
 
 from __future__ import annotations
@@ -76,6 +77,7 @@ def run(
     oam_row_corruption: bool = True,
     timeout: float = 600,
     check: bool = True,
+    core: str | None = None,
 ) -> dict:
     """One run of machine ``nes``; returns the manifest. Stops with the tool's status if not 0,
     or, with ``check`` false, returns the manifest anyway (``{}`` if none was written), the
@@ -83,7 +85,8 @@ def run(
     (the tool copies it into the run and removes the copy). ``until``: the tool's ``--until``
     (``"log:TEXT"``, with ``lua``): the run ends at the end of the frame in which the script logs
     a line starting with TEXT, ``frames`` being the most it runs; the manifest's ``end`` says
-    how it ended (mesen2-runner 0.3.0)."""
+    how it ended (mesen2-runner 0.3.0). ``core``: the tool's ``--core`` (``"mesence"`` runs its
+    own pinned MesenCE build; mesen2-runner 0.4.0)."""
     command = [
         TOOL_PYTHON, "-I", str(run_py()), "--machine", "nes",
         "--rom", str(loose_rom(rom, out / "rom")), "--out", str(out),
@@ -101,7 +104,9 @@ def run(
         command += ["--until", until]
     if fds_bios:
         command += ["--fds-bios", str(fds_bios)]
-    if not os.environ.get("MESEN_CORE") and HAND_BUILD.exists():
+    if core:
+        command += ["--core", core]
+    elif not os.environ.get("MESEN_CORE") and HAND_BUILD.exists():
         command += ["--lib", str(HAND_BUILD)]
     done = subprocess.run(command, check=False)
     if done.returncode != 0 and check:

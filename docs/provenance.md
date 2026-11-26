@@ -222,3 +222,19 @@ type identifier (docs/README.md, handoff-brief.md, start-here.md), Mesen2's `Nes
 that pass missed, `DeltaModulationChannel::Reset` (scripts/mesen_lockstep.py: the referee's
 DMC start, which rests on the sweep it cites, OBSERVED). The earlier citations remain
 in the public history, as recorded above.
+
+### MesenCE's build moved to emu-tools-gpl (2026-11-25)
+
+Aubrey's decision T2 (emulator-lineage docs/proposals/2026-11-decisions.md): the last MesenCE
+build kept here, `reference/build-mesence/` (the library alone, `4b8a196e`, sha1 `6bdbfe4a`,
+and its build log), was moved unopened to a backup outside the repository (not deleted).
+MesenCE is now the second pinned core of emu-tools-gpl's Mesen2 tool (mesen2-runner 0.4.0,
+`--core mesence`, pinned at the same commit, built there unpatched), reached only as a program
+through `$EMU_TOOLS_GPL` (scripts/mesen2_tool.py, `core`). Identity check, 2026-11-25:
+`scripts/mesen_accuracycoin.py` on the old build and with `--core mesence`: 143 of 147 both, the
+same four failures and codes (DMC Reload Timing $06, ALE + Read $0A, Hybrid Addresses $0A,
+Frozen OAM2 Increment $0A), and the script log's 256 result bytes identical (sha1 `ce4bc385`
+for both logs). MesenCE's community bans AI contributions: it is run only; nothing found with it
+is sent there. No pin to remove (MesenCE's left `scripts/pinned_repos.json` on 2026-11-24).
+Still here: the hand-built Mesen2 library under `reference/build-mesen2/` (sha1 `c48cfc76`),
+which the tool's own patched build could replace the same way.

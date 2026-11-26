@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 """Run AccuracyCoin on Mesen2 or MesenCE and print what it fails.
 
-    [MESEN_CORE=...] python scripts/mesen_accuracycoin.py [--frames N]
+    python scripts/mesen_accuracycoin.py [--core mesence] [--frames N]
 
 Presses Start on the page index, as scripts/accuracycoin.py does on the board, lets
 all the tests run, and reads the result bytes at $0400-$04FF. The emulators are detectors;
@@ -10,7 +10,9 @@ this says which of AccuracyCoin's hardware answers they get right, with the same
 settings as the frame comparisons. Run as a separate program only: the family's
 mesen2-runner, ``$EMU_TOOLS_GPL/tools/mesen2/run.py --machine nes --lua``
 (scripts/mesen2_tool.py; exit status 3 without it), whose script log this reads.
-``MESEN_CORE`` names another library (MesenCE's, say). OBSERVED, never hardware.
+``--core mesence`` runs the tool's own pinned MesenCE build (mesen2-runner 0.4.0; until
+2026-11-25 this checkout kept a MesenCE build of its own, named by ``MESEN_CORE``), and
+``MESEN_CORE`` still names any other library. OBSERVED, never hardware.
 """
 
 from __future__ import annotations
@@ -65,6 +67,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--frames", type=int, default=20000)
     parser.add_argument("--seconds", type=float, default=280)
+    parser.add_argument(
+        "--core",
+        choices=("mesen2", "mesence"),
+        help="the tool's pinned core (default: MESEN_CORE, else Mesen2)",
+    )
     args = parser.parse_args()
     tests = accuracycoin_tests((HOME / "AccuracyCoin.asm").read_text())
     addresses = ", ".join(str(0x400 | test.address & 0xFF) for test in tests)
@@ -76,6 +83,7 @@ def main() -> None:
         until="log:DONE",
         timeout=args.seconds,
         check=False,
+        core=args.core,
     )
     wall = time.monotonic() - began
     lines = dict(line.partition(" ")[::2] for line in log if line.startswith("L"))

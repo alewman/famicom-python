@@ -2070,12 +2070,19 @@ SourMesen/Mesen2 is archived; development went to
 [nesdev-org/MesenCE](https://github.com/nesdev-org/MesenCE). Built as Mesen2 was, by
 hand and not by the fetch script, because it is GPL: `4b8a196e` in
 `reference/build-mesence/MesenCE`, `USE_GCC=true make core`, run as a library only. Since
-2026-11-24 only the built library stays there (sha1 `6bdbfe4a`); the source copy was moved out
-unopened (Aubrey's rule).
+2026-11-24 only the built library stayed there (sha1 `6bdbfe4a`); the source copy was moved out
+unopened (Aubrey's rule). Since 2026-11-25 MesenCE is emu-tools-gpl's second pinned core of the
+Mesen2 tool (mesen2-runner 0.4.0, `--core mesence`, the same commit `4b8a196`, built by its
+`build.sh --core mesence`, unpatched), and this checkout's build was moved out to a backup
+(Aubrey's decision T2); `scripts/mesen_accuracycoin.py --core mesence` runs it, 143 of 147 and
+all 256 result bytes identical to the old build's (OBSERVED, 2026-11-25).
 `MESEN_LIB=.../MesenCore.so` selected it for every script that used `mesen_run.py`; since
 2026-11-24 `MESEN_CORE=.../MesenCore.so` selects it for every script that runs mesen2-runner
 (scripts/mesen2_tool.py; AccuracyCoin on MesenCE, `mesen_accuracycoin.py`, 143 of 147 both
-ways, the same four failures and codes, OBSERVED).
+ways, the same four failures and codes, OBSERVED). Since 2026-11-25 `--core mesence` replaces
+that `MESEN_CORE` (mesen2_tool.run's `core`); other scripts reach the tool's MesenCE build
+through `MESEN_CORE` naming it under `$EMU_TOOLS_GPL/tools/mesen2/upstream/MesenCE` (the tool's
+README).
 
 What differs from Mesen2, found by measuring the running library: `NesConfig` has
 the same layout, but `ControllerType` was renumbered (the NES pad is 10, not 6, and with 6
